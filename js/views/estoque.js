@@ -7,8 +7,8 @@ import { situacaoEstoque } from '../calc.js';
 import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS } from '../config.js';
 
 const MENSAGEM = {
-  critico: 'Estoque acabando. Compre ração já.',
-  atencao: 'Planeje a próxima compra.',
+  critico: 'Estoque acabando. Compre já e conte o que sobrou.',
+  atencao: 'Planeje a próxima compra. Com pouco estoque, contar é rápido: aproveite para contar.',
   negativo: 'O consumo lançado passou do que foi comprado. Confira as compras e faça uma contagem.',
   'sem-dado': 'Sem consumo nos últimos 7 dias para estimar quanto dura.',
   ok: 'Estoque tranquilo.',
@@ -51,12 +51,21 @@ export async function renderEstoque(ctx, el) {
     ${!navigator.onLine ? '<p class="aviso">Sem internet: os valores podem estar desatualizados.</p>' : ''}
     ${gerir ? (ult
       ? `<p class="mudo">Última contagem: ${fmtData(ult.data)} · ${Number(ult.diferenca_kg) === 0 ? 'bateu certinho' : `${Number(ult.diferenca_kg) < 0 ? 'faltaram' : 'sobraram'} ${sc(Math.abs(ult.diferenca_kg))} sacos`}</p>`
-      : '<p class="aviso">Ainda não houve contagem. Conte os sacos no galpão e registre abaixo: é isso que deixa o saldo confiável.</p>') : ''}
+      : '<p class="aviso">Ainda não houve contagem. Não precisa contar tudo: conte por pilhas (camadas × sacos) ou espere o estoque ficar baixo, quando contar é rápido. É a contagem que deixa o saldo confiável.</p>') : ''}
 
     ${gerir ? `
     <details class="card form-dobra" id="d-contagem">
       <summary>Contar o estoque no galpão</summary>
       <form id="f-contagem" class="form" novalidate>
+        <div class="pilhas" id="pilhas">
+          <b>Contar por pilhas</b>
+          <small class="mudo">Em cada pilha: quantas camadas de sacos e quantos sacos por camada.</small>
+          <div id="pilhas-linhas"></div>
+          <button type="button" class="btn mini" id="b-pilha">+ Adicionar pilha</button>
+          <label>Sacos soltos ou abertos <input id="avulsos" type="number" inputmode="decimal" step="0.5" min="0" placeholder="0"></label>
+          <div class="calc" id="tot-pilhas">Total das pilhas: —</div>
+          <button type="button" class="btn" id="b-usar-pilhas" hidden>Usar este total</button>
+        </div>
         <label>Quantos sacos tem no galpão agora? <input id="contados" class="grande" type="number" inputmode="decimal" step="0.5" min="0" placeholder="0" required></label>
         <div class="calc" id="prev-cont">O sistema calcula ${sc(kg)} sacos.</div>
         <label>Observação — opcional <input id="obs" maxlength="120" placeholder="Ex.: 3 sacos molhados"></label>
@@ -119,6 +128,33 @@ export async function renderEstoque(ctx, el) {
     if (!(n >= 0)) { prev.textContent = `O sistema calcula ${sc(kg)} sacos.`; return; }
     const dif = n * kgS - kg;
     prev.textContent = `O sistema calcula ${sc(kg)} sacos. ` + (Math.abs(dif) < 0.5 ? 'Bateu certinho.' : `Diferença: ${dif < 0 ? 'faltam' : 'sobram'} ${sc(Math.abs(dif))} sacos.`);
+  });
+  // ajuda de contagem por pilhas
+  const linhas = fc.querySelector('#pilhas-linhas');
+  const somaPilhas = () => {
+    let t = 0, algum = false;
+    linhas.querySelectorAll('.pilha').forEach((l) => {
+      const c = num(l.querySelector('.p-cam').value), s = num(l.querySelector('.p-sac').value);
+      const v = c > 0 && s > 0 ? c * s : 0; if (v) algum = true;
+      l.querySelector('.p-tot').textContent = v ? `= ${fmtInt(v)}` : '';
+      t += v;
+    });
+    const av = num(fc.querySelector('#avulsos').value); if (av > 0) { t += av; algum = true; }
+    fc.querySelector('#tot-pilhas').textContent = algum ? `Total das pilhas: ${fmtNum(t, t % 1 ? 1 : 0)} sacos` : 'Total das pilhas: —';
+    const b = fc.querySelector('#b-usar-pilhas'); b.hidden = !algum; b.dataset.total = String(t);
+  };
+  const addPilha = () => {
+    const d = document.createElement('div'); d.className = 'pilha';
+    d.innerHTML = '<label>Camadas<input class="p-cam" type="number" inputmode="numeric" min="1" step="1"></label><span>×</span><label>Sacos por camada<input class="p-sac" type="number" inputmode="numeric" min="1" step="1"></label><b class="p-tot"></b>';
+    d.querySelectorAll('input').forEach((i) => i.addEventListener('input', somaPilhas));
+    linhas.appendChild(d);
+  };
+  addPilha();
+  fc.querySelector('#b-pilha').addEventListener('click', addPilha);
+  fc.querySelector('#avulsos').addEventListener('input', somaPilhas);
+  fc.querySelector('#b-usar-pilhas').addEventListener('click', (ev) => {
+    const c = fc.querySelector('#contados'); c.value = String(Number(ev.currentTarget.dataset.total));
+    c.dispatchEvent(new Event('input', { bubbles: true })); c.focus();
   });
   fc.addEventListener('submit', async (ev) => {
     ev.preventDefault(); ec.hidden = true;

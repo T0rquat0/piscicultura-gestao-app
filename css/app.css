@@ -424,3 +424,8 @@ input.grande { font-size: 2rem; font-weight: 700; min-height: 72px; text-align: 
 .est-card.n-critico .est-d, .est-card.n-negativo .est-d { color: #b03020; }
 .est-t small { white-space: nowrap; }
 .est-d { font-size: .85rem; max-width: 40%; }
+.pilhas { display: grid; gap: .6rem; background: var(--rio-claro); border-radius: 16px; padding: .9rem; }
+.pilha { display: flex; align-items: flex-end; gap: .5rem; }
+.pilha label { flex: 1; min-width: 0; font-size: .85rem; }
+.pilha span { padding-bottom: .8rem; font-weight: 700; }
+.pilha .p-tot { padding-bottom: .7rem; min-width: 3.5rem; text-align: right; }
