@@ -1,6 +1,15 @@
 import { esc, fmtInt, fmtNum, fmtData, hojeISO, diasEntre, ROTULO_TIPO } from '../util.js';
 import * as db from '../db.js';
 
+export const ordemNatural = (a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR', { numeric: true, sensitivity: 'base' });
+
+export function statusTanque(tanque, lotes, resumo, racaoHojeLocal, hoje) {
+  const meus = lotes.filter((l) => l.tanque_id === tanque.id);
+  if (!meus.length) return 'semlote';
+  const lancou = racaoHojeLocal.has(tanque.id) || meus.some((l) => resumo[l.id] && resumo[l.id].ultima_racao === hoje);
+  return lancou ? 'ok' : 'falta';
+}
+
 export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje) {
   const blocos = lotes.length
     ? lotes.map((l) => {
@@ -31,7 +40,7 @@ export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje) {
     : '<span class="tag alerta"><i></i>Sem ração hoje</span>';
 
   return `
-  <article class="card tanque-card">
+  <article class="card tanque-card ${!comLote ? 'sem-lote' : lancouHoje ? 'ok' : 'falta'}">
     <header><h3>${esc(tanque.nome)}</h3>${selo}</header>
     <div class="corpo">
     ${blocos}
@@ -44,13 +53,12 @@ export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje) {
   </article>`;
 }
 
-function resumoDia(tanques, lotes, resumo, racaoHojeLocal, hoje) {
-  const comLote = tanques.filter((t) => lotes.some((l) => l.tanque_id === t.id));
-  const lancou = comLote.filter((t) => racaoHojeLocal.has(t.id) || lotes.some((l) => l.tanque_id === t.id && resumo[l.id] && resumo[l.id].ultima_racao === hoje));
-  const faltam = comLote.length - lancou.length;
+function resumoDia(comLote, faltam) {
   return `<section class="resumo" aria-label="Resumo do dia">
-    <div><span>Tanques com lote</span><b>${fmtInt(comLote.length)}</b></div>
-    <div class="${faltam ? 'atencao' : ''}"><span>${faltam ? 'Sem ração hoje' : 'Ração lançada hoje'}</span><b>${faltam ? fmtInt(faltam) : 'Tudo certo'}</b></div>
+    <div><span>Tanques com lote</span><b>${fmtInt(comLote)}</b></div>
+    ${faltam
+      ? `<button type="button" class="atencao" data-filtrar-falta><span>Falta alimentar hoje</span><b>${fmtInt(faltam)}</b></button>`
+      : '<div><span>Ração lançada hoje</span><b>Tudo certo</b></div>'}
   </section>`;
 }
 
@@ -77,11 +85,44 @@ export async function renderHome(ctx, el) {
   const fila = await db.filaList();
   const racaoHojeLocal = new Set(fila.filter((i) => i.tabela === 'racao_consumo' && i.payload.data === hoje).map((i) => i.payload.tanque_id));
 
+  const status = {};
+  for (const t of tanques) status[t.id] = statusTanque(t, lotes, resumo, racaoHojeLocal, hoje);
+  const grupos = {
+    falta: tanques.filter((t) => status[t.id] === 'falta').sort(ordemNatural),
+    ok: tanques.filter((t) => status[t.id] === 'ok').sort(ordemNatural),
+    semlote: tanques.filter((t) => status[t.id] === 'semlote').sort(ordemNatural),
+  };
+  const card = (t) => htmlCardTanque(t, lotes.filter((l) => l.tanque_id === t.id), resumo, racaoHojeLocal, hoje);
+  const bloco = (chave, titulo, classe) => (grupos[chave].length ? `
+    <section class="grupo ${classe}"><h2>${titulo} <span class="contagem">${grupos[chave].length}</span></h2>
+      <div class="grade">${grupos[chave].map(card).join('')}</div></section>` : '');
+  const faltam = grupos.falta.length;
+
+  let filtro = 'todos';
   el.innerHTML = `
     <h1>Olá, ${esc(primeiro)}</h1>
-    ${resumoDia(tanques, lotes, resumo, racaoHojeLocal, hoje)}
+    ${resumoDia(grupos.falta.length + grupos.ok.length, faltam)}
     ${semDetalhe ? '<p class="aviso">Sem conexão: mostrando só os dados guardados no aparelho. Os totais aparecem quando houver internet.</p>' : ''}
-    <div class="grade">
-      ${tanques.map((t) => htmlCardTanque(t, lotes.filter((l) => l.tanque_id === t.id), resumo, racaoHojeLocal, hoje)).join('')}
-    </div>`;
+    ${grupos.falta.length + grupos.ok.length ? `<div class="seg" style="--n:3" role="tablist">
+      <button type="button" data-filtro="todos">Todos</button>
+      <button type="button" data-filtro="falta">Faltam${faltam ? ` (${faltam})` : ''}</button>
+      <button type="button" data-filtro="ok">Feitos${grupos.ok.length ? ` (${grupos.ok.length})` : ''}</button>
+    </div>` : ''}
+    <div id="lista-tanques"></div>`;
+
+  const lista = el.querySelector('#lista-tanques');
+  function pintar() {
+    el.querySelectorAll('[data-filtro]').forEach((b) => b.classList.toggle('on', b.dataset.filtro === filtro));
+    const mostrar = (k) => filtro === 'todos' || filtro === k;
+    const partes = [
+      mostrar('falta') ? bloco('falta', 'Falta alimentar', 'g-falta') : '',
+      mostrar('ok') ? bloco('ok', 'Já alimentados hoje', 'g-ok') : '',
+      filtro === 'todos' ? bloco('semlote', 'Sem lote', 'g-sem') : '',
+    ].join('');
+    lista.innerHTML = partes || `<div class="card vazio"><p>${filtro === 'falta' ? 'Todos os tanques já foram alimentados hoje.' : 'Nenhum tanque alimentado ainda hoje.'}</p></div>`;
+  }
+  el.querySelectorAll('[data-filtro]').forEach((b) => b.addEventListener('click', () => { filtro = b.dataset.filtro; pintar(); }));
+  const atalho = el.querySelector('[data-filtrar-falta]');
+  if (atalho) atalho.addEventListener('click', () => { filtro = 'falta'; pintar(); window.scrollTo({ top: 0 }); });
+  pintar();
 }
