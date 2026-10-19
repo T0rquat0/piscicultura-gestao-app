@@ -454,3 +454,15 @@ h1 { font-size: 1.75rem; margin: .2rem 0 .8rem; }
 #f .data-linha > span:first-child b { text-transform: none; letter-spacing: 0; font-size: 1.05rem; color: var(--tinta); }
 #f > label:has(input.grande) { border-bottom: 0; padding-bottom: .3rem; }
 #f > .calc { padding-top: 0; font-size: .92rem; }
+
+/* opções avançadas (exclusões) e campo de confirmação digitada */
+.avancado { margin-top: 2rem; }
+.avancado > summary { cursor: pointer; list-style: none; color: var(--tinta-2); font-size: .92rem; font-weight: 600; padding: .6rem 0; }
+.avancado > summary::-webkit-details-marker { display: none; }
+.avancado > summary::before { content: '▸ '; }
+.avancado[open] > summary::before { content: '▾ '; }
+.avancado hr { border: 0; border-top: 1px solid #e3eae5; margin: 1rem 0; }
+.dialogo.com-campo { align-items: center; }
+.dialogo-campo { display: grid; gap: .4rem; margin-top: 1rem; font-weight: 500; color: var(--tinta-2); }
+.dialogo-campo b { color: var(--tinta); overflow-wrap: anywhere; }
+.dialogo-acoes .btn[disabled] { opacity: .4; }

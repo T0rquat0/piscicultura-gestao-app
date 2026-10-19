@@ -74,7 +74,6 @@ export async function renderTanque(ctx, el, id) {
             <span class="tag ${l.ativo ? 'ok' : ''}">${l.ativo ? 'Ativo' : 'Encerrado'}</span>
             <a class="btn mini" href="#/relatorio/${esc(l.id)}">Relatório</a>
             ${l.ativo ? `<button class="btn mini perigo" data-encerrar="${esc(l.id)}" type="button">Encerrar</button>` : ''}
-            ${dono ? `<button class="btn mini perigo" data-excluir-lote="${esc(l.id)}" type="button">Excluir</button>` : ''}
           </div>
         </li>`).join('')}</ul>` : '<p class="mudo" style="margin:0">Nenhum lote neste tanque ainda.</p>'}
     </div>
@@ -104,11 +103,17 @@ export async function renderTanque(ctx, el, id) {
       <p id="erro-nome" class="erro" hidden></p>
       <button class="btn" type="submit">Salvar nome</button>
     </form>
-    ${dono ? `<h2>Apagar tanque</h2>
-    <div class="card">
-      <p style="margin-top:0">Use para zerar um tanque cadastrado errado ou recomeçar do zero. Apaga o tanque, os lotes e <b>todos</b> os lançamentos dele.</p>
-      <button class="btn perigo" id="b-apagar-tanque" type="button">Apagar este tanque</button>
-    </div>` : ''}`;
+    ${dono ? `<details class="avancado">
+      <summary>Opções avançadas</summary>
+      <div class="card">
+        <p style="margin-top:0"><b>Excluir um lote</b><br><span class="mudo">Apaga o lote e tudo o que foi lançado nele. Use se o lote foi cadastrado errado.</span></p>
+        ${todos.length ? `<ul class="lista">${todos.map((l) => `<li><div class="esq"><b>${esc(ROTULO_TIPO[l.tipo] || l.tipo)} · ${esc(l.especie)}</b><small>desde ${fmtData(l.data_entrada)} · ${l.ativo ? 'ativo' : 'encerrado'}</small></div>
+          <button class="btn mini perigo" data-excluir-lote="${esc(l.id)}" type="button">Excluir</button></li>`).join('')}</ul>` : '<p class="mudo">Nenhum lote.</p>'}
+        <hr>
+        <p><b>Apagar o tanque inteiro</b><br><span class="mudo">Apaga o tanque, os lotes e todos os lançamentos dele. Serve para zerar e recomeçar.</span></p>
+        <button class="btn perigo" id="b-apagar-tanque" type="button">Apagar este tanque</button>
+      </div>
+    </details>` : ''}`;
 
   // peso médio inicial ao vivo
   const f = el.querySelector('#f-lote');
@@ -167,7 +172,7 @@ export async function renderTanque(ctx, el, id) {
     try {
       const lote = todos.find((l) => l.id === b.dataset.excluirLote);
       const r = await resumoDe([lote.id]);
-      if (!(await confirmar({ titulo: 'Excluir este lote?', texto: `Será apagado de vez, com ${txtResumo(r)} Não dá para desfazer.`, ok: 'Excluir lote', perigo: true }))) return;
+      if (!(await confirmar({ titulo: 'Excluir este lote?', texto: `Será apagado de vez, com ${txtResumo(r)} Não dá para desfazer.`, ok: 'Excluir lote', perigo: true, digitar: 'excluir' }))) return;
       await ctx.api.excluirLote(lote.id);
       await ctx.atualizarRef(true);
       ctx.toast('Lote excluído', 'ok');
@@ -180,8 +185,7 @@ export async function renderTanque(ctx, el, id) {
     if (!navigator.onLine) return ctx.toast('Sem internet', 'erro');
     try {
       const r = await resumoDe(todos.map((l) => l.id));
-      if (!(await confirmar({ titulo: `Apagar "${tanque.nome}"?`, texto: `Serão apagados ${todos.length} lote(s), ${txtResumo(r)}`, ok: 'Continuar', perigo: true }))) return;
-      if (!(await confirmar({ titulo: 'Tem certeza?', texto: `"${tanque.nome}" e todo o histórico dele serão apagados de vez. Não dá para desfazer.`, ok: 'Apagar tanque', perigo: true }))) return;
+      if (!(await confirmar({ titulo: `Apagar "${tanque.nome}"?`, texto: `Serão apagados ${todos.length} lote(s), ${txtResumo(r)} Não dá para desfazer.`, ok: 'Apagar tanque', perigo: true, digitar: tanque.nome }))) return;
       await ctx.api.excluirTanque(id);
       await ctx.atualizarRef(true);
       ctx.toast('Tanque apagado', 'ok');
