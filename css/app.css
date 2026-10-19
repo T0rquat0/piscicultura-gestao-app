@@ -290,3 +290,16 @@ summary { cursor: pointer; font-weight: 700; padding: .7rem 0; font-size: 1.05re
 .matriz td, .matriz th { padding: .8rem .3rem; }
 .matriz th.n { min-width: 0; }
 .matriz td:first-child, .matriz th:first-child { padding-left: .9rem; white-space: nowrap; }
+
+/* ----- janela de confirmação ----- */
+.dialogo { position: fixed; inset: 0; z-index: 90; display: grid; align-items: end; justify-items: center; background: rgba(10, 30, 26, .5); padding: 1rem calc(1rem + env(safe-area-inset-right)) calc(1rem + env(safe-area-inset-bottom)) 1rem; animation: fundo-entra .18s ease-out; }
+.dialogo.sai { opacity: 0; transition: opacity .18s; }
+.dialogo-caixa { width: 100%; max-width: 440px; background: var(--card); border-radius: 26px; padding: 1.5rem 1.3rem 1.2rem; animation: caixa-entra .24s var(--ease); }
+.dialogo-caixa h3 { font-size: 1.3rem; margin-bottom: .5rem; }
+.dialogo-caixa p { color: var(--tinta-2); margin: 0; }
+.dialogo-acoes { display: grid; gap: .6rem; margin-top: 1.4rem; }
+.dialogo-acoes .btn { width: 100%; }
+@keyframes fundo-entra { from { opacity: 0; } to { opacity: 1; } }
+@keyframes caixa-entra { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+@media (min-width: 640px) { .dialogo { align-items: center; } }
+@media print { .dialogo { display: none !important; } }

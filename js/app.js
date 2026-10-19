@@ -5,6 +5,7 @@ import { criarApi } from './api.js';
 import * as db from './db.js';
 import { sincronizar } from './sync.js';
 import { icone } from './icons.js';
+import { confirmar } from './dialogo.js';
 import { splashDoDia } from './splash.js';
 import { renderLogin } from './views/login.js';
 import { renderHome } from './views/home.js';
@@ -178,7 +179,7 @@ async function restaurarSessao() {
 
 async function sair(forcar = false) {
   await atualizarPendentes();
-  if (!forcar && state.pendentes && !confirm(`Há ${state.pendentes} lançamento(s) neste aparelho ainda não enviados. Eles continuam guardados e serão enviados quando você entrar de novo. Sair mesmo assim?`)) return;
+  if (!forcar && state.pendentes && !(await confirmar({ titulo: 'Há lançamentos sem enviar', texto: `${state.pendentes} lançamento(s) neste aparelho ainda não foram enviados. Eles continuam guardados e saem quando você entrar de novo. Sair mesmo assim?`, ok: 'Sair mesmo assim', cancelar: 'Ficar', perigo: true }))) return;
   saindo = true;
   try { await client.auth.signOut(); } catch { /* ignora */ }
   // se estiver sem internet o signOut falha e a sessão local ficaria: limpa na mão

@@ -1,4 +1,5 @@
 // Relatórios por lote (precisam de internet: usam os dados já sincronizados no servidor).
+import { confirmar } from '../dialogo.js';
 import { icone } from '../icons.js';
 import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, ROTULO_TIPO } from '../util.js';
 import { calcularLote, precoMedioKg, pontosPeso, pesoMedioKg, evolucaoPeso, racaoPorSemana, matrizRacao } from '../calc.js';
@@ -168,7 +169,7 @@ export async function renderRelatorioLote(ctx, el, id) {
     painel.querySelectorAll('[data-del]').forEach((b) =>
       b.addEventListener('click', async () => {
         const [tab, rid] = b.dataset.del.split(':');
-        if (!confirm('Excluir este lançamento? Isso altera os totais do relatório.')) return;
+        if (!(await confirmar({ titulo: 'Excluir este lançamento?', texto: 'Os totais do relatório serão recalculados.', ok: 'Excluir', perigo: true }))) return;
         try { await ctx.api.excluir(tab, rid); ctx.toast('Lançamento excluído', 'ok'); renderRelatorioLote(ctx, el, id); }
         catch (e) { ctx.toast(e.message, 'erro'); }
       }));

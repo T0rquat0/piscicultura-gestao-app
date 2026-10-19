@@ -1,4 +1,5 @@
 // Cadastro de tanques e lotes (dono e gerente). Precisa de internet.
+import { confirmar } from '../dialogo.js';
 import { icone } from '../icons.js';
 import { esc, fmtData, fmtInt, fmtNum, hojeISO, num, ROTULO_TIPO } from '../util.js';
 
@@ -122,7 +123,7 @@ export async function renderTanque(ctx, el, id) {
     if (!f.querySelector('#data').value) return falha('Informe a data de entrada.');
     if (!(qtd >= 1) || !Number.isInteger(qtd)) return falha('Informe a quantidade de peixes (número inteiro).');
     if (!(peso > 0)) return falha('Informe o peso total do lote em kg.');
-    if (ativos.length && !confirm(`Este tanque já tem ${ativos.length} lote(s) ativo(s). Cadastrar outro lote mesmo assim?\n(Se o anterior terminou, encerre-o antes.)`)) return;
+    if (ativos.length && !(await confirmar({ titulo: ativos.length === 1 ? 'Este tanque já tem um lote ativo' : `Este tanque já tem ${ativos.length} lotes ativos`, texto: 'Se o lote anterior terminou, encerre-o antes de cadastrar o novo. Quer cadastrar outro lote mesmo assim?', ok: 'Cadastrar mesmo assim', cancelar: 'Voltar' }))) return;
     const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
     try {
       await ctx.api.criarLote({ tanque_id: id, tipo: f.querySelector('#tipo').value, especie, data_entrada: f.querySelector('#data').value, quantidade_inicial: qtd, peso_inicial_kg: peso });
@@ -134,7 +135,7 @@ export async function renderTanque(ctx, el, id) {
 
   el.querySelectorAll('[data-encerrar]').forEach((b) =>
     b.addEventListener('click', async () => {
-      if (!confirm('Encerrar este lote? Ele deixa de aparecer nos lançamentos, mas o histórico e o relatório continuam disponíveis.')) return;
+      if (!(await confirmar({ titulo: 'Encerrar este lote?', texto: 'Ele deixa de aparecer nos lançamentos. O histórico e o relatório continuam disponíveis.', ok: 'Encerrar lote' }))) return;
       try {
         await ctx.api.encerrarLote(b.dataset.encerrar);
         await ctx.atualizarRef();

@@ -1,4 +1,5 @@
 // Estoque de ração: saldo (todos veem, só em kg) e compras (dono/gerente veem e lançam custo).
+import { confirmar } from '../dialogo.js';
 import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num } from '../util.js';
 import { PESO_SACO_PADRAO_KG } from '../config.js';
 
@@ -83,7 +84,7 @@ export async function renderEstoque(ctx, el) {
 
   el.querySelectorAll('[data-del]').forEach((b) =>
     b.addEventListener('click', async () => {
-      if (!confirm('Excluir esta entrada de ração? O saldo será recalculado.')) return;
+      if (!(await confirmar({ titulo: 'Excluir esta entrada de ração?', texto: 'O saldo de estoque será recalculado.', ok: 'Excluir', perigo: true }))) return;
       try { await ctx.api.excluir('racao_estoque', b.dataset.del); ctx.toast('Entrada excluída', 'ok'); renderEstoque(ctx, el); }
       catch (e) { ctx.toast(e.message, 'erro'); }
     }));

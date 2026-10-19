@@ -1,5 +1,6 @@
 // Lançamentos guardados no aparelho que ainda não chegaram ao servidor.
 import { esc, fmtData, fmtNum } from '../util.js';
+import { confirmar } from '../dialogo.js';
 import * as db from '../db.js';
 
 const ROTULO = { racao_consumo: 'Ração', biometrias: 'Biometria', mortalidade: 'Mortalidade' };
@@ -45,7 +46,7 @@ export async function renderPendencias(ctx, el) {
   });
   el.querySelectorAll('[data-descartar]').forEach((b) =>
     b.addEventListener('click', async () => {
-      if (!confirm('Descartar este lançamento? Ele NÃO será enviado e não poderá ser recuperado.')) return;
+      if (!(await confirmar({ titulo: 'Descartar este lançamento?', texto: 'Ele não será enviado e não poderá ser recuperado.', ok: 'Descartar', perigo: true }))) return;
       await db.filaRemove(b.dataset.descartar);
       await ctx.atualizarPendentes();
       renderPendencias(ctx, el);
