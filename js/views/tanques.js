@@ -1,5 +1,5 @@
 // Cadastro de tanques e lotes (dono e gerente). Precisa de internet.
-import { confirmar } from '../dialogo.js';
+import { confirmar, ocupado } from '../dialogo.js';
 import { icone } from '../icons.js';
 import { esc, fmtData, fmtInt, fmtNum, hojeISO, num, ROTULO_TIPO } from '../util.js';
 
@@ -171,10 +171,11 @@ export async function renderTanque(ctx, el, id) {
     if (!navigator.onLine) return ctx.toast('Sem internet', 'erro');
     try {
       const lote = todos.find((l) => l.id === b.dataset.excluirLote);
-      const r = await resumoDe([lote.id]);
+      const livre0 = ocupado('Conferindo o que será apagado…');
+      let r; try { r = await resumoDe([lote.id]); } finally { livre0(); }
       if (!(await confirmar({ titulo: 'Excluir este lote?', texto: `Será apagado de vez, com ${txtResumo(r)} Não dá para desfazer.`, ok: 'Excluir lote', perigo: true, digitar: 'excluir' }))) return;
-      await ctx.api.excluirLote(lote.id);
-      await ctx.atualizarRef(true);
+      const livre = ocupado('Excluindo o lote…');
+      try { await ctx.api.excluirLote(lote.id); await ctx.atualizarRef(true); } finally { livre(); }
       ctx.toast('Lote excluído', 'ok');
       renderTanque(ctx, el, id);
     } catch (e) { ctx.toast(e.message, 'erro'); }
@@ -184,10 +185,14 @@ export async function renderTanque(ctx, el, id) {
   if (ba) ba.addEventListener('click', async () => {
     if (!navigator.onLine) return ctx.toast('Sem internet', 'erro');
     try {
-      const r = await resumoDe(todos.map((l) => l.id));
+      const livre0 = ocupado('Conferindo o que será apagado…');
+      let r; try { r = await resumoDe(todos.map((l) => l.id)); } finally { livre0(); }
       if (!(await confirmar({ titulo: `Apagar "${tanque.nome}"?`, texto: `Serão apagados ${todos.length} lote(s), ${txtResumo(r)} Não dá para desfazer.`, ok: 'Apagar tanque', perigo: true, digitar: tanque.nome }))) return;
-      await ctx.api.excluirTanque(id);
-      await ctx.atualizarRef(true);
+      const livre = ocupado('Apagando o tanque…');
+      try {
+        await ctx.api.excluirTanque(id);
+        await ctx.atualizarRef(true);
+      } finally { livre(); }
       ctx.toast('Tanque apagado', 'ok');
       location.hash = '#/tanques';
     } catch (e) { ctx.toast(e.message, 'erro'); }

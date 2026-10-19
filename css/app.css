@@ -476,3 +476,20 @@ body.sem-rolagem { overflow: hidden; }
 .pdf-paginas { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: .8rem; display: grid; gap: .8rem; justify-items: center; align-content: start; overscroll-behavior: contain; }
 .pdf-paginas canvas { background: #fff; box-shadow: 0 2px 10px rgba(14,79,69,.25); max-width: 100%; }
 .pdf-view footer { display: grid; grid-template-columns: 1.4fr 1fr; gap: .6rem; padding: .7rem .8rem calc(.7rem + env(safe-area-inset-bottom)); background: var(--card); border-top: 1px solid #e3eae5; }
+
+/* Ração fornecida (relatório do dia/semana) */
+.outro-dia { display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin:.75rem 0 1rem; color:var(--mudo,#667); font-size:.9rem; }
+.outro-dia input { width:auto; min-width:10.5rem; }
+.racao-total { display:flex; flex-direction:column; gap:.1rem; padding:1rem 1.1rem; margin-bottom:.75rem; border-radius:18px; background:#f1f6f3; }
+.racao-total small { text-transform:uppercase; letter-spacing:.06em; font-size:.72rem; color:#5d6b64; }
+.racao-total b { font-size:2rem; line-height:1.1; }
+.racao-total span { color:#5d6b64; }
+.racao-lista li { display:flex; align-items:center; justify-content:space-between; gap:.75rem; }
+.racao-lista .valor { font-size:1.25rem; white-space:nowrap; }
+.racao-lista .valor small { font-weight:400; font-size:.8rem; color:#5d6b64; }
+
+.dialogo.sai { pointer-events: none; }
+.ocupado { position: fixed; inset: 0; z-index: 95; display: grid; place-items: center; background: rgba(10, 30, 26, .45); }
+.ocupado-caixa { display: flex; align-items: center; gap: .8rem; background: var(--card); padding: 1rem 1.3rem; border-radius: 18px; }
+.ocupado-giro { width: 20px; height: 20px; border: 3px solid var(--rio-claro); border-top-color: var(--rio); border-radius: 50%; animation: giro .8s linear infinite; }
+@keyframes giro { to { transform: rotate(360deg); } }

@@ -24,7 +24,8 @@ export function confirmar({ titulo, texto = '', ok = 'Confirmar', cancelar = 'Vo
       document.removeEventListener('keydown', tecla);
       fundo.classList.add('sai');
       setTimeout(() => fundo.remove(), 180);
-      if (anterior && anterior.focus) try { anterior.focus(); } catch { /* ignore */ }
+      try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch { /* ignore */ }
+      if (anterior && anterior.isConnected && anterior.focus && !digitar) try { anterior.focus({ preventScroll: true }); } catch { /* ignore */ }
       resolve(valor);
     };
     const tecla = (e) => { if (e.key === 'Escape') fechar(false); };
@@ -42,4 +43,14 @@ export function confirmar({ titulo, texto = '', ok = 'Confirmar', cancelar = 'Vo
     document.body.appendChild(fundo);
     fundo.querySelector(digitar ? '[data-digitar]' : perigo ? '[data-cancelar]' : '[data-ok]').focus();
   });
+}
+
+// Tela de espera que bloqueia toques enquanto uma operação demorada roda. Devolve a função que a fecha.
+export function ocupado(texto = 'Aguarde…') {
+  const f = document.createElement('div');
+  f.className = 'ocupado';
+  f.setAttribute('role', 'status');
+  f.innerHTML = `<div class="ocupado-caixa"><span class="ocupado-giro"></span><b>${esc(texto)}</b></div>`;
+  document.body.appendChild(f);
+  return () => f.remove();
 }

@@ -3,6 +3,7 @@ import { PESO_SACO_PADRAO_KG, ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS } from 
 import { carregarGerador, carregarFontes, abrirVisualizador } from '../pdf_ui.js';
 import { gerarPdfLote } from '../pdf_lote.js';
 import { gerarPdfFazenda } from '../pdf_fazenda.js';
+import { gerarPdfRacao } from '../pdf_racao.js';
 import { confirmar } from '../dialogo.js';
 import { icone } from '../icons.js';
 import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, ROTULO_TIPO } from '../util.js';
@@ -269,54 +270,133 @@ function svgSemanas(sem) {
     <p class="mudo nota" style="margin:.4rem 0 0">Cada barra é uma semana (início na segunda-feira), em kg.</p>`;
 }
 
-// Tabela dia × tanque: o relatório que o fazendeiro fazia no papel
+// Ração por tanque: o relatório que o responsável manda ao dono (dia ou semana)
 export async function renderRacaoDia(ctx, el) {
-  el.innerHTML = '<p class="carregando">Montando tabela…</p>';
+  el.innerHTML = '<p class="carregando">Montando relatório…</p>';
   if (!navigator.onLine) {
     el.innerHTML = `<p><a class="voltar" href="#/relatorio">${icone('voltar', 18)} Relatórios</a></p><h1>Ração por dia</h1><div class="card vazio"><p>Este relatório precisa de internet.</p></div>`;
     return;
   }
   const tanques = ctx.state.ref.tanques;
+  const lotesAtivos = (ctx.state.ref.lotes || []).filter((l) => l.ativo !== false);
+  const kgS = ctx.state.ref.kgSaco || PESO_SACO_PADRAO_KG;
+  const fazenda = (ctx.state.perfil.fazendas && ctx.state.perfil.fazendas.nome) || 'Piscicultura';
   const hoje = hojeISO();
-  let dias = 7;
-  const desdeDe = (n) => { const d = new Date(`${hoje}T00:00:00Z`); d.setUTCDate(d.getUTCDate() - (n - 1)); return d.toISOString().slice(0, 10); };
-  const linhas = await ctx.api.racaoPeriodo(desdeDe(30));
+  const somaDias = (iso, n) => { const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const linhas = await ctx.api.racaoPeriodo(somaDias(hoje, -59));
+  const nat = (a, b) => String(a).localeCompare(String(b), 'pt-BR', { numeric: true, sensitivity: 'base' });
+  const diaSemana = (iso) => new Intl.DateTimeFormat('pt-BR', { weekday: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`)).replace(/^./, (c) => c.toUpperCase());
   const diaCurto = (iso) => {
-    const d = new Date(`${iso}T00:00:00Z`);
-    const wd = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', timeZone: 'UTC' }).format(d).replace('.', '');
+    const wd = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`)).replace('.', '');
     return `${wd} ${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
   };
-  const kg = (v) => (v == null ? '<span class="vazio-cel">–</span>' : fmtNum(v, v % 1 ? 1 : 0));
+  const f1 = (v) => fmtNum(v, Math.abs(v - Math.round(v)) < 0.05 ? 0 : 1);
+  const sacos = (v) => f1(v / kgS);
+  const kgTxt = (v) => fmtNum(v, v % 1 ? 1 : 0);
+  const kg = (v) => (v == null ? '<span class="vazio-cel">–</span>' : kgTxt(v));
+
+  let per = 'hoje'; let outro = hoje;
+  const intervalo = () => {
+    if (per === 'hoje') return [hoje, hoje];
+    if (per === 'ontem') return [somaDias(hoje, -1), somaDias(hoje, -1)];
+    if (per === 'dia') return [outro, outro];
+    const n = Number(per); return [somaDias(hoje, -(n - 1)), hoje];
+  };
+
+  function calcular() {
+    const [ini, fim] = intervalo();
+    const dias = [];
+    for (let d = fim; d >= ini; d = somaDias(d, -1)) dias.push(d);
+    const noPeriodo = linhas.filter((r) => r.data >= ini && r.data <= fim);
+    const porTanque = new Map(); const porDia = new Map();
+    for (const r of noPeriodo) {
+      const q = Number(r.quantidade_kg) || 0;
+      porTanque.set(r.tanque_id, (porTanque.get(r.tanque_id) || 0) + q);
+      const m = porDia.get(r.data) || new Map(); m.set(r.tanque_id, (m.get(r.tanque_id) || 0) + q); porDia.set(r.data, m);
+    }
+    const ativosIds = new Set(lotesAtivos.map((l) => l.tanque_id));
+    const lista = tanques.filter((t) => porTanque.has(t.id) || ativosIds.has(t.id))
+      .map((t) => ({ id: t.id, nome: t.nome, kg: porTanque.get(t.id) || 0, ativo: ativosIds.has(t.id) })).sort((a, b) => nat(a.nome, b.nome));
+    const linhasDia = dias.map((d) => {
+      const m = porDia.get(d) || new Map(); const por = {}; let tot = 0;
+      lista.forEach((t) => { por[t.nome] = m.has(t.id) ? m.get(t.id) : null; tot += m.get(t.id) || 0; });
+      return { data: d, kg: tot, por };
+    });
+    const total = lista.reduce((s, t) => s + t.kg, 0);
+    const um = ini === fim;
+    const rotulo = um ? (fim === hoje ? 'Hoje' : fim === somaDias(hoje, -1) ? 'Ontem' : diaSemana(fim)) : `Últimos ${dias.length} dias`;
+    const periodo = um ? `${diaSemana(fim)}, ${fmtData(fim)}` : `${fmtData(ini).slice(0, 5)} a ${fmtData(fim)}`;
+    return { ini, fim, dias, lista, linhasDia, total, um, rotulo, periodo, colunas: lista.map((t) => t.nome) };
+  }
+
+  function mensagem(r) {
+    const L = [`*Ração · ${fazenda}*`, r.um ? `${diaSemana(r.fim)}, ${fmtData(r.fim)}` : `Período: ${fmtData(r.ini)} a ${fmtData(r.fim)}`, ''];
+    r.lista.forEach((t) => L.push(t.kg > 0 ? `${t.nome}: ${sacos(t.kg)} ${sacos(t.kg) === '1' ? 'saco' : 'sacos'} (${kgTxt(t.kg)} kg)` : (t.ativo ? `${t.nome}: sem lançamento` : null)));
+    L.push('', `*Total: ${sacos(r.total)} sacos (${kgTxt(r.total)} kg)*`);
+    if (!r.um) {
+      L.push('', 'Por dia:');
+      r.linhasDia.slice().reverse().forEach((d) => L.push(`${diaCurto(d.data)}: ${d.kg > 0 ? `${sacos(d.kg)} sacos (${kgTxt(d.kg)} kg)` : 'nada lançado'}`));
+    }
+    return L.filter((x) => x !== null).join('\n');
+  }
 
   el.innerHTML = `
     <p class="no-print"><a class="voltar" href="#/relatorio">${icone('voltar', 18)} Relatórios</a></p>
-    <h1>Ração por dia</h1>
-    <div class="seg no-print" style="--n:3" role="tablist">${[7, 15, 30].map((n) => `<button type="button" data-dias="${n}">${n} dias</button>`).join('')}</div>
-    <div id="matriz"></div>
-    <div class="acoes no-print"><button class="btn" id="b-csv" type="button">Baixar planilha (CSV)</button><button class="btn" id="b-print" type="button">Imprimir / salvar PDF</button></div>`;
+    <h1>Ração fornecida</h1>
+    <div class="seg no-print" style="--n:4" role="tablist">${[['hoje', 'Hoje'], ['ontem', 'Ontem'], ['7', '7 dias'], ['30', '30 dias']].map(([k, t]) => `<button type="button" data-per="${k}">${t}</button>`).join('')}</div>
+    <label class="outro-dia no-print">Ou escolha um dia<input type="date" id="outro" max="${hoje}" value="${hoje}"></label>
+    <div id="corpo"></div>
+    <div class="acoes no-print">
+      <button class="btn primario grande" id="b-msg" type="button">Enviar por mensagem</button>
+      <button class="btn" id="b-pdf-racao" type="button">Gerar PDF</button>
+      <button class="btn" id="b-csv" type="button">Baixar planilha (CSV)</button>
+    </div>`;
 
-  let ultima = null;
+  let r = null;
   function pintar() {
-    el.querySelectorAll('[data-dias]').forEach((b) => b.classList.toggle('on', Number(b.dataset.dias) === dias));
-    const ids = tanques.map((t) => t.id);
-    const m = matrizRacao(linhas.filter((r) => r.data >= desdeDe(dias)), ids, dias, hoje);
-    ultima = m;
-    el.querySelector('#matriz').innerHTML = !tanques.length ? '<div class="card vazio">Nenhum tanque disponível.</div>' : `
+    el.querySelectorAll('[data-per]').forEach((b) => b.classList.toggle('on', b.dataset.per === per));
+    r = calcular();
+    const ranque = r.lista.map((t) => `
+      <li><span class="esq"><b>${esc(t.nome)}</b>${t.kg > 0 ? `<small>${kgTxt(t.kg)} kg</small>` : ''}</span>
+      ${t.kg > 0 ? `<b class="valor">${sacos(t.kg)} <small>sacos</small></b>` : `<span class="tag ${t.ativo ? 'aviso' : ''}">${t.ativo ? 'sem lançamento' : '–'}</span>`}</li>`).join('');
+    const matriz = r.um || !r.lista.length ? '' : `
+      <h2>Dia a dia</h2>
       <div class="card tabela matriz rolagem"><table>
-        <thead><tr><th>Dia</th>${tanques.map((t) => `<th class="n">${esc(t.nome)}</th>`).join('')}<th class="n total">Total</th></tr></thead>
-        <tbody>${m.rows.map((r) => `<tr><td>${diaCurto(r.data)}</td>${ids.map((t) => `<td class="n">${kg(r.por[t])}</td>`).join('')}<td class="n total"><b>${r.total ? fmtNum(r.total, r.total % 1 ? 1 : 0) : '–'}</b></td></tr>`).join('')}</tbody>
-        <tfoot><tr><td>Total</td>${ids.map((t) => `<td class="n">${fmtNum(m.totalTanque[t], 0)}</td>`).join('')}<td class="n total">${fmtNum(m.total, 0)} kg</td></tr></tfoot>
+        <thead><tr><th>Dia</th>${r.lista.map((t) => `<th class="n">${esc(t.nome)}</th>`).join('')}<th class="n total">Total</th></tr></thead>
+        <tbody>${r.linhasDia.map((d) => `<tr><td>${diaCurto(d.data)}</td>${r.lista.map((t) => `<td class="n">${kg(d.por[t.nome])}</td>`).join('')}<td class="n total"><b>${d.kg ? kgTxt(d.kg) : '–'}</b></td></tr>`).join('')}</tbody>
+        <tfoot><tr><td>Total</td>${r.lista.map((t) => `<td class="n">${fmtNum(t.kg, 0)}</td>`).join('')}<td class="n total">${fmtNum(r.total, 0)} kg</td></tr></tfoot>
       </table></div>
       <p class="mudo nota">Valores em kg. “–” significa que nada foi lançado naquele dia.</p>`;
+    el.querySelector('#corpo').innerHTML = !r.lista.length ? '<div class="card vazio">Nenhum tanque com lote ativo ou ração neste período.</div>' : `
+      <div class="racao-total"><small>${esc(r.periodo)}</small><b>${sacos(r.total)} sacos</b><span>${kgTxt(r.total)} kg no total</span></div>
+      <div class="card"><ul class="lista racao-lista">${ranque}</ul></div>${matriz}`;
   }
-  el.querySelectorAll('[data-dias]').forEach((b) => b.addEventListener('click', () => { dias = Number(b.dataset.dias); pintar(); }));
+  el.querySelectorAll('[data-per]').forEach((b) => b.addEventListener('click', () => { per = b.dataset.per; pintar(); }));
+  el.querySelector('#outro').addEventListener('change', (e) => { if (e.target.value) { outro = e.target.value > hoje ? hoje : e.target.value; per = 'dia'; pintar(); } });
   pintar();
-  el.querySelector('#b-print').addEventListener('click', () => window.print());
+
+  el.querySelector('#b-msg').addEventListener('click', async () => {
+    const texto = mensagem(r);
+    try {
+      if (navigator.share) { await navigator.share({ text: texto }); return; }
+      if (navigator.clipboard) { await navigator.clipboard.writeText(texto); ctx.toast('Texto copiado. Cole na conversa para enviar.', 'ok'); return; }
+      window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
+    } catch (e) { if (e && e.name !== 'AbortError') ctx.toast('Não foi possível compartilhar: ' + e.message, 'erro'); }
+  });
+  const bp = el.querySelector('#b-pdf-racao');
+  bp.addEventListener('click', async () => {
+    const t0 = bp.textContent; bp.disabled = true; bp.textContent = 'Gerando PDF…';
+    try {
+      const [jsPDF, fontes] = await Promise.all([carregarGerador(), carregarFontes()]);
+      const doc = gerarPdfRacao(jsPDF, { fazenda, geradoEm: hoje, kgSaco: kgS, fontes, rotulo: r.rotulo, periodo: r.periodo, dias: r.dias.length, tanques: r.lista, linhasDia: r.linhasDia, colunas: r.colunas });
+      bp.disabled = false; bp.textContent = t0;
+      await abrirVisualizador({ blob: doc.output('blob'), nome: `racao-${r.ini}${r.um ? '' : '_a_' + r.fim}.pdf`, titulo: `Ração · ${r.periodo}`, toast: ctx.toast });
+    } catch (e) { ctx.toast(e.message || 'Não foi possível gerar o PDF', 'erro'); bp.disabled = false; bp.textContent = t0; }
+  });
   el.querySelector('#b-csv').addEventListener('click', () => {
-    const ids = tanques.map((t) => t.id);
-    const L = [['Ração por dia (kg)'], [`Últimos ${dias} dias`], [], ['Dia', ...tanques.map((t) => t.nome), 'Total']];
-    ultima.rows.forEach((r) => L.push([fmtData(r.data), ...ids.map((t) => (r.por[t] == null ? '' : String(r.por[t]).replace('.', ','))), String(r.total).replace('.', ',')]));
-    L.push(['Total', ...ids.map((t) => String(ultima.totalTanque[t]).replace('.', ',')), String(ultima.total).replace('.', ',')]);
-    baixarCsv(`racao-por-dia-${hoje}.csv`, '﻿' + L.map((l) => l.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n'));
+    const L = [['Ração fornecida (kg)'], [r.periodo], [], ['Dia', ...r.colunas, 'Total']];
+    r.linhasDia.forEach((d) => L.push([fmtData(d.data), ...r.lista.map((t) => (d.por[t.nome] == null ? '' : String(d.por[t.nome]).replace('.', ','))), String(d.kg).replace('.', ',')]));
+    L.push(['Total', ...r.lista.map((t) => String(t.kg).replace('.', ',')), String(r.total).replace('.', ',')]);
+    baixarCsv(`racao-${r.ini}${r.um ? '' : '_a_' + r.fim}.csv`, '\ufeff' + L.map((l) => l.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n'));
   });
 }
