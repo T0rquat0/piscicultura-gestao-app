@@ -466,3 +466,13 @@ h1 { font-size: 1.75rem; margin: .2rem 0 .8rem; }
 .dialogo-campo { display: grid; gap: .4rem; margin-top: 1rem; font-weight: 500; color: var(--tinta-2); }
 .dialogo-campo b { color: var(--tinta); overflow-wrap: anywhere; }
 .dialogo-acoes .btn[disabled] { opacity: .4; }
+
+/* ===== visualizador de PDF ===== */
+body.sem-rolagem { overflow: hidden; }
+.pdf-view { position: fixed; inset: 0; z-index: 80; display: grid; grid-template-rows: auto 1fr auto; background: #d7dfd9; animation: fundo-entra .18s ease-out; }
+.pdf-view header { display: flex; align-items: center; gap: .6rem; padding: calc(.6rem + env(safe-area-inset-top)) .8rem .6rem; background: var(--rio); color: #fff; }
+.pdf-view header b { font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pdf-x { appearance: none; border: 0; background: rgba(255,255,255,.14); color: #fff; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; flex: none; cursor: pointer; }
+.pdf-paginas { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: .8rem; display: grid; gap: .8rem; justify-items: center; align-content: start; overscroll-behavior: contain; }
+.pdf-paginas canvas { background: #fff; box-shadow: 0 2px 10px rgba(14,79,69,.25); max-width: 100%; }
+.pdf-view footer { display: grid; grid-template-columns: 1.4fr 1fr; gap: .6rem; padding: .7rem .8rem calc(.7rem + env(safe-area-inset-bottom)); background: var(--card); border-top: 1px solid #e3eae5; }

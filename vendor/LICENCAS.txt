@@ -1,0 +1,4 @@
+Bibliotecas de terceiros usadas para gerar e exibir o relatório em PDF:
+- jsPDF 2.5.2 (MIT) - https://github.com/parallax/jsPDF
+- jsPDF-AutoTable 3.8.4 (MIT) - https://github.com/simonbengtsson/jsPDF-AutoTable
+- PDF.js 4.10.38, build legacy (Apache-2.0) - https://github.com/mozilla/pdf.js

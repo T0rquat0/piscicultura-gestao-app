@@ -2,7 +2,7 @@
 // Estratégia: rede primeiro (sempre pega a versão nova quando há sinal), com limite de 4 s;
 // se a rede falhar ou demorar, usa a cópia guardada. Requisições ao Supabase (outro domínio)
 // NÃO passam por aqui: os dados offline ficam no IndexedDB (js/db.js), não neste cache.
-const CACHE = 'piscicultura-shell-v12';
+const CACHE = 'piscicultura-shell-v13';
 const SHELL = [
   './',
   'index.html',
@@ -14,7 +14,7 @@ const SHELL = [
   'fonts/schibsted-grotesk.woff2', 'js/icons.js', 'js/dialogo.js', 'js/splash.js',
   'js/app.js', 'js/config.js', 'js/util.js', 'js/calc.js', 'js/db.js', 'js/sync.js', 'js/api.js',
   'js/views/login.js', 'js/views/home.js', 'js/views/lancar.js', 'js/views/tanques.js',
-  'js/views/estoque.js', 'js/views/relatorio.js', 'js/views/equipe.js', 'js/views/pendencias.js', 'js/views/mais.js',
+  'js/pdf_lote.js', 'js/pdf_ui.js', 'js/views/estoque.js', 'js/views/relatorio.js', 'js/views/equipe.js', 'js/views/pendencias.js', 'js/views/mais.js',
 ];
 
 self.addEventListener('install', (e) => {

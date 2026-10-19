@@ -1,5 +1,7 @@
 // Relatórios por lote (precisam de internet: usam os dados já sincronizados no servidor).
 import { PESO_SACO_PADRAO_KG } from '../config.js';
+import { carregarGerador, abrirVisualizador } from '../pdf_ui.js';
+import { gerarPdfLote } from '../pdf_lote.js';
 import { confirmar } from '../dialogo.js';
 import { icone } from '../icons.js';
 import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, ROTULO_TIPO } from '../util.js';
@@ -85,7 +87,7 @@ export async function renderRelatorioLote(ctx, el, id) {
   const datas = [...bios, ...mort, ...rac].map((x) => x.data).sort();
   const fim = lote.ativo ? hoje : (datas.length ? datas[datas.length - 1] : hoje);
   const c = calcularLote(lote, bios, mort, rac, fim, gerir ? precoMedioKg(compras) : null);
-  const nomeTanque = lote.tanques ? lote.tanques.nome : '';
+  const nomeTanque = lote.tanques ? lote.tanques.nome : ((ctx.state.ref.tanques.find((t) => t.id === lote.tanque_id) || {}).nome || '');
 
   const unid = (v, u) => `${v}<em>${u}</em>`;
   const destaque = (rotulo, valor, sub) => `<div class="destaque"><span>${rotulo}</span><b>${valor}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
@@ -160,8 +162,8 @@ export async function renderRelatorioLote(ctx, el, id) {
     <div class="seg no-print" style="--n:${abas.length}" role="tablist">${abas.map(([k, r]) => `<button type="button" data-aba="${k}">${r}</button>`).join('')}</div>
     <div id="painel"></div>
     <div class="acoes no-print">
+      <button class="btn primario" id="b-pdf" type="button">Gerar PDF para compartilhar</button>
       <button class="btn" id="b-csv" type="button">Baixar planilha (CSV)</button>
-      <button class="btn" id="b-print" type="button">Imprimir / salvar PDF</button>
     </div>`;
 
   const painel = el.querySelector('#painel');
@@ -179,7 +181,22 @@ export async function renderRelatorioLote(ctx, el, id) {
   el.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => { aba = b.dataset.aba; pintar(); }));
   pintar();
 
-  el.querySelector('#b-print').addEventListener('click', () => window.print());
+  const bpdf = el.querySelector('#b-pdf');
+  bpdf.addEventListener('click', async () => {
+    if (!navigator.onLine) return ctx.toast('Sem internet', 'erro');
+    const texto = bpdf.textContent; bpdf.disabled = true; bpdf.textContent = 'Gerando PDF…';
+    try {
+      const jsPDF = await carregarGerador();
+      const doc = gerarPdfLote(jsPDF, {
+        fazenda: (ctx.state.perfil.fazendas && ctx.state.perfil.fazendas.nome) || 'Piscicultura', lote, nomeTanque, c, bios, mort, rac,
+        evo: evolucaoPeso(lote, bios), semanas: racaoPorSemana(rac), kgSaco: kgS, gerir, geradoEm: hoje,
+      });
+      const blob = doc.output('blob');
+      const nome = `relatorio-${(nomeTanque || 'tanque').replace(/\W+/g, '-')}-${(lote.especie || '').replace(/\W+/g, '-')}-${hoje}.pdf`;
+      bpdf.disabled = false; bpdf.textContent = texto;
+      await abrirVisualizador({ blob, nome, titulo: `${nomeTanque} · ${lote.especie}`, toast: ctx.toast });
+    } catch (e) { ctx.toast(e.message || 'Não foi possível gerar o PDF', 'erro'); bpdf.disabled = false; bpdf.textContent = texto; }
+  });
   el.querySelector('#b-csv').addEventListener('click', () => baixarCsv(`relatorio-${(nomeTanque || 'tanque').replace(/\W+/g, '-')}-${lote.data_entrada}.csv`, montarCsv(lote, nomeTanque, c, bios, mort, rac, quem)));
 }
 
