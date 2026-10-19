@@ -70,6 +70,15 @@ export function criarApi(client) {
     async criarLote(lote) {
       ok(await client.from('lotes').insert({ id: uuid(), ...lote }));
     },
+    // exclusões definitivas (só o dono; o RLS barra os demais). Apagam em cascata os lançamentos.
+    async excluirLote(id) {
+      const d = ok(await client.from('lotes').delete().eq('id', id).select('id'));
+      if (!d || !d.length) throw new Error('Não foi possível excluir. Só o dono pode excluir lotes.');
+    },
+    async excluirTanque(id) {
+      const d = ok(await client.from('tanques').delete().eq('id', id).select('id'));
+      if (!d || !d.length) throw new Error('Não foi possível excluir. Só o dono pode excluir tanques.');
+    },
     async encerrarLote(id) {
       ok(await client.from('lotes').update({ ativo: false }).eq('id', id));
     },

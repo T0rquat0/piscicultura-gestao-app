@@ -56,6 +56,7 @@ export async function renderTanque(ctx, el, id) {
   el.innerHTML = `<h1>${esc(tanque.nome)}</h1><p class="carregando">Carregando…</p>`;
   const todos = (await ctx.api.lotes()).filter((l) => l.tanque_id === id);
   const ativos = todos.filter((l) => l.ativo);
+  const dono = ctx.state.perfil.papel === 'dono';
   const hoje = hojeISO();
 
   el.innerHTML = `
@@ -73,6 +74,7 @@ export async function renderTanque(ctx, el, id) {
             <span class="tag ${l.ativo ? 'ok' : ''}">${l.ativo ? 'Ativo' : 'Encerrado'}</span>
             <a class="btn mini" href="#/relatorio/${esc(l.id)}">Relatório</a>
             ${l.ativo ? `<button class="btn mini perigo" data-encerrar="${esc(l.id)}" type="button">Encerrar</button>` : ''}
+            ${dono ? `<button class="btn mini perigo" data-excluir-lote="${esc(l.id)}" type="button">Excluir</button>` : ''}
           </div>
         </li>`).join('')}</ul>` : '<p class="mudo" style="margin:0">Nenhum lote neste tanque ainda.</p>'}
     </div>
@@ -101,7 +103,12 @@ export async function renderTanque(ctx, el, id) {
       <label>Renomear <input id="nome" maxlength="60" value="${esc(tanque.nome)}"></label>
       <p id="erro-nome" class="erro" hidden></p>
       <button class="btn" type="submit">Salvar nome</button>
-    </form>`;
+    </form>
+    ${dono ? `<h2>Apagar tanque</h2>
+    <div class="card">
+      <p style="margin-top:0">Use para zerar um tanque cadastrado errado ou recomeçar do zero. Apaga o tanque, os lotes e <b>todos</b> os lançamentos dele.</p>
+      <button class="btn perigo" id="b-apagar-tanque" type="button">Apagar este tanque</button>
+    </div>` : ''}`;
 
   // peso médio inicial ao vivo
   const f = el.querySelector('#f-lote');
@@ -143,6 +150,44 @@ export async function renderTanque(ctx, el, id) {
         renderTanque(ctx, el, id);
       } catch (e) { ctx.toast(e.message, 'erro'); }
     }));
+
+  // resumo do que será apagado (para o dono saber o que perde)
+  async function resumoDe(lotesIds) {
+    const r = { bios: 0, mort: 0, racN: 0, racKg: 0 };
+    for (const lid of lotesIds) {
+      const d = await ctx.api.dadosLote(lid);
+      r.bios += d.bios.length; r.mort += d.mort.length; r.racN += d.rac.length; r.racKg += d.rac.reduce((s, x) => s + Number(x.quantidade_kg || 0), 0);
+    }
+    return r;
+  }
+  const txtResumo = (r) => `${r.bios} biometria(s), ${r.mort} registro(s) de mortalidade e ${r.racN} lançamento(s) de ração (${fmtNum(r.racKg, 0)} kg). A ração apagada volta para o saldo do estoque.`;
+
+  el.querySelectorAll('[data-excluir-lote]').forEach((b) => b.addEventListener('click', async () => {
+    if (!navigator.onLine) return ctx.toast('Sem internet', 'erro');
+    try {
+      const lote = todos.find((l) => l.id === b.dataset.excluirLote);
+      const r = await resumoDe([lote.id]);
+      if (!(await confirmar({ titulo: 'Excluir este lote?', texto: `Será apagado de vez, com ${txtResumo(r)} Não dá para desfazer.`, ok: 'Excluir lote', perigo: true }))) return;
+      await ctx.api.excluirLote(lote.id);
+      await ctx.atualizarRef(true);
+      ctx.toast('Lote excluído', 'ok');
+      renderTanque(ctx, el, id);
+    } catch (e) { ctx.toast(e.message, 'erro'); }
+  }));
+
+  const ba = el.querySelector('#b-apagar-tanque');
+  if (ba) ba.addEventListener('click', async () => {
+    if (!navigator.onLine) return ctx.toast('Sem internet', 'erro');
+    try {
+      const r = await resumoDe(todos.map((l) => l.id));
+      if (!(await confirmar({ titulo: `Apagar "${tanque.nome}"?`, texto: `Serão apagados ${todos.length} lote(s), ${txtResumo(r)}`, ok: 'Continuar', perigo: true }))) return;
+      if (!(await confirmar({ titulo: 'Tem certeza?', texto: `"${tanque.nome}" e todo o histórico dele serão apagados de vez. Não dá para desfazer.`, ok: 'Apagar tanque', perigo: true }))) return;
+      await ctx.api.excluirTanque(id);
+      await ctx.atualizarRef(true);
+      ctx.toast('Tanque apagado', 'ok');
+      location.hash = '#/tanques';
+    } catch (e) { ctx.toast(e.message, 'erro'); }
+  });
 
   const fn = el.querySelector('#f-nome');
   fn.addEventListener('submit', async (ev) => {
