@@ -315,3 +315,5 @@ summary { cursor: pointer; font-weight: 700; padding: .7rem 0; font-size: 1.05re
 .tanque-card.falta .tag.alerta { background: #fff; }
 .tanque-card.sem-lote { opacity: .85; }
 .tanque-card.sem-lote > header { background: #e4e8e2; }
+
+.calc { white-space: pre-line; }

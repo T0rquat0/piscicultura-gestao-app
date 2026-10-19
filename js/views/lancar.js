@@ -1,6 +1,6 @@
 // Lançamento de ração, biometria e mortalidade. Funciona sem internet:
 // o item é gravado na fila local (IndexedDB) e enviado quando houver conexão.
-import { esc, hojeISO, fmtData, fmtNum, num, uuid, ROTULO_TIPO } from '../util.js';
+import { esc, hojeISO, fmtData, fmtNum, fmtInt, num, uuid, ROTULO_TIPO } from '../util.js';
 import * as db from '../db.js';
 
 const TIPOS = {
@@ -17,12 +17,13 @@ function camposDoTipo(tipo) {
   if (tipo === 'biometria') {
     return `
       <div class="duas">
-        <label>Peso total da amostra (kg)
+        <label>Peso de todos os peixes pesados juntos (kg)
           <input id="peso" type="number" inputmode="decimal" step="0.001" min="0" placeholder="Ex.: 2,4" required></label>
-        <label>Nº de peixes na amostra
+        <label>Quantos peixes foram pesados
           <input id="amostra" type="number" inputmode="numeric" step="1" min="1" placeholder="Ex.: 10" required></label>
       </div>
-      <div class="calc" id="pm">Peso médio: —</div>`;
+      <div class="calc" id="pm">Peso médio: —</div>
+      <p id="aviso-amostra" class="aviso" hidden>Amostra pequena: com menos de 30 peixes o peso médio fica pouco confiável. O ideal é pesar de 5% a 10% do lote.</p>`;
   }
   return `<label>Quantidade de peixes mortos
     <input id="qtd" type="number" inputmode="numeric" step="1" min="1" placeholder="Ex.: 3" required></label>`;
@@ -89,12 +90,29 @@ export async function renderLancar(ctx, el, params = {}) {
   montarLotes();
 
   if (tipo === 'biometria') {
+    // mortos por lote (só com internet): permite estimar os peixes vivos e a biomassa na hora
+    let mortos = null;
     const atualizaPm = () => {
       const p = num(f.querySelector('#peso').value), q = num(f.querySelector('#amostra').value);
-      f.querySelector('#pm').textContent = p > 0 && q > 0 ? `Peso médio: ${fmtNum((p / q) * 1000, 0)} g por peixe` : 'Peso médio: —';
+      const pm = f.querySelector('#pm'), aviso = f.querySelector('#aviso-amostra');
+      if (!(p > 0 && q > 0)) { pm.textContent = 'Peso médio: —'; aviso.hidden = true; return; }
+      const medioG = (p / q) * 1000;
+      let txt = `Peso médio: ${fmtNum(medioG, 0)} g por peixe`;
+      const lote = lotes.find((l) => l.id === selLote.value);
+      if (lote && mortos) {
+        const vivos = Math.max(0, Number(lote.quantidade_inicial) - (mortos[lote.id] || 0));
+        txt += `\nBiomassa estimada do tanque: ${fmtNum((vivos * medioG) / 1000, 0)} kg (${fmtInt(vivos)} peixes vivos)`;
+      }
+      pm.textContent = txt;
+      aviso.hidden = !(q < 30);
     };
     f.querySelector('#peso').addEventListener('input', atualizaPm);
     f.querySelector('#amostra').addEventListener('input', atualizaPm);
+    selLote.addEventListener('change', atualizaPm);
+    selTanque.addEventListener('change', atualizaPm);
+    if (navigator.onLine) {
+      ctx.api.resumoLotes().then((r) => { mortos = Object.fromEntries(r.map((x) => [x.lote_id, Number(x.mortos)])); atualizaPm(); }).catch(() => {});
+    }
   }
 
   f.addEventListener('submit', async (ev) => {
@@ -140,6 +158,7 @@ export async function renderLancar(ctx, el, params = {}) {
     // limpa só os campos de quantidade; mantém tanque/data para o próximo lançamento
     f.querySelectorAll('#qtd, #peso, #amostra').forEach((i) => { i.value = ''; });
     const pm = f.querySelector('#pm'); if (pm) pm.textContent = 'Peso médio: —';
+    const av = f.querySelector('#aviso-amostra'); if (av) av.hidden = true;
     btn.disabled = false;
     ctx.sincronizarAgora(); // em segundo plano; não trava a tela
   });
