@@ -18,6 +18,14 @@ import { renderMais } from './views/mais.js';
 
 const root = document.getElementById('root');
 splashDoDia();
+// iOS ignora user-scalable=no: bloqueia o zoom por gesto de pinça e o toque duplo
+for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, (e) => e.preventDefault());
+let ultimoToque = 0;
+document.addEventListener('touchend', (e) => {
+  const t = Date.now();
+  if (t - ultimoToque < 350 && !(e.target.closest && e.target.closest('input, select, textarea'))) e.preventDefault();
+  ultimoToque = t;
+}, { passive: false });
 const state = { user: null, perfil: null, ref: { tanques: [], lotes: [] }, pendentes: 0, semRede: false };
 let client = null;
 let api = null;
