@@ -1,5 +1,5 @@
 // Camada de acesso ao Supabase. Todas as funções lançam ErroApi (mensagem já em português).
-import { uuid, traduzErro } from './util.js';
+import { uuid, traduzErro, hojeISO } from './util.js';
 
 export class ErroApi extends Error {
   constructor(original) {
@@ -86,7 +86,17 @@ export function criarApi(client) {
     // ----- ração: estoque -----
     async saldoRacao() {
       const d = ok(await client.rpc('saldo_racao'));
-      return Array.isArray(d) ? d[0] : d;
+      const s = Array.isArray(d) ? d[0] : d;
+      // Banco sem o sql/04: a função antiga não devolve o consumo dos últimos 7 dias; calcula aqui.
+      if (s && s.consumo_7d_kg == null) {
+        try {
+          const hoje = hojeISO();
+          const d7 = new Date(`${hoje}T00:00:00Z`); d7.setUTCDate(d7.getUTCDate() - 7);
+          const linhas = await todos(() => client.from('racao_consumo').select('id,quantidade_kg').gte('data', d7.toISOString().slice(0, 10)).lt('data', hoje).order('id'));
+          s.consumo_7d_kg = linhas.reduce((t, r) => t + Number(r.quantidade_kg || 0), 0);
+        } catch { /* segue sem estimativa */ }
+      }
+      return s;
     },
     async consumoDiario(dias = 30) {
       return ok(await client.rpc('consumo_diario', { p_dias: dias })) || [];

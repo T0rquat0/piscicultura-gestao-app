@@ -29,7 +29,9 @@ export function gerarPdfFazenda(jsPDF, d) {
   const vivos = lotes.reduce((s, l) => s + (l.c.vivos || 0), 0);
   const biomassa = lotes.reduce((s, l) => s + (l.c.biomassaAtual || 0), 0);
   const racao30 = racaoDia.reduce((s, r) => s + r.kg, 0);
-  const meta = [['Lotes ativos', fmtInt(lotes.length)], ['Peixes vivos (estim.)', fmtInt(vivos)], ['Biomassa estimada', `${n(biomassa, 0)} kg`], ['Ração em 30 dias', `${n(racao30 / kgSaco, 0)} sacos`]];
+  const mortos = lotes.reduce((s, l) => s + (l.c.mortos || 0), 0);
+  const inicial = lotes.reduce((s, l) => s + (Number(l.lote.quantidade_inicial) || 0), 0);
+  const meta = [['Lotes ativos', fmtInt(lotes.length)], ['Peixes vivos (estim.)', fmtInt(vivos)], ['Mortos no total', `${fmtInt(mortos)}${inicial > 0 ? ` (${n((mortos / inicial) * 100, 1)}%)` : ''}`], ['Ração em 30 dias', `${n(racao30 / kgSaco, 0)} sacos`]];
   cor('fill', COR.fundo); doc.roundedRect(M, y, LARG, 16, 5, 5, 'F');
   meta.forEach(([k, v], i) => { const x = M + 6 + ((LARG - 8) / 4) * i; caps(k, x, y + 6); txt(v, x, y + 11.4, { size: 10.5 }); });
   y += 28;
@@ -82,12 +84,12 @@ export function gerarPdfFazenda(jsPDF, d) {
   if (lotes.length) {
     const corpo = lotes.map((l) => [
       l.nomeTanque, `${l.lote.especie} (${l.lote.tipo === 'alevinagem' ? 'alev.' : 'eng.'})`, fmtInt(l.c.diasCultivo),
-      l.c.pmAtualG != null ? n(l.c.pmAtualG, 0) : '-', fmtInt(l.c.vivos), l.c.sobrevivencia != null ? `${n(l.c.sobrevivencia, 1)}%` : '-',
+      l.c.pmAtualG != null ? n(l.c.pmAtualG, 0) : '-', fmtInt(l.c.vivos), fmtInt(l.c.mortos), l.c.sobrevivencia != null ? `${n(l.c.sobrevivencia, 1)}%` : '-',
       l.c.biomassaAtual != null ? n(l.c.biomassaAtual, 0) : '-', l.c.ca != null ? n(l.c.ca, 2) : '-',
     ]);
-    tabela(doc, y, [['TANQUE', 'ESPÉCIE', 'DIAS', 'PESO (g)', 'VIVOS', 'SOBREV.', 'BIOMASSA (kg)', 'CONVERSÃO']], corpo, ['left', 'left', 'right', 'right', 'right', 'right', 'right', 'right'], [34, 40]);
+    tabela(doc, y, [['TANQUE', 'ESPÉCIE', 'DIAS', 'PESO (g)', 'VIVOS', 'MORTOS', 'SOBREV.', 'BIOMASSA', 'CONV.']], corpo, ['left', 'left', 'right', 'right', 'right', 'right', 'right', 'right', 'right'], [30, 34]);
     y = doc.lastAutoTable.finalY + 3;
-    txt('Peso, vivos, biomassa e conversão são estimativas a partir da última biometria e da mortalidade lançada. Conversão: kg de ração por kg ganho.', M, y + 2, { size: 7.5, color: COR.mudo });
+    txt('Peso, vivos, biomassa (kg) e conversão são estimativas a partir da última biometria e da mortalidade lançada. Conversão: kg de ração por kg ganho.', M, y + 2, { size: 7.5, color: COR.mudo });
     y += 10;
   } else { txt('Nenhum lote ativo.', M, y + 1, { size: 9, color: COR.mudo }); y += 10; }
 
