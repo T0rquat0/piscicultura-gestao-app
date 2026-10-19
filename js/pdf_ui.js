@@ -23,6 +23,23 @@ export function carregarGerador() {
   return promessaGerador;
 }
 
+let promessaFontes = null;
+function base64(buf) {
+  const b = new Uint8Array(buf); let s = '';
+  for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+// Fontes do app (Schibsted Grotesk) para o PDF ter a mesma cara do aplicativo. Sem elas, usa Helvetica.
+export function carregarFontes() {
+  if (!promessaFontes) {
+    promessaFontes = (async () => {
+      const [r, b] = await Promise.all(['fonts/schibsted-regular.ttf', 'fonts/schibsted-bold.ttf'].map((f) => fetch(new URL(f, document.baseURI).href).then((x) => { if (!x.ok) throw new Error('fonte'); return x.arrayBuffer(); })));
+      return { regular: base64(r), bold: base64(b) };
+    })().catch(() => { promessaFontes = null; return null; });
+  }
+  return promessaFontes;
+}
+
 let promessaLeitor = null;
 async function carregarLeitor() {
   if (!promessaLeitor) {

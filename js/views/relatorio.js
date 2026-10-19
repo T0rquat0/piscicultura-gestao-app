@@ -1,6 +1,6 @@
 // Relatórios por lote (precisam de internet: usam os dados já sincronizados no servidor).
 import { PESO_SACO_PADRAO_KG } from '../config.js';
-import { carregarGerador, abrirVisualizador } from '../pdf_ui.js';
+import { carregarGerador, carregarFontes, abrirVisualizador } from '../pdf_ui.js';
 import { gerarPdfLote } from '../pdf_lote.js';
 import { confirmar } from '../dialogo.js';
 import { icone } from '../icons.js';
@@ -186,10 +186,10 @@ export async function renderRelatorioLote(ctx, el, id) {
     if (!navigator.onLine) return ctx.toast('Sem internet', 'erro');
     const texto = bpdf.textContent; bpdf.disabled = true; bpdf.textContent = 'Gerando PDF…';
     try {
-      const jsPDF = await carregarGerador();
+      const [jsPDF, fontes] = await Promise.all([carregarGerador(), carregarFontes()]);
       const doc = gerarPdfLote(jsPDF, {
         fazenda: (ctx.state.perfil.fazendas && ctx.state.perfil.fazendas.nome) || 'Piscicultura', lote, nomeTanque, c, bios, mort, rac,
-        evo: evolucaoPeso(lote, bios), semanas: racaoPorSemana(rac), kgSaco: kgS, gerir, geradoEm: hoje,
+        evo: evolucaoPeso(lote, bios), semanas: racaoPorSemana(rac), kgSaco: kgS, gerir, geradoEm: hoje, fontes,
       });
       const blob = doc.output('blob');
       const nome = `relatorio-${(nomeTanque || 'tanque').replace(/\W+/g, '-')}-${(lote.especie || '').replace(/\W+/g, '-')}-${hoje}.pdf`;

@@ -1,261 +1,269 @@
-// Relatório do lote em PDF (A4). Desenha com jsPDF (vetorial, texto selecionável).
-// Recebe o construtor jsPDF já carregado (no navegador vem de vendor/, nos testes do npm),
-// que precisa ter o plugin autoTable aplicado.
-// Só usa caracteres da codificação padrão do PDF (sem "≈", "−" etc.).
+// Relatório do lote em PDF (A4), em estilo de documento técnico: texto, filetes finos e
+// números grandes, sem cartões coloridos. Desenha com jsPDF (vetorial, texto selecionável).
+// Recebe o construtor jsPDF (com o plugin autoTable aplicado) e, opcionalmente, as fontes
+// em base64 { regular, bold } (Schibsted Grotesk). Sem fontes, usa Helvetica.
 import { fmtNum, fmtInt, fmtData, fmtBRL, ROTULO_TIPO, diasEntre } from './util.js';
 import { pesoMedioKg } from './calc.js';
 
 export const COR = {
-  rio: [14, 79, 69], rio2: [10, 61, 53], claro: [225, 238, 232], linha: [208, 220, 213],
-  tinta: [24, 36, 31], mudo: [96, 112, 104], branco: [255, 255, 255], zebra: [246, 249, 247],
+  tinta: [23, 33, 29], mudo: [118, 130, 123], linha: [226, 233, 229], rio: [14, 79, 69], fundo: [243, 248, 245],
+  suave: [160, 184, 172], ambar: [168, 100, 8], branco: [255, 255, 255],
 };
-export const M = 14;             // margem lateral (mm)
-export const LARG = 210 - 2 * M; // largura útil
-const TOPO = 22;                 // início do conteúdo nas páginas seguintes
-const BASE = 280;                // limite inferior do conteúdo
+export const M = 16;
+export const LARG = 210 - 2 * M;
+const TOPO = 26;
+const BASE = 278;
 
 const n = (v, d = 1) => fmtNum(v, d);
 const dm = (iso) => fmtData(iso).slice(0, 5);
 
+let FAM = 'helvetica';
+function prepararFontes(doc, fontes) {
+  FAM = 'helvetica';
+  if (!fontes) return;
+  doc.addFileToVFS('Schibsted-Regular.ttf', fontes.regular); doc.addFont('Schibsted-Regular.ttf', 'Schibsted', 'normal');
+  doc.addFileToVFS('Schibsted-Bold.ttf', fontes.bold); doc.addFont('Schibsted-Bold.ttf', 'Schibsted', 'bold');
+  FAM = 'Schibsted';
+}
+
 export function gerarPdfLote(jsPDF, d) {
-  const { fazenda, lote, nomeTanque, c, bios, mort, evo, semanas, kgSaco, gerir, geradoEm } = d;
+  const { fazenda, lote, nomeTanque, c, bios, mort, evo, semanas, kgSaco, gerir, geradoEm, fontes } = d;
   const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
+  prepararFontes(doc, fontes);
   doc.setProperties({ title: `Relatório do lote - ${nomeTanque} - ${lote.especie}`, author: fazenda, creator: 'Gestão de Piscicultura' });
   let y = 0;
 
   const cor = (t, v) => doc[t === 'fill' ? 'setFillColor' : t === 'draw' ? 'setDrawColor' : 'setTextColor'](...v);
-  const txt = (s, x, yy, { size = 10, bold = false, color = COR.tinta, align = 'left', maxW } = {}) => {
-    doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setFontSize(size); cor('text', color);
-    doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setFontSize(size);
-    doc.text(maxW ? doc.splitTextToSize(String(s), maxW) : (Array.isArray(s) ? s : String(s)), x, yy, { align });
+  const fonte = (size, bold) => { doc.setFont(FAM, bold ? 'bold' : 'normal'); doc.setFontSize(size); };
+  const txt = (s, x, yy, { size = 10, bold = false, color = COR.tinta, align = 'left', cs = 0 } = {}) => {
+    fonte(size, bold); cor('text', color);
+    doc.text(Array.isArray(s) ? s : String(s), x, yy, { align, charSpace: cs });
   };
-  const nova = () => { doc.addPage(); y = TOPO; };
-  const cabe = (h) => { if (y + h > BASE) nova(); };
+  const caps = (s, x, yy, o = {}) => txt(String(s).toUpperCase(), x, yy, { size: 7, color: COR.mudo, cs: 0.35, ...o });
+  const linha = (x1, y1, x2, y2, w = 0.2, c2 = COR.linha) => { cor('draw', c2); doc.setLineWidth(w); doc.line(x1, y1, x2, y2); };
+  const largura = (s, size, bold) => { fonte(size, bold); return doc.getTextWidth(String(s)); };
+  const quebra = (s, w, size, bold) => { fonte(size, bold); return doc.splitTextToSize(String(s), w); };
+  const cabe = (h) => { if (y + h > BASE) { doc.addPage(); y = TOPO; } };
 
-  // ---------- capa / cabeçalho ----------
-  cor('fill', COR.rio); doc.rect(0, 0, 210, 40, 'F');
-  txt('RELATÓRIO DO LOTE', M, 14, { size: 9, bold: true, color: [181, 214, 203] });
-  txt(`${nomeTanque}  |  ${lote.especie}`, M, 25, { size: 20, bold: true, color: COR.branco, maxW: LARG });
-  txt(`${ROTULO_TIPO[lote.tipo] || lote.tipo}  ·  entrada em ${fmtData(lote.data_entrada)}  ·  ${lote.ativo ? 'lote ativo' : 'lote encerrado'}`, M, 33, { size: 10, color: [211, 231, 223] });
-  txt(fazenda, 210 - M, 14, { size: 9, bold: true, color: [181, 214, 203], align: 'right' });
-  txt(`Gerado em ${fmtData(geradoEm)}`, 210 - M, 33, { size: 9, color: [211, 231, 223], align: 'right' });
-  y = 50;
+  // ---------- cabeçalho da primeira página ----------
+  caps(fazenda, M, 16, { color: COR.rio, size: 7.5 });
+  caps('Relatório do lote', 210 - M, 16, { align: 'right' });
+  const titulo = quebra(nomeTanque || 'Lote', LARG, 28, true).slice(0, 2);
+  txt(titulo, M, 36, { size: 28, bold: true });
+  y = 36 + (titulo.length - 1) * 11;
+  txt(`${lote.especie}  ·  ${ROTULO_TIPO[lote.tipo] || lote.tipo}`, M, y + 8, { size: 12.5, color: COR.mudo });
+  y += 17;
 
-  const secao = (titulo, sub, need = 20) => {
-    cabe(need);
-    txt(titulo, M, y, { size: 13, bold: true, color: COR.rio });
-    y += 2; cor('draw', COR.rio); doc.setLineWidth(0.5); doc.line(M, y, M + 14, y);
-    cor('draw', COR.linha); doc.setLineWidth(0.2); doc.line(M + 14, y, 210 - M, y);
-    y += 5;
-    if (sub) { doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); const ls = doc.splitTextToSize(sub, LARG); txt(ls, M, y, { size: 8.5, color: COR.mudo }); y += ls.length * 4 + 1.5; }
+  const meta = [['Entrada', fmtData(lote.data_entrada)], ['Situação', lote.ativo ? 'Lote ativo' : 'Lote encerrado'], ['Peixes na entrada', fmtInt(lote.quantidade_inicial)], ['Relatório de', fmtData(geradoEm)]];
+  cor('fill', COR.fundo); doc.roundedRect(M, y, LARG, 16, 5, 5, 'F');
+  meta.forEach(([k, v], i) => { const x = M + 6 + ((LARG - 8) / 4) * i; caps(k, x, y + 6); txt(v, x, y + 11.4, { size: 10.5 }); });
+  y += 28;
+
+  // ---------- títulos de seção ----------
+  let num = 0;
+  const secao = (titulo2, need = 30) => {
+    cabe(need); num += 1;
+    cor('fill', COR.rio); doc.circle(M + 1.6, y + 6.6, 1.6, 'F');
+    txt(titulo2, M + 6, y + 8, { size: 12.5, bold: true });
+    y += 15;
   };
-  const paragrafo = (s, o = {}) => {
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
-    const linhas = doc.splitTextToSize(s, LARG);
-    cabe(linhas.length * 4.6 + 2);
-    txt(linhas, M, y, { size: 9.5, color: o.color || COR.tinta });
-    y += linhas.length * 4.6 + 1.8;
-  };
 
-  // ---------- 1. resumo (cartões) ----------
-  secao('Resumo do lote', 'Os números abaixo usam os lançamentos feitos no aplicativo até a data de geração.');
-  const kpi = [
-    ['Dias de cultivo', fmtInt(c.diasCultivo), `desde ${fmtData(lote.data_entrada)}`],
-    ['Peso médio atual', c.pmAtualG != null ? `${n(c.pmAtualG, 0)} g` : '-', c.dataUltimaBio ? `biometria de ${fmtData(c.dataUltimaBio)}` : 'sem biometria'],
-    ['Peixes vivos (estim.)', fmtInt(c.vivos), `de ${fmtInt(lote.quantidade_inicial)} que entraram`],
-    ['Sobrevivência', c.sobrevivencia != null ? `${n(c.sobrevivencia, 1)}%` : '-', `${fmtInt(c.mortos)} morto(s)`],
-    ['Biomassa estimada', c.biomassaAtual != null ? `${n(c.biomassaAtual, 0)} kg` : '-', `na entrada: ${n(c.biomassaInicial, 0)} kg`],
-    ['Ração fornecida', `${n(c.racaoTotal, 0)} kg`, `${n(c.racaoTotal / kgSaco, 1)} sacos de ${n(kgSaco, 0)} kg`],
-    ['Conversão alimentar', c.ca != null ? n(c.ca, 2) : '-', c.ca != null ? 'kg de ração por kg ganho' : 'precisa de biometria com ganho'],
-    ['Ganho de peso diário', c.gpd != null ? `${n(c.gpd, 1)} g/dia` : '-', 'por peixe, desde a entrada'],
+  // ---------- 1. indicadores ----------
+  secao('Indicadores do lote', 70);
+  const ind = [
+    ['Dias de cultivo', fmtInt(c.diasCultivo), 'dias', `desde ${fmtData(lote.data_entrada)}`],
+    ['Peso médio atual', c.pmAtualG != null ? n(c.pmAtualG, 0) : '-', c.pmAtualG != null ? 'g' : '', c.dataUltimaBio ? `biometria de ${fmtData(c.dataUltimaBio)}` : 'sem biometria'],
+    ['Peixes vivos', fmtInt(c.vivos), 'estim.', `de ${fmtInt(lote.quantidade_inicial)} na entrada`],
+    ['Sobrevivência', c.sobrevivencia != null ? n(c.sobrevivencia, 1) : '-', '%', `${fmtInt(c.mortos)} morto(s)`],
+    ['Biomassa', c.biomassaAtual != null ? n(c.biomassaAtual, 0) : '-', c.biomassaAtual != null ? 'kg' : '', `na entrada: ${n(c.biomassaInicial, 0)} kg`],
+    ['Ração fornecida', n(c.racaoTotal, 0), 'kg', `${n(c.racaoTotal / kgSaco, 1)} sacos de ${n(kgSaco, 0)} kg`],
+    ['Conversão alimentar', c.ca != null ? n(c.ca, 2) : '-', '', c.ca != null ? 'kg de ração por kg ganho' : 'precisa de biometria'],
+    ['Ganho diário', c.gpd != null ? n(c.gpd, 1) : '-', c.gpd != null ? 'g/dia' : '', 'por peixe desde a entrada'],
   ];
   if (gerir) {
     const custoKg = c.custoRacao != null && c.ganhoBiomassa > 0 ? c.custoRacao / c.ganhoBiomassa : null;
-    kpi.push(['Custo de ração', c.custoRacao != null ? fmtBRL(c.custoRacao) : '-', c.custoRacao != null ? 'preço médio pago por kg' : 'sem valor nas compras']);
-    kpi.push(['Custo por kg ganho', custoKg != null ? fmtBRL(custoKg) : '-', 'ração / ganho de biomassa']);
+    ind.push(['Custo de ração', c.custoRacao != null ? fmtBRL(c.custoRacao) : '-', '', c.custoRacao != null ? 'preço médio pago por kg' : 'sem valor nas compras']);
+    ind.push(['Custo por kg ganho', custoKg != null ? fmtBRL(custoKg) : '-', '', 'ração / ganho de biomassa']);
   }
-  const cw = (LARG - 3 * 3) / 4, ch = 23;
-  kpi.forEach((k, i) => {
-    const col = i % 4;
-    if (col === 0) cabe(ch + 3);
-    const x = M + col * (cw + 3);
-    cor('fill', COR.claro); doc.roundedRect(x, y, cw, ch, 2.5, 2.5, 'F');
-    txt(k[0], x + 3, y + 5.5, { size: 7.5, color: COR.mudo, maxW: cw - 6 });
-    txt(k[1], x + 3, y + 13.5, { size: 14, bold: true, color: COR.rio2, maxW: cw - 6 });
-    txt(k[2], x + 3, y + 19.5, { size: 7, color: COR.mudo, maxW: cw - 6 });
-    if (col === 3 || i === kpi.length - 1) y += ch + 3;
-  });
+  const cw = LARG / 4, ch = 25;
+  const linhas = Math.ceil(ind.length / 4);
+  for (let r = 0; r < linhas; r++) {
+    cabe(ch);
+    ind.slice(r * 4, r * 4 + 4).forEach((k, i) => {
+      const x = M + i * cw + (i ? 4 : 0);
+      caps(k[0], x, y + 5);
+      txt(k[1], x, y + 14, { size: 20 });
+      if (k[2]) txt(k[2], x + largura(k[1], 20, false) + 1.4, y + 14, { size: 8.5, color: COR.mudo });
+      txt(k[3], x, y + 20, { size: 7.5, color: COR.mudo });
+    });
+    y += ch + 1;
+  }
+  y += 8;
+
+  // ---------- 2. observações ----------
+  const obs = [];
+  obs.push(['Crescimento', c.pmAtualG != null
+    ? `Peso médio de ${n(c.pmInicialG, 1)} g na entrada para ${n(c.pmAtualG, 0)} g em ${fmtData(c.dataUltimaBio)}${c.gpd != null ? ` (${n(c.gpd, 1)} g por dia por peixe)` : ''}.`
+    : 'Sem biometria registrada. Pese uma amostra para calcular peso médio, biomassa e conversão alimentar.']);
+  obs.push(['Sobrevivência', `${fmtInt(c.mortos)} morte(s) em ${fmtInt(lote.quantidade_inicial)} peixes (${n(100 - (c.sobrevivencia ?? 100), 1)}%). Restam cerca de ${fmtInt(c.vivos)}.`]);
+  obs.push(['Ração', `${n(c.racaoTotal, 0)} kg fornecidos (${n(c.racaoTotal / kgSaco, 1)} sacos de ${n(kgSaco, 0)} kg)${c.racaoMediaDia != null ? `, média de ${n(c.racaoMediaDia, 1)} kg por dia` : ''}.`]);
+  if (c.ca != null) obs.push(['Conversão', `${n(c.ca, 2)} kg de ração por kg de peixe ganho até a última biometria. Referência usual: 1,2 a 2,0, conforme espécie e fase.`]);
+  if (gerir && c.custoRacao != null) obs.push(['Custo', `${fmtBRL(c.custoRacao)} em ração, calculado pelo preço médio das compras com valor informado.`]);
+  const alertas = [];
+  if (bios.length < 2) alertas.push('Menos de duas biometrias: ganho de peso e conversão alimentar ficam pouco confiáveis. O ideal é pesar a cada 15 dias.');
+  if (bios.some((b) => Number(b.quantidade_amostrada) < 30)) alertas.push('Há biometria com menos de 30 peixes pesados. Amostras pequenas dão peso médio menos preciso; o ideal é 5% a 10% do lote.');
+
+  secao('Observações', 40);
+  const colEsq = 30;
+  const bloco = (rot, texto, corRot) => {
+    const ls = quebra(texto, LARG - colEsq, 9.5, false);
+    cabe(ls.length * 4.6 + 4);
+    caps(rot, M, y + 0.2, { color: corRot || COR.mudo });
+    txt(ls, M + colEsq, y, { size: 9.5 });
+    y += ls.length * 4.6 + 3;
+  };
+  obs.forEach(([r, t]) => bloco(r, t));
+  alertas.forEach((a) => bloco('Atenção', a, COR.ambar));
   y += 3;
 
-  // ---------- 2. leitura em palavras ----------
-  secao('O que os números dizem', null, 50);
-  const frases = [];
-  if (c.pmAtualG != null) {
-    frases.push(`Peso: o peso médio passou de ${n(c.pmInicialG, 1)} g na entrada para ${n(c.pmAtualG, 0)} g na última biometria (${fmtData(c.dataUltimaBio)})${c.gpd != null ? `, um ganho de cerca de ${n(c.gpd, 1)} g por peixe por dia` : ''}.`);
-  } else {
-    frases.push('Peso: ainda não há biometria registrada. Pese uma amostra de peixes para calcular o peso médio, a biomassa e a conversão alimentar.');
-  }
-  frases.push(`Sobrevivência: dos ${fmtInt(lote.quantidade_inicial)} peixes que entraram, ${fmtInt(c.mortos)} morreram (${n(100 - (c.sobrevivencia ?? 100), 1)}% de mortalidade). Restam cerca de ${fmtInt(c.vivos)} vivos.`);
-  frases.push(`Ração: foram fornecidos ${n(c.racaoTotal, 0)} kg (${n(c.racaoTotal / kgSaco, 1)} sacos de ${n(kgSaco, 0)} kg)${c.racaoMediaDia != null ? `, em média ${n(c.racaoMediaDia, 1)} kg por dia (${n(c.racaoMediaDia / kgSaco, 1)} sacos por dia)` : ''}.`);
-  if (c.ca != null) frases.push(`Conversão alimentar: ${n(c.ca, 2)}. Foram usados ${n(c.ca, 2)} kg de ração para cada 1 kg de peixe ganho até a última biometria. Quanto menor, melhor; o valor costuma ficar entre 1,2 e 2,0, conforme a espécie e a fase.`);
-  if (gerir && c.custoRacao != null) frases.push(`Custo: a ração do lote custou cerca de ${fmtBRL(c.custoRacao)} (preço médio pago por kg, calculado pelas compras com valor informado).`);
-  frases.forEach((f) => paragrafo(f));
-
-  const avisos = [];
-  if (bios.length < 2) avisos.push('Há menos de duas biometrias: o ganho de peso e a conversão alimentar ficam pouco confiáveis. O ideal é pesar uma amostra a cada 15 dias.');
-  if (bios.some((b) => Number(b.quantidade_amostrada) < 30)) avisos.push('Alguma biometria usou menos de 30 peixes. Amostras pequenas dão um peso médio menos preciso; o ideal é pesar de 5% a 10% do lote.');
-  if (avisos.length) {
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
-    const h = avisos.reduce((s, a) => s + doc.splitTextToSize(a, LARG - 10).length * 4.2, 0) + 4 + 1.5 * avisos.length;
-    cabe(h + 2);
-    cor('fill', [253, 240, 214]); doc.roundedRect(M, y, LARG, h, 2, 2, 'F');
-    let yy = y + 5.5;
-    avisos.forEach((a) => { const ls = doc.splitTextToSize(a, LARG - 10); txt(ls, M + 5, yy, { size: 8.5, color: [110, 70, 6] }); yy += ls.length * 4.2 + 1.5; });
-    y += h + 4;
-  }
-
-  // ---------- 3. gráfico de peso ----------
-  secao('Evolução do peso médio', 'Cada ponto é uma biometria. O primeiro é o peso médio na entrada do lote.', 90);
+  // ---------- 3. peso ----------
+  secao('Evolução do peso médio', 86);
   const pts = evo.filter((p) => p.g != null);
   if (pts.length >= 2) {
-    grafico(doc, M, y, LARG, 62, pts.map((p) => ({ x: p.data, y: p.g })), (v) => (v === 0 ? '0 g' : `${n(v, v < 10 ? 1 : 0)} g`));
-    y += 68;
-  } else paragrafo('São necessárias pelo menos duas pesagens (a entrada conta como uma) para desenhar o gráfico.', { color: COR.mudo });
+    txt('Peso médio por biometria, em gramas. O primeiro ponto é a entrada do lote.', M, y, { size: 8, color: COR.mudo });
+    y += 3;
+    grafico(doc, M, y, LARG, 58, pts.map((p) => ({ x: p.data, y: p.g })), (v) => (v === 0 ? '0' : n(v, v < 10 ? 1 : 0)), txt, caps);
+    y += 64;
+  } else { txt('São necessárias ao menos duas pesagens (a entrada conta como uma) para desenhar o gráfico.', M, y + 1, { size: 9, color: COR.mudo }); y += 9; }
 
-  // ---------- 4. tabela de biometrias ----------
-  secao('Biometrias', 'Peso médio = peso da amostra dividido pelo número de peixes pesados.', 50);
+  // ---------- 4. biometrias ----------
+  secao('Biometrias', 44);
   if (evo.length) {
     const validas = bios.filter((b) => pesoMedioKg(b) != null);
     let k = 0;
-    const linhas = evo.map((p) => {
+    const corpo = evo.map((p) => {
       const b = p.inicial ? null : validas[k++];
       return [fmtData(p.data), p.inicial ? 'Entrada do lote' : `${fmtInt(b.quantidade_amostrada)} peixes`, n(p.g, 1), p.ganhoDia != null ? n(p.ganhoDia, 1) : '-', n(Math.max(0, diasEntre(lote.data_entrada, p.data)), 0)];
     });
-    tabela(doc, y, [['Data', 'Amostra', 'Peso médio (g)', 'Ganho no período (g/dia)', 'Dia do lote']], linhas, ['left', 'left', 'right', 'right', 'right']);
-    y = doc.lastAutoTable.finalY + 7;
-  } else paragrafo('Nenhuma biometria registrada.', { color: COR.mudo });
+    tabela(doc, y, [['DATA', 'AMOSTRA', 'PESO MÉDIO (g)', 'GANHO (g/dia)', 'DIA DO LOTE']], corpo, ['left', 'left', 'right', 'right', 'right']);
+    y = doc.lastAutoTable.finalY + 3;
+    txt('Peso médio = peso da amostra dividido pelo número de peixes pesados. Ganho = variação desde a pesagem anterior.', M, y + 2, { size: 7.5, color: COR.mudo });
+    y += 10;
+  } else { txt('Nenhuma biometria registrada.', M, y + 1, { size: 9, color: COR.mudo }); y += 9; }
 
   // ---------- 5. ração ----------
-  secao('Ração por semana', 'Soma do que foi lançado de segunda a domingo. A semana é identificada pela segunda-feira.', 76);
+  secao('Ração por semana', 80);
   if (semanas.length) {
-    const ult = semanas.slice(-16);
-    barras(doc, M, y, LARG, 52, ult.map((s) => ({ r: dm(s.inicio), v: s.kg })));
-    y += 58;
-    const linhas = semanas.slice().reverse().map((s) => [`Semana de ${fmtData(s.inicio)}`, n(s.kg, 1), n(s.kg / kgSaco, 1), n(s.kg / 7, 1)]);
-    tabela(doc, y, [['Semana', 'Ração (kg)', `Sacos de ${n(kgSaco, 0)} kg`, 'Média por dia (kg)']], linhas, ['left', 'right', 'right', 'right']);
-    y = doc.lastAutoTable.finalY + 7;
-  } else paragrafo('Nenhuma ração lançada.', { color: COR.mudo });
+    txt('Total lançado de segunda a domingo, em kg. A última barra pode ser uma semana incompleta.', M, y, { size: 8, color: COR.mudo });
+    y += 3;
+    barras(doc, M, y, LARG, 46, semanas.slice(-20).map((s) => ({ r: dm(s.inicio), v: s.kg })), txt);
+    y += 52;
+    const corpo = semanas.slice().reverse().map((s) => [`Semana de ${fmtData(s.inicio)}`, n(s.kg, 1), n(s.kg / kgSaco, 1), n(s.kg / 7, 1)]);
+    tabela(doc, y, [['SEMANA', 'RAÇÃO (kg)', `SACOS DE ${n(kgSaco, 0)} kg`, 'MÉDIA (kg/dia)']], corpo, ['left', 'right', 'right', 'right']);
+    y = doc.lastAutoTable.finalY + 9;
+  } else { txt('Nenhuma ração lançada.', M, y + 1, { size: 9, color: COR.mudo }); y += 9; }
 
   // ---------- 6. mortalidade ----------
-  secao('Mortalidade', null, 45);
+  secao('Mortalidade', 44);
   if (mort.length) {
     let acc = 0;
-    const linhas = mort.map((m) => { acc += Number(m.quantidade); return [fmtData(m.data), fmtInt(m.quantidade), fmtInt(acc), `${n((acc / Number(lote.quantidade_inicial)) * 100, 2)}%`]; });
-    const lim = linhas.slice(-25);
-    tabela(doc, y, [['Data', 'Mortos no dia', 'Total acumulado', '% do lote inicial']], lim, ['left', 'right', 'right', 'right']);
+    const todas = mort.map((m) => { acc += Number(m.quantidade); return [fmtData(m.data), fmtInt(m.quantidade), fmtInt(acc), `${n((acc / Number(lote.quantidade_inicial)) * 100, 2)}%`]; });
+    const lim = todas.slice(-25);
+    tabela(doc, y, [['DATA', 'MORTOS NO DIA', 'ACUMULADO', '% DO LOTE']], lim, ['left', 'right', 'right', 'right']);
     y = doc.lastAutoTable.finalY + 3;
-    if (linhas.length > lim.length) { txt(`Mostrando os ${lim.length} registros mais recentes de ${linhas.length}.`, M, y + 2, { size: 8, color: COR.mudo }); y += 6; }
-    y += 4;
-  } else paragrafo('Nenhuma mortalidade registrada.', { color: COR.mudo });
+    if (todas.length > lim.length) { txt(`Mostrando os ${lim.length} registros mais recentes de ${todas.length}.`, M, y + 2, { size: 7.5, color: COR.mudo }); y += 6; }
+    y += 7;
+  } else { txt('Nenhuma mortalidade registrada.', M, y + 1, { size: 9, color: COR.mudo }); y += 10; }
 
-  // ---------- 7. como ler ----------
-  secao('Como ler este relatório');
+  // ---------- 7. notas ----------
+  secao('Notas', 50);
   [
-    ['Peso médio', 'Peso de uma amostra de peixes dividido pelo número de peixes pesados.'],
     ['Biomassa', 'Peso total estimado dos peixes vivos: peixes vivos x peso médio da última biometria.'],
-    ['Sobrevivência', 'Percentual de peixes que continuam vivos em relação ao que entrou. Depende da mortalidade registrada.'],
-    ['Conversão alimentar', 'Quantos kg de ração foram usados para cada 1 kg de peixe ganho. Quanto menor, melhor o aproveitamento.'],
-    ['Ganho de peso diário', 'Quantos gramas, em média, cada peixe ganha por dia.'],
-    ['Valores estimados', 'Peixes vivos, biomassa e conversão são estimativas: dependem de a mortalidade e as biometrias terem sido lançadas. Quanto mais biometrias, mais confiável.'],
+    ['Sobrevivência', 'Peixes que continuam vivos em relação ao que entrou, pela mortalidade registrada.'],
+    ['Conversão alimentar', 'Kg de ração usados para cada kg de peixe ganho. Quanto menor, melhor o aproveitamento.'],
+    ['Estimativas', 'Peixes vivos, biomassa e conversão dependem de mortalidade e biometrias lançadas. Quanto mais biometrias, mais confiável.'],
   ].forEach(([t, s]) => {
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-    const ls = doc.splitTextToSize(s, LARG - 46); cabe(ls.length * 4.2 + 3);
-    txt(t, M, y, { size: 9, bold: true, color: COR.rio2 }); txt(ls, M + 44, y, { size: 9 });
-    y += ls.length * 4.2 + 2.2;
+    const ls = quebra(s, LARG - 40, 8.5, false); cabe(ls.length * 4 + 3);
+    txt(t, M, y, { size: 8.5, bold: true }); txt(ls, M + 38, y, { size: 8.5, color: COR.mudo });
+    y += ls.length * 4 + 2.4;
   });
 
-  rodape(doc, fazenda, `${nomeTanque} | ${lote.especie}`);
+  rodape(doc, fazenda, nomeTanque, txt, caps, linha);
   return doc;
 }
 
 // cabeçalho corrente (páginas 2+) e rodapé em todas as páginas
-export function rodape(doc, fazenda, titulo) {
+function rodape(doc, fazenda, titulo, txt, caps, linha) {
   const total = doc.getNumberOfPages();
   for (let p = 1; p <= total; p++) {
     doc.setPage(p);
     if (p > 1) {
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(...COR.rio); doc.text(titulo, M, 12);
-      doc.setFont('helvetica', 'normal'); doc.setTextColor(...COR.mudo); doc.text(fazenda, 210 - M, 12, { align: 'right' });
-      doc.setDrawColor(...COR.linha); doc.setLineWidth(0.2); doc.line(M, 15, 210 - M, 15);
+      caps(fazenda, M, 14, { color: COR.rio, size: 7 }); caps(`Relatório do lote  ·  ${titulo}`, 210 - M, 14, { align: 'right' });
     }
-    doc.setDrawColor(...COR.linha); doc.setLineWidth(0.2); doc.line(M, 287, 210 - M, 287);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...COR.mudo);
-    doc.text('Gestão de Piscicultura', M, 292);
-    doc.text(`Página ${p} de ${total}`, 210 - M, 292, { align: 'right' });
+    txt('Gestão de Piscicultura', M, 291, { size: 7.5, color: COR.mudo });
+    txt(`${p} / ${total}`, 210 - M, 291, { size: 7.5, color: COR.mudo, align: 'right' });
   }
 }
 
 export function tabela(doc, y, head, body, align) {
   const colStyles = {}; align.forEach((a, i) => { colStyles[i] = { halign: a }; });
   doc.autoTable({
-    startY: y, head, body, margin: { left: M, right: M, top: TOPO, bottom: 14 }, theme: 'plain',
-    styles: { font: 'helvetica', fontSize: 8.5, cellPadding: { top: 1.8, bottom: 1.8, left: 2.5, right: 2.5 }, textColor: COR.tinta },
-    headStyles: { fillColor: COR.rio, textColor: COR.branco, fontStyle: 'bold', fontSize: 8 },
-    alternateRowStyles: { fillColor: COR.zebra },
+    startY: y, head, body, margin: { left: M, right: M, top: TOPO, bottom: 16 }, theme: 'plain',
+    styles: { font: FAM, fontSize: 9, cellPadding: { top: 2.2, bottom: 2.2, left: 1.5, right: 1.5 }, textColor: COR.tinta, lineColor: COR.linha, lineWidth: { bottom: 0.12 } },
+    headStyles: { font: FAM, fontStyle: 'bold', fontSize: 6.8, textColor: COR.mudo, fillColor: false, lineColor: COR.linha, lineWidth: { bottom: 0.12 }, cellPadding: { top: 1.6, bottom: 2, left: 1.5, right: 1.5 } },
     columnStyles: colStyles,
     didParseCell: (h) => { if (h.section === 'head') h.cell.styles.halign = align[h.column.index]; },
   });
 }
 
-// escala "bonita" para o eixo Y
 function escala(max) {
-  const bruto = (max || 1) / 4; const mag = 10 ** Math.floor(Math.log10(bruto));
+  const bruto = (max || 1) / 3; const mag = 10 ** Math.floor(Math.log10(bruto));
   const passo = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((p) => p >= bruto) || mag;
   return { passo, topo: Math.max(passo, Math.ceil(max / passo) * passo) };
 }
 
-export function grafico(doc, x0, y0, w, h, pontos, fmtY) {
-  const pl = 16, pr = 6, pt = 8, pb = 9;
+export function grafico(doc, x0, y0, w, h, pontos, fmtY, txt, caps) {
+  const pl = 11, pr = 5, pt = 6, pb = 9;
   const X = x0 + pl, Y = y0 + pt, W = w - pl - pr, H = h - pt - pb;
   const t = (iso) => new Date(`${iso}T00:00:00Z`).getTime();
   const t0 = t(pontos[0].x), t1 = t(pontos[pontos.length - 1].x);
   const { passo, topo } = escala(Math.max(...pontos.map((p) => p.y)));
   const px = (iso) => X + (t1 === t0 ? 0 : ((t(iso) - t0) / (t1 - t0)) * W);
   const py = (v) => Y + H - (v / topo) * H;
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
   for (let v = 0; v <= topo + 1e-9; v += passo) {
     doc.setDrawColor(...COR.linha); doc.setLineWidth(0.15); doc.line(X, py(v), X + W, py(v));
-    doc.setTextColor(...COR.mudo); doc.text(fmtY(v), X - 2, py(v) + 1, { align: 'right' });
+    txt(fmtY(v), X - 2, py(v) + 1, { size: 7, color: COR.mudo, align: 'right' });
   }
-  doc.setDrawColor(...COR.rio); doc.setLineWidth(0.8);
+  doc.setDrawColor(...COR.rio); doc.setLineWidth(0.8); doc.setLineCap('round'); doc.setLineJoin('round');
   for (let i = 1; i < pontos.length; i++) doc.line(px(pontos[i - 1].x), py(pontos[i - 1].y), px(pontos[i].x), py(pontos[i].y));
-  pontos.forEach((p) => { doc.setFillColor(...COR.branco); doc.setDrawColor(...COR.rio); doc.setLineWidth(0.6); doc.circle(px(p.x), py(p.y), 1.2, 'FD'); });
-  const rot = pontos.length <= 8 ? pontos : [pontos[0], pontos[Math.floor(pontos.length / 2)], pontos[pontos.length - 1]];
-  rot.forEach((p, i) => {
-    doc.setTextColor(...COR.tinta); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
-    doc.text(fmtY(p.y), px(p.x), py(p.y) - 2.6, { align: i === 0 ? 'left' : i === rot.length - 1 ? 'right' : 'center' });
+  doc.setFillColor(...COR.branco); doc.setDrawColor(...COR.rio); doc.setLineWidth(0.6);
+  pontos.forEach((p) => doc.circle(px(p.x), py(p.y), 1.1, 'FD'));
+  doc.setLineCap('butt');
+  const max = pontos.reduce((m, p, i) => (p.y > pontos[m].y ? i : m), 0);
+  const rot = new Set([0, pontos.length - 1, ...(pontos.length <= 7 ? pontos.map((_, i) => i) : [max])]);
+  [...rot].forEach((i) => {
+    const p = pontos[i];
+    txt(`${fmtY(p.y)} g`, px(p.x), py(p.y) - 2.8, { size: 7.5, bold: i === pontos.length - 1, align: i === 0 ? 'left' : i === pontos.length - 1 ? 'right' : 'center' });
   });
-  doc.setFont('helvetica', 'normal'); doc.setTextColor(...COR.mudo);
-  const datas = pontos.length <= 6 ? pontos : rot;
-  datas.forEach((p, i) => doc.text(fmtData(p.x), px(p.x), Y + H + 5, { align: i === 0 ? 'left' : i === datas.length - 1 ? 'right' : 'center' }));
+  const datas = pontos.length <= 5 ? pontos : [pontos[0], pontos[Math.floor(pontos.length / 2)], pontos[pontos.length - 1]];
+  datas.forEach((p, i) => txt(fmtData(p.x), px(p.x), Y + H + 5.5, { size: 7, color: COR.mudo, align: i === 0 ? 'left' : i === datas.length - 1 ? 'right' : 'center' }));
 }
 
-export function barras(doc, x0, y0, w, h, itens) {
-  const pl = 14, pr = 2, pt = 6, pb = 8;
+export function barras(doc, x0, y0, w, h, itens, txt) {
+  const pl = 11, pr = 2, pt = 5, pb = 8;
   const X = x0 + pl, Y = y0 + pt, W = w - pl - pr, H = h - pt - pb;
   const { passo, topo } = escala(Math.max(...itens.map((i) => i.v)));
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
   for (let v = 0; v <= topo + 1e-9; v += passo) {
     const yy = Y + H - (v / topo) * H;
     doc.setDrawColor(...COR.linha); doc.setLineWidth(0.15); doc.line(X, yy, X + W, yy);
-    doc.setTextColor(...COR.mudo); doc.text(fmtNum(v, 0), X - 2, yy + 1, { align: 'right' });
+    txt(fmtNum(v, 0), X - 2, yy + 1, { size: 7, color: COR.mudo, align: 'right' });
   }
-  const slot = W / itens.length, bw = Math.min(slot * 0.62, 12);
+  const slot = W / itens.length, bw = Math.min(slot * 0.5, 5);
+  const max = itens.reduce((m, it, i) => (it.v > itens[m].v ? i : m), 0);
   itens.forEach((it, i) => {
     const bh = (it.v / topo) * H, bx = X + i * slot + (slot - bw) / 2;
-    doc.setFillColor(...COR.rio); doc.roundedRect(bx, Y + H - bh, bw, Math.max(bh, 0.4), 0.8, 0.8, 'F');
-    if (itens.length <= 12) { doc.setTextColor(...COR.tinta); doc.setFontSize(7); doc.text(fmtNum(it.v, 0), bx + bw / 2, Y + H - bh - 1.5, { align: 'center' }); }
-    doc.setTextColor(...COR.mudo); doc.setFontSize(6.8);
-    if (itens.length <= 10 || i % 2 === 0) doc.text(it.r, bx + bw / 2, Y + H + 4.5, { align: 'center' });
+    doc.setFillColor(...(i === itens.length - 1 ? COR.rio : COR.suave)); doc.roundedRect(bx, Y + H - bh, bw, Math.max(bh, 0.8), Math.min(bw / 2, 1.6), Math.min(bw / 2, 1.6), 'F');
+    if (i === itens.length - 1 || i === max) txt(fmtNum(it.v, 0), bx + bw / 2, Y + H - bh - 1.6, { size: 7, bold: true, align: 'center' });
+    if (itens.length <= 8 || i % 3 === 0) txt(it.r, bx + bw / 2, Y + H + 4.5, { size: 6.8, color: COR.mudo, align: 'center' });
   });
 }
