@@ -93,6 +93,10 @@ export function criarApi(client) {
       ]);
       return { bios, mort, rac };
     },
+    // ração de todos os tanques visíveis ao usuário a partir de uma data (para a tabela dia × tanque)
+    async racaoPeriodo(desde) {
+      return todos(() => client.from('racao_consumo').select('id,data,tanque_id,quantidade_kg').gte('data', desde).order('data').order('id'));
+    },
     async nomesUsuarios() {
       const lista = ok(await client.from('usuarios').select('id,nome'));
       return Object.fromEntries(lista.map((u) => [u.id, u.nome]));

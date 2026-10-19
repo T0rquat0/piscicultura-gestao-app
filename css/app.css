@@ -104,7 +104,6 @@ small { font-size: .85rem; }
 .destaques { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; margin-bottom: .8rem; }
 .destaques .mudo { display: block; font-size: .85rem; }
 .grande-num { display: block; white-space: nowrap; font-size: 2.1rem; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; }
-td { font-variant-numeric: tabular-nums; }
 .grande-num em { font-style: normal; font-size: .55em; font-weight: 600; letter-spacing: 0; margin-left: .15em; color: var(--tinta-2); }
 .dados { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem .8rem; }
 .dados div { font-size: .85rem; }
@@ -167,7 +166,7 @@ input:focus, select:focus { outline: none; border-color: var(--rio); box-shadow:
 .duas { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
 .linha-check { display: flex; align-items: center; gap: .7rem; font-weight: 500; }
 .linha-check input { width: 24px; min-height: 24px; height: 24px; accent-color: var(--rio); }
-.seg { display: grid; grid-template-columns: repeat(3, 1fr); background: #cfe0d7; border-radius: 999px; padding: 4px; margin-bottom: 1.1rem; gap: 4px; }
+.seg { display: grid; grid-template-columns: repeat(var(--n, 3), 1fr); background: #cfe0d7; border-radius: 999px; padding: 4px; margin-bottom: 1.1rem; gap: 4px; }
 .seg button { appearance: none; border: 0; background: transparent; font: inherit; font-weight: 600; padding: .75rem .2rem; border-radius: 999px; color: var(--tinta-2); cursor: pointer; transition: background .2s var(--ease), color .2s; }
 .seg button.on { background: var(--rio); color: #fff; }
 .calc { background: var(--rio-claro); color: var(--rio-2); border-radius: var(--r-campo); padding: .75rem .9rem; font-weight: 600; }
@@ -260,3 +259,34 @@ summary { cursor: pointer; font-weight: 700; padding: .7rem 0; font-size: 1.05re
 .fase.eng { background: var(--rio); }
 .tanque-card > header .tag.ok { background: #fff; }
 .tanque-card > header .tag.alerta { background: #ffe3b0; }
+
+/* ----- relatório: abas, tabelas e barras ----- */
+.seg[style*="--n:4"] button { font-size: .9rem; }
+.atalho { display: flex; align-items: center; gap: .9rem; text-decoration: none; color: inherit; margin-bottom: 1rem; }
+.atalho .esq { flex: 1; }
+.atalho .esq b, .atalho .esq small { display: block; }
+.card.tabela { padding: .4rem 1rem; }
+.tabela td, .tabela th { padding: .85rem .4rem; }
+.tabela thead th { border-bottom: 1px solid var(--linha); }
+.tabela tfoot td { border-top: 2px solid var(--linha); border-bottom: 0; font-weight: 700; }
+.matriz.rolagem { padding: .4rem 0; }
+.matriz table { min-width: 100%; }
+.matriz th:first-child, .matriz td:first-child { position: sticky; left: 0; background: var(--card); padding-left: 1rem; z-index: 1; }
+.matriz th:last-child, .matriz td:last-child { padding-right: 1rem; }
+.matriz td.total, .matriz th.total { background: var(--rio-claro); }
+.matriz td:first-child { text-transform: capitalize; }
+.vazio-cel { color: #a9b3ab; }
+.grafico .barra { fill: var(--rio); }
+
+/* matriz dia × tanque: cabe em 3 tanques; com mais, rola e mantém Dia e Total à vista */
+.matriz table { font-size: .9rem; }
+.matriz td, .matriz th { padding: .8rem .45rem; }
+.matriz th.n { line-height: 1.15; white-space: normal; min-width: 4.2rem; }
+.matriz th:last-child, .matriz td:last-child { position: sticky; right: 0; z-index: 1; padding-right: 1rem; }
+.matriz td:first-child { padding-right: .8rem; }
+.matriz tfoot td:first-child, .matriz tfoot td:last-child { background: var(--card); }
+.matriz tfoot td.total { background: var(--rio-claro); }
+.matriz table { font-size: .85rem; }
+.matriz td, .matriz th { padding: .8rem .3rem; }
+.matriz th.n { min-width: 0; }
+.matriz td:first-child, .matriz th:first-child { padding-left: .9rem; white-space: nowrap; }

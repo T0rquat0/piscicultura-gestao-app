@@ -75,3 +75,54 @@ export function pontosPeso(lote, bios) {
   }
   return pts;
 }
+
+// Evolução entre biometrias: peso médio (g) e ganho diário (g/dia) em relação ao ponto anterior (entrada incluída)
+export function evolucaoPeso(lote, bios) {
+  const pts = pontosPeso(lote, bios);
+  return pts.map((p, i) => {
+    const ant = i ? pts[i - 1] : null;
+    const dias = ant ? diasEntre(ant.data, p.data) : null;
+    return { data: p.data, g: p.g, inicial: !!p.inicial, ganhoDia: ant && dias > 0 ? (p.g - ant.g) / dias : null };
+  });
+}
+
+// Segunda-feira da semana (YYYY-MM-DD) de uma data ISO
+export function inicioSemana(iso) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  const dia = (d.getUTCDay() + 6) % 7; // segunda = 0
+  d.setUTCDate(d.getUTCDate() - dia);
+  return d.toISOString().slice(0, 10);
+}
+
+// Ração somada por semana, da mais antiga para a mais recente
+export function racaoPorSemana(rac) {
+  const m = new Map();
+  for (const r of rac) m.set(inicioSemana(r.data), (m.get(inicioSemana(r.data)) || 0) + Number(r.quantidade_kg || 0));
+  return [...m.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([inicio, kg]) => ({ inicio, kg }));
+}
+
+// Matriz dias × tanques: linhas do dia mais recente ao mais antigo (inclui dias sem lançamento)
+export function matrizRacao(linhas, tanqueIds, dias, hoje) {
+  const celulas = new Map(); // "data|tanque" -> kg
+  for (const r of linhas) {
+    const k = `${r.data}|${r.tanque_id}`;
+    celulas.set(k, (celulas.get(k) || 0) + Number(r.quantidade_kg || 0));
+  }
+  const datas = [];
+  const base = new Date(`${hoje}T00:00:00Z`);
+  for (let i = 0; i < dias; i++) {
+    const d = new Date(base); d.setUTCDate(d.getUTCDate() - i);
+    datas.push(d.toISOString().slice(0, 10));
+  }
+  const totalTanque = Object.fromEntries(tanqueIds.map((t) => [t, 0]));
+  const rows = datas.map((data) => {
+    const por = {}; let total = 0;
+    for (const t of tanqueIds) {
+      const v = celulas.get(`${data}|${t}`);
+      por[t] = v == null ? null : v;
+      if (v != null) { total += v; totalTanque[t] += v; }
+    }
+    return { data, por, total };
+  });
+  return { rows, totalTanque, total: rows.reduce((s, r) => s + r.total, 0) };
+}
