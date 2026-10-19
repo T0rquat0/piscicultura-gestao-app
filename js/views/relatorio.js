@@ -1,4 +1,5 @@
 // Relatórios por lote (precisam de internet: usam os dados já sincronizados no servidor).
+import { PESO_SACO_PADRAO_KG } from '../config.js';
 import { confirmar } from '../dialogo.js';
 import { icone } from '../icons.js';
 import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, ROTULO_TIPO } from '../util.js';
@@ -78,6 +79,7 @@ export async function renderRelatorioLote(ctx, el, id) {
     ctx.api.nomesUsuarios().catch(() => ({})),
     gerir ? ctx.api.compras(true).catch(() => []) : Promise.resolve([]),
   ]);
+  const kgS = ctx.state.ref.kgSaco || PESO_SACO_PADRAO_KG;
   const quem = (uid) => nomes[uid] || (uid === ctx.state.perfil.id ? 'Você' : 'Colega');
   const hoje = hojeISO();
   const datas = [...bios, ...mort, ...rac].map((x) => x.data).sort();
@@ -100,7 +102,7 @@ export async function renderRelatorioLote(ctx, el, id) {
   const painelResumo = () => `
     <div class="card destaques3">
       ${destaque('Peso médio atual', c.pmAtualG != null ? unid(fmtNum(c.pmAtualG, 0), 'g') : '—', c.pmAtualG != null ? `em ${fmtData(c.dataUltimaBio)}` : 'sem biometria ainda')}
-      ${destaque('Ração fornecida', unid(fmtNum(c.racaoTotal, 0), 'kg'), c.racaoMediaDia != null ? `média ${fmtNum(c.racaoMediaDia, 1)} kg/dia` : '')}
+      ${destaque('Ração fornecida', unid(fmtNum(c.racaoTotal, 0), 'kg'), `≈ ${fmtNum(c.racaoTotal / kgS, 1)} sacos` + (c.racaoMediaDia != null ? ` · média ${fmtNum(c.racaoMediaDia, 1)} kg/dia` : ''))}
       ${destaque('Conversão alimentar', c.ca != null ? fmtNum(c.ca, 2) : '—', c.ca != null ? 'kg de ração por kg ganho' : 'precisa de biometria com ganho')}
     </div>
     <section class="bloco"><h2>Situação do lote</h2>
@@ -133,7 +135,7 @@ export async function renderRelatorioLote(ctx, el, id) {
     const recentes = [...rac].reverse().slice(0, 14);
     return `
     <div class="card destaques3">
-      ${destaque('Ração fornecida', unid(fmtNum(c.racaoTotal, 0), 'kg'), c.racaoMediaDia != null ? `média ${fmtNum(c.racaoMediaDia, 1)} kg/dia` : '')}
+      ${destaque('Ração fornecida', unid(fmtNum(c.racaoTotal, 0), 'kg'), `≈ ${fmtNum(c.racaoTotal / kgS, 1)} sacos` + (c.racaoMediaDia != null ? ` · média ${fmtNum(c.racaoMediaDia, 1)} kg/dia` : ''))}
       ${gerir ? destaque('Custo de ração', c.custoRacao != null ? fmtBRL(c.custoRacao) : '—', c.custoRacao != null ? 'pelo preço médio pago por kg' : 'registre o valor nas compras') : ''}
     </div>
     <section class="bloco"><h2>Por semana</h2><div class="card">${svgSemanas(sem)}</div></section>
@@ -145,7 +147,7 @@ export async function renderRelatorioLote(ctx, el, id) {
   };
 
   const painelRegistros = () => `
-    ${secao('Ração lançada', [...rac].reverse().map((r) => registro(r.data, r.registrado_por, `${fmtNum(r.quantidade_kg, 1)} kg`, 'racao_consumo', r.id)), 'Nenhuma ração lançada.')}
+    ${secao('Ração lançada', [...rac].reverse().map((r) => registro(r.data, r.registrado_por, `${fmtNum(r.quantidade_kg, 1)} kg (≈ ${fmtNum(r.quantidade_kg / kgS, 1)} sacos)`, 'racao_consumo', r.id)), 'Nenhuma ração lançada.')}
     ${secao('Biometrias', [...bios].reverse().map((b) => registro(b.data, b.registrado_por, `${fmtNum(pesoMedioKg(b) * 1000, 0)} g<small>${fmtInt(b.quantidade_amostrada)} peixes · ${fmtNum(b.peso_amostra_kg, 3)} kg</small>`, 'biometrias', b.id)), 'Nenhuma biometria registrada.')}
     ${secao('Mortalidade', [...mort].reverse().map((m) => registro(m.data, m.registrado_por, `${fmtInt(m.quantidade)} peixes`, 'mortalidade', m.id)), 'Nenhuma mortalidade registrada.')}`;
 

@@ -378,3 +378,12 @@ input.grande { font-size: 2rem; font-weight: 700; min-height: 72px; text-align: 
 .tile.feito .ponto { background: var(--ok); }
 .tile.on .ponto { background: #fff !important; }
 .tile.on { color: #fff; background: var(--rio); border-color: var(--rio); }
+
+/* nomes de tanque longos (ex.: "Viveiro do Açude Grande") */
+.tiles.compactos { grid-template-columns: 1fr; }
+.tiles.compactos .tile { min-height: 52px; font-size: 1.05rem; line-height: 1.2; text-align: left; }
+.tile > span, .tile .nome { min-width: 0; overflow-wrap: anywhere; }
+.tanque-atual > div { min-width: 0; }
+.tanque-atual b { display: block; overflow-wrap: anywhere; }
+.mini-topo b { min-width: 0; overflow-wrap: anywhere; line-height: 1.15; }
+.tile { overflow-wrap: anywhere; }

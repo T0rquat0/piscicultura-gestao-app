@@ -70,8 +70,8 @@ async function carregarRefLocal() {
 async function atualizarRef() {
   if (!navigator.onLine || !state.user || !api) return false;
   try {
-    const [tanques, lotes] = await Promise.all([api.tanques(), api.lotes({ apenasAtivos: true })]);
-    state.ref = { tanques, lotes, userId: state.perfil.id, atualizado_em: new Date().toISOString() };
+    const [tanques, lotes, kgSaco] = await Promise.all([api.tanques(), api.lotes({ apenasAtivos: true }), api.kgSaco().catch(() => null)]);
+    state.ref = { tanques, lotes, kgSaco: kgSaco || (state.ref && state.ref.kgSaco) || null, userId: state.perfil.id, atualizado_em: new Date().toISOString() };
     await db.kvSet('ref', state.ref);
     state.semRede = false;
     atualizarPill();

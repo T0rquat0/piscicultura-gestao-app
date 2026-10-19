@@ -1,5 +1,7 @@
 import { esc, ROTULO_PAPEL } from '../util.js';
 import { icone } from '../icons.js';
+import { num, fmtNum } from '../util.js';
+import { PESO_SACO_PADRAO_KG } from '../config.js';
 
 export function renderMais(ctx, el) {
   const { state } = ctx;
@@ -26,6 +28,12 @@ export function renderMais(ctx, el) {
       </div>
     </div>
 
+    ${p.papel === 'dono' ? `<div class="card">
+      <b>Peso do saco de ração</b>
+      <small style="display:block">Usado para converter sacos em kg ao lançar a ração.</small>
+      <form id="f-saco" class="duas" style="margin-top:10px"><label>kg por saco <input id="kgsaco" type="number" inputmode="decimal" step="0.1" min="1" value="${state.ref.kgSaco || PESO_SACO_PADRAO_KG}" required></label>
+      <button class="btn" type="submit">Salvar</button></form></div>` : ''}
+
     <details class="card">
       <summary>Como instalar no celular</summary>
       <p><b>Android (Chrome):</b> menu (três pontos) → “Instalar app” ou “Adicionar à tela inicial”.</p>
@@ -33,6 +41,19 @@ export function renderMais(ctx, el) {
       <p class="mudo">Instalar é importante: no iPhone, lançamentos guardados sem internet podem ser apagados pelo sistema se o app não estiver instalado.</p>
     </details>`;
 
+  const fs = el.querySelector('#f-saco');
+  if (fs) fs.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const kg = num(fs.querySelector('#kgsaco').value);
+    if (!(kg >= 1 && kg <= 100)) return ctx.toast('Informe o peso do saco em kg (ex.: 25).', 'erro');
+    if (!navigator.onLine) return ctx.toast('Sem internet', 'erro');
+    try {
+      await ctx.api.salvarKgSaco(state.perfil.fazenda_id, kg);
+      if (!(await ctx.api.kgSaco())) return ctx.toast('Falta rodar o sql/03 no Supabase.', 'erro');
+      await ctx.atualizarRef(true);
+      ctx.toast(`Saco = ${fmtNum(kg, 0)} kg`, 'ok');
+    } catch (e) { ctx.toast('Não salvou: ' + e.message, 'erro'); }
+  });
   el.querySelector('#b-atualizar').addEventListener('click', async () => {
     if (!navigator.onLine) return ctx.toast('Sem internet', 'erro');
     await ctx.atualizarRef(true);

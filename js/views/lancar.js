@@ -4,6 +4,7 @@ import { icone } from '../icons.js';
 import { esc, hojeISO, fmtData, fmtNum, fmtInt, num, uuid, ROTULO_TIPO } from '../util.js';
 import * as db from '../db.js';
 import { ordemNatural } from './home.js';
+import { PESO_SACO_PADRAO_KG } from '../config.js';
 
 const TIPOS = {
   racao: { rotulo: 'Ração', tabela: 'racao_consumo' },
@@ -11,12 +12,16 @@ const TIPOS = {
   mortalidade: { rotulo: 'Mortalidade', tabela: 'mortalidade' },
 };
 
-const kgTxt = (v) => fmtNum(v, Number.isInteger(Number(v)) ? 0 : 2);
+const casas = (x) => (Number.isInteger(x) ? 0 : Number.isInteger(Math.round(x * 100) / 10) ? 1 : 2);
+const kgTxt = (v) => fmtNum(Number(v), casas(Number(v)));
 
-function camposDoTipo(tipo) {
+const sacosTxt = (n) => `${fmtNum(n, casas(n))} ${n === 1 ? 'saco' : 'sacos'}`;
+
+function camposDoTipo(tipo, kgSaco) {
   if (tipo === 'racao') {
-    return `<label>Quantos kg de ração?
-      <input id="qtd" class="grande" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0" required></label>
+    return `<label>Quantos sacos de ração?
+      <input id="qtd" class="grande" type="number" inputmode="decimal" step="0.5" min="0" placeholder="0" required></label>
+      <div class="calc" id="conv">Cada saco = ${fmtNum(kgSaco, 0)} kg</div>
       <button type="button" class="chip" id="b-ultima" hidden></button>`;
   }
   if (tipo === 'biometria') {
@@ -38,6 +43,7 @@ export async function renderLancar(ctx, el, params = {}) {
   const { state } = ctx;
   const tipo = TIPOS[params.tipo] ? params.tipo : 'racao';
   const { tanques, lotes } = state.ref;
+  const kgSaco = state.ref.kgSaco || PESO_SACO_PADRAO_KG;
 
   if (!tanques.length) {
     el.innerHTML = `<h1>Lançar</h1><div class="card vazio"><p>Nenhum tanque disponível.${ctx.podeGerir() ? ' Cadastre um tanque primeiro.' : ' Peça ao gerente para liberar seus tanques.'}</p>${ctx.podeGerir() ? '<a class="btn primario" href="#/tanques">Ir para Tanques</a>' : ''}</div>`;
@@ -65,7 +71,7 @@ export async function renderLancar(ctx, el, params = {}) {
       <p id="aviso-lotes" class="aviso" hidden></p>
       <div class="data-linha"><span>Data: <b id="data-txt">hoje</b></span><button type="button" class="link" id="b-data">Mudar</button></div>
       <label id="data-wrap" hidden>Data <input id="data" type="date" value="${hoje}" max="${hoje}" required></label>
-      ${camposDoTipo(tipo)}
+      ${camposDoTipo(tipo, kgSaco)}
       <p id="erro" class="erro" hidden></p>
       <button class="btn primario grande" type="submit">Salvar ${TIPOS[tipo].rotulo.toLowerCase()}</button>
       <p class="mudo" style="margin:0;text-align:center">${navigator.onLine ? 'Será enviado ao servidor agora.' : 'Sem internet: será salvo no celular e enviado depois.'}</p>
@@ -158,10 +164,15 @@ export async function renderLancar(ctx, el, params = {}) {
     const v = m[selTanque.value];
     if (!(v > 0)) { b.hidden = true; return; }
     b.hidden = false;
-    b.textContent = `Última vez neste tanque: ${kgTxt(v)} kg. Toque para usar`;
-    b.onclick = () => { f.querySelector('#qtd').value = String(v); f.querySelector('#qtd').focus(); };
+    const sc = Math.round((v / kgSaco) * 100) / 100;
+    b.textContent = `Última vez neste tanque: ${sacosTxt(sc)}. Toque para usar`;
+    b.onclick = () => { f.querySelector('#qtd').value = String(sc); f.querySelector('#qtd').dispatchEvent(new Event('input')); f.querySelector('#qtd').focus(); };
   }
   mostrarUltima();
+  if (tipo === 'racao') {
+    const q = f.querySelector('#qtd'), conv = f.querySelector('#conv');
+    q.addEventListener('input', () => { const n = num(q.value); conv.textContent = n > 0 ? `${sacosTxt(n)} = ${fmtNum(n * kgSaco, 1)} kg` : `Cada saco = ${fmtNum(kgSaco, 0)} kg`; });
+  }
 
   // marca os tanques que já receberam ração hoje (fila local + servidor, quando houver internet)
   async function marcarAlimentados() {
@@ -191,8 +202,9 @@ export async function renderLancar(ctx, el, params = {}) {
     let payload;
     if (tipo === 'racao') {
       const q = num(f.querySelector('#qtd').value);
-      if (!(q > 0)) return mostrarErro('Informe a quantidade de ração em kg (maior que zero).');
-      payload = { ...base, tanque_id: selTanque.value, quantidade_kg: q };
+      if (!(q > 0)) return mostrarErro('Informe quantos sacos de ração (pode ser meio saco: 0,5).');
+      if (q * kgSaco > 2000) return mostrarErro('Quantidade muito alta. Confira o número de sacos.');
+      payload = { ...base, tanque_id: selTanque.value, quantidade_kg: Math.round(q * kgSaco * 100) / 100 };
     } else if (tipo === 'biometria') {
       const p = num(f.querySelector('#peso').value), q = num(f.querySelector('#amostra').value);
       if (!(p > 0)) return mostrarErro('Informe o peso total da amostra em kg.');
@@ -222,7 +234,7 @@ export async function renderLancar(ctx, el, params = {}) {
     await ctx.atualizarPendentes();
     ctx.sincronizarAgora(); // em segundo plano; não trava a tela
     const nomeTanque = (tanques.find((t) => t.id === selTanque.value) || {}).nome || '';
-    const resumo = tipo === 'racao' ? `${kgTxt(payload.quantidade_kg)} kg de ração`
+    const resumo = tipo === 'racao' ? `${sacosTxt(num(f.querySelector('#qtd').value))} de ração (${kgTxt(payload.quantidade_kg)} kg)`
       : tipo === 'biometria' ? `${fmtNum((payload.peso_amostra_kg / payload.quantidade_amostrada) * 1000, 0)} g de peso médio (${fmtInt(payload.quantidade_amostrada)} peixes pesados)`
       : `${fmtInt(payload.quantidade)} peixe(s) morto(s)`;
     ctx.toast(navigator.onLine ? 'Salvo. Enviando…' : 'Salvo no celular. Será enviado quando houver internet.', 'ok');

@@ -16,7 +16,7 @@ export async function renderEstoque(ctx, el) {
     <h1>Estoque de ração</h1>
     <div class="kpis">
       <div class="kpi" style="grid-column:1/-1"><span>Saldo em estoque</span><b style="font-size:2rem;${kg < 0 ? 'color:var(--erro)' : ''}">${fmtNum(kg, 0)} kg</b>
-        <small>≈ ${fmtNum(kg / PESO_SACO_PADRAO_KG, 1)} sacos de ${PESO_SACO_PADRAO_KG} kg</small></div>
+        <small>≈ ${fmtNum(kg / (ctx.state.ref.kgSaco || PESO_SACO_PADRAO_KG), 1)} sacos de ${ctx.state.ref.kgSaco || PESO_SACO_PADRAO_KG} kg</small></div>
       <div class="kpi"><span>Total comprado</span><b>${fmtNum(comprado, 0)} kg</b></div>
       <div class="kpi"><span>Total consumido</span><b>${fmtNum(consumido, 0)} kg</b></div>
     </div>
@@ -30,7 +30,7 @@ export async function renderEstoque(ctx, el) {
       <label>Data <input id="data" type="date" value="${hoje}" max="${hoje}" required></label>
       <div class="duas">
         <label>Nº de sacos <input id="sacos" type="number" inputmode="numeric" step="1" min="1" required></label>
-        <label>kg por saco <input id="kgsaco" type="number" inputmode="decimal" step="0.1" min="0.1" value="${PESO_SACO_PADRAO_KG}" required></label>
+        <label>kg por saco <input id="kgsaco" type="number" inputmode="decimal" step="0.1" min="0.1" value="${ctx.state.ref.kgSaco || PESO_SACO_PADRAO_KG}" required></label>
       </div>
       <div class="calc" id="total">Total: —</div>
       <label>Valor total pago (R$) — opcional <input id="custo" type="number" inputmode="decimal" step="0.01" min="0"></label>

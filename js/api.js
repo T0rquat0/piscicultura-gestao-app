@@ -34,6 +34,15 @@ export function criarApi(client) {
     async perfil(userId) {
       return ok(await client.from('usuarios').select('id,nome,papel,fazenda_id,ativo,fazendas(nome)').eq('id', userId).maybeSingle());
     },
+    // peso do saco de ração da fazenda; null se a coluna ainda não existe (sql/03 não rodado)
+    async kgSaco() {
+      const { data, error } = await client.from('fazendas').select('kg_saco').maybeSingle();
+      if (error || !data || !(Number(data.kg_saco) > 0)) return null;
+      return Number(data.kg_saco);
+    },
+    async salvarKgSaco(fazendaId, kg) {
+      ok(await client.from('fazendas').update({ kg_saco: kg }).eq('id', fazendaId));
+    },
     async tanques() {
       return ok(await client.from('tanques').select('id,nome').order('nome'));
     },
