@@ -365,3 +365,16 @@ input.grande { font-size: 2rem; font-weight: 700; min-height: 72px; text-align: 
 .mini.falta small { color: var(--alerta); }
 .mini.semlote { background: transparent; box-shadow: none; border: 2px dashed #b9c6bd; }
 .seg button { padding: .6rem .2rem; }
+
+/* ----- lançar: tanque atual e lista compacta ----- */
+.tanque-atual { display: flex; align-items: center; justify-content: space-between; gap: .8rem; background: var(--rio-claro); border-radius: 18px; padding: .7rem .9rem .7rem 1.1rem; }
+.tanque-atual .rotulo { display: block; font-size: .8rem; color: var(--rio-2); }
+.tanque-atual b { font-size: 1.5rem; letter-spacing: -.02em; line-height: 1.15; }
+.tiles.compactos { grid-template-columns: repeat(3, 1fr); gap: .45rem; margin-top: .3rem; }
+.tiles.compactos .tile { min-height: 48px; padding: .4rem .6rem; font-size: .95rem; border-width: 1.5px; border-radius: 14px; display: flex; align-items: center; justify-content: space-between; gap: .3rem; }
+.tile .ponto { width: 9px; height: 9px; border-radius: 50%; background: transparent; flex: none; }
+.tile.pend .ponto { background: #e39a22; }
+.tile.feito { color: var(--tinta-2); border-color: #d9e1da; background: #f4f7f4; }
+.tile.feito .ponto { background: var(--ok); }
+.tile.on .ponto { background: #fff !important; }
+.tile.on { color: #fff; background: var(--rio); border-color: var(--rio); }

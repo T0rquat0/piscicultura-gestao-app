@@ -54,8 +54,10 @@ export async function renderLancar(ctx, el, params = {}) {
       ${Object.entries(TIPOS).map(([k, v]) => `<button type="button" data-tipo="${k}" class="${k === tipo ? 'on' : ''}">${v.rotulo}</button>`).join('')}
     </div>
     <form id="f" class="form card" novalidate>
-      <div class="campo"><span class="rotulo">Qual tanque?</span>
-        <div class="tiles" role="radiogroup" aria-label="Tanque">${[...tanques].sort(ordemNatural).map((t) => `<button type="button" class="tile${t.id === tanqueInicial ? ' on' : ''}" role="radio" aria-checked="${t.id === tanqueInicial}" data-tanque="${esc(t.id)}"><span>${esc(t.nome)}</span><small></small></button>`).join('')}</div>
+      <div class="campo">
+        <div class="tanque-atual"><div><span class="rotulo">Tanque</span><b id="tanque-nome">${esc((tanques.find((t) => t.id === tanqueInicial) || {}).nome || '')}</b></div>
+          ${tanques.length > 1 ? `<button type="button" class="btn mini" id="b-trocar">${params.escolher ? 'Fechar' : 'Trocar'}</button>` : ''}</div>
+        <div class="tiles compactos" id="tiles" role="radiogroup" aria-label="Escolha o tanque"${params.escolher ? '' : ' hidden'}>${[...tanques].sort(ordemNatural).map((t) => `<button type="button" class="tile${t.id === tanqueInicial ? ' on' : ''}" role="radio" aria-checked="${t.id === tanqueInicial}" data-tanque="${esc(t.id)}"><span>${esc(t.nome)}</span><i class="ponto"></i></button>`).join('')}</div>
         <select id="tanque" hidden>${tanques.map((t) => `<option value="${esc(t.id)}"${t.id === tanqueInicial ? ' selected' : ''}>${esc(t.nome)}</option>`).join('')}</select>
       </div>
       <p id="lote-linha" class="lote-linha" hidden></p>
@@ -78,8 +80,15 @@ export async function renderLancar(ctx, el, params = {}) {
     selTanque.value = b.dataset.tanque;
     f.querySelectorAll('.tile').forEach((x) => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', String(on)); });
     selTanque.dispatchEvent(new Event('change'));
+    f.querySelector('#tanque-nome').textContent = (tanques.find((t) => t.id === b.dataset.tanque) || {}).nome || '';
+    fecharTiles();
     mostrarUltima();
   }));
+  function fecharTiles() { const t = f.querySelector('#tiles'); t.hidden = true; const bt = f.querySelector('#b-trocar'); if (bt) bt.textContent = 'Trocar'; }
+  const btTrocar = f.querySelector('#b-trocar');
+  if (btTrocar) btTrocar.addEventListener('click', () => {
+    const t = f.querySelector('#tiles'); t.hidden = !t.hidden; btTrocar.textContent = t.hidden ? 'Trocar' : 'Fechar';
+  });
   const dataIn = f.querySelector('#data');
   f.querySelector('#b-data').addEventListener('click', () => {
     const w = f.querySelector('#data-wrap'); w.hidden = !w.hidden;
@@ -160,8 +169,13 @@ export async function renderLancar(ctx, el, params = {}) {
     if (navigator.onLine) {
       try { for (const r of await ctx.api.resumoLotes()) { if (r.ultima_racao === hoje) { const l = lotes.find((x) => x.id === r.lote_id); if (l) feitos.add(l.tanque_id); } } } catch { /* sem detalhe */ }
     }
-    f.querySelectorAll('.tile').forEach((b) => { const ok = feitos.has(b.dataset.tanque); b.classList.toggle('feito', ok); b.querySelector('small').textContent = ok ? 'já recebeu hoje' : ''; });
+    feitosHoje = feitos;
+    const tiles = f.querySelector('#tiles');
+    const lista = [...tiles.querySelectorAll('.tile')];
+    lista.forEach((b) => { const ok = feitos.has(b.dataset.tanque); const tem = lotes.some((l) => l.tanque_id === b.dataset.tanque); b.classList.toggle('feito', ok); b.classList.toggle('pend', !ok && tem); b.title = ok ? 'já recebeu ração hoje' : ''; });
+    lista.sort((a, b2) => Number(a.classList.contains('feito')) - Number(b2.classList.contains('feito'))).forEach((b) => tiles.appendChild(b));
   }
+  let feitosHoje = null;
   if (tipo === 'racao') marcarAlimentados();
 
   f.addEventListener('submit', async (ev) => {
@@ -212,6 +226,14 @@ export async function renderLancar(ctx, el, params = {}) {
       : tipo === 'biometria' ? `${fmtNum((payload.peso_amostra_kg / payload.quantidade_amostrada) * 1000, 0)} g de peso médio (${fmtInt(payload.quantidade_amostrada)} peixes pesados)`
       : `${fmtInt(payload.quantidade)} peixe(s) morto(s)`;
     ctx.toast(navigator.onLine ? 'Salvo. Enviando…' : 'Salvo no celular. Será enviado quando houver internet.', 'ok');
+    // sugestão de ronda: o próximo tanque (em ordem) que ainda não recebeu ração hoje
+    let proximo = null;
+    if (tipo === 'racao') {
+      const feitos = new Set([...(feitosHoje || []), selTanque.value]);
+      const ordem = [...tanques].sort(ordemNatural).filter((t) => lotes.some((l) => l.tanque_id === t.id));
+      const i = ordem.findIndex((t) => t.id === selTanque.value);
+      proximo = [...ordem.slice(i + 1), ...ordem.slice(0, Math.max(i, 0))].find((t) => !feitos.has(t.id)) || null;
+    }
     f.outerHTML = `
       <div class="sucesso card" role="status">
         <div class="sucesso-ic">${icone('check', 40)}</div>
@@ -219,10 +241,13 @@ export async function renderLancar(ctx, el, params = {}) {
         <p class="sucesso-res"><b>${esc(nomeTanque)}</b><br>${esc(resumo)}</p>
         <p class="mudo">${navigator.onLine ? 'Enviando para o servidor.' : 'Sem internet: guardado no celular. Será enviado sozinho quando a internet voltar.'}</p>
         <div class="dialogo-acoes">
-          <button type="button" class="btn primario grande" id="b-outro">Lançar em outro tanque</button>
+          ${proximo ? `<button type="button" class="btn primario grande" id="b-proximo">Próximo: ${esc(proximo.nome)}</button>` : ''}
+          <button type="button" class="btn ${proximo ? '' : 'primario '}grande" id="b-outro">${proximo ? 'Escolher outro tanque' : 'Lançar em outro tanque'}</button>
           <a class="btn grande" href="#/">Voltar ao início</a>
         </div>
       </div>`;
-    el.querySelector('#b-outro').addEventListener('click', () => renderLancar(ctx, el, { tipo }));
+    el.querySelector('#b-outro').addEventListener('click', () => renderLancar(ctx, el, { tipo, escolher: '1' }));
+    const bp = el.querySelector('#b-proximo');
+    if (bp) bp.addEventListener('click', () => renderLancar(ctx, el, { tipo, tanque: proximo.id }));
   });
 }
