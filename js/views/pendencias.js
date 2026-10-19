@@ -34,7 +34,7 @@ export async function renderPendencias(ctx, el) {
           ${it.status === 'erro' ? `<small style="color:var(--erro)">Não enviado: ${esc(it.erro || 'erro')}</small>` : '<small>Aguardando envio</small>'}</div>
           <button class="btn mini perigo" data-descartar="${esc(it.uuid_local)}" type="button">Descartar</button></li>`;
       }).join('')}</ul></div>`
-      : '<div class="card vazio"><p>Tudo enviado ✔<br>Nenhum lançamento pendente.</p></div>'}`;
+      : '<div class="card vazio"><p>Tudo enviado.<br>Nenhum lançamento pendente.</p></div>'}`;
 
   const enviar = el.querySelector('#b-enviar');
   if (enviar) enviar.addEventListener('click', async () => {

@@ -131,7 +131,7 @@ export async function renderLancar(ctx, el, params = {}) {
       return mostrarErro('Não foi possível salvar no aparelho: ' + (e && e.message ? e.message : 'armazenamento indisponível'));
     }
     await ctx.atualizarPendentes();
-    ctx.toast(navigator.onLine ? 'Salvo ✔ enviando…' : 'Salvo no celular ✔ — será enviado com internet', 'ok');
+    ctx.toast(navigator.onLine ? 'Salvo. Enviando…' : 'Salvo no celular. Será enviado quando houver internet.', 'ok');
     // limpa só os campos de quantidade; mantém tanque/data para o próximo lançamento
     f.querySelectorAll('#qtd, #peso, #amostra').forEach((i) => { i.value = ''; });
     const pm = f.querySelector('#pm'); if (pm) pm.textContent = 'Peso médio: —';

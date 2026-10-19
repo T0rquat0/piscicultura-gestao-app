@@ -1,4 +1,5 @@
 // Relatórios por lote (precisam de internet: usam os dados já sincronizados no servidor).
+import { icone } from '../icons.js';
 import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, ROTULO_TIPO } from '../util.js';
 import { calcularLote, precoMedioKg, pontosPeso, pesoMedioKg } from '../calc.js';
 
@@ -64,7 +65,7 @@ export async function renderRelatorios(ctx, el) {
 export async function renderRelatorioLote(ctx, el, id) {
   el.innerHTML = '<p class="carregando">Montando relatório…</p>';
   if (!navigator.onLine) {
-    el.innerHTML = '<p><a href="#/relatorio">‹ Relatórios</a></p><div class="card vazio"><p>O relatório precisa de internet.</p></div>';
+    el.innerHTML = `<p><a class="voltar" href="#/relatorio">${icone('voltar', 18)} Relatórios</a></p><div class="card vazio"><p>O relatório precisa de internet.</p></div>`;
     return;
   }
   const gerir = ctx.podeGerir();
@@ -86,7 +87,7 @@ export async function renderRelatorioLote(ctx, el, id) {
   const del = (tab, rid) => (gerir ? `<td><button class="btn mini perigo no-print" data-del="${tab}:${esc(rid)}" type="button">Excluir</button></td>` : '');
 
   el.innerHTML = `
-    <p class="no-print"><a href="#/relatorio">‹ Relatórios</a></p>
+    <p class="no-print"><a class="voltar" href="#/relatorio">${icone('voltar', 18)} Relatórios</a></p>
     <h1>${esc(nomeTanque)} · ${esc(lote.especie)}</h1>
     <p class="mudo">${esc(ROTULO_TIPO[lote.tipo] || lote.tipo)} · entrada em ${fmtData(lote.data_entrada)} · ${lote.ativo ? 'lote ativo' : 'lote encerrado'}</p>
     <div class="acoes no-print">

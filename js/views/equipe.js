@@ -61,7 +61,7 @@ export async function renderEquipe(ctx, el) {
       try {
         if (Object.keys(campos).length) await ctx.api.atualizarUsuario(uid, campos);
         await ctx.api.salvarVinculos(uid, adicionar, remover);
-        ctx.toast('Equipe atualizada ✔', 'ok');
+        ctx.toast('Equipe atualizada', 'ok');
         renderEquipe(ctx, el);
       } catch (e) { erro.textContent = e.message; erro.hidden = false; btn.disabled = false; }
     }));
@@ -76,7 +76,7 @@ export async function renderEquipe(ctx, el) {
     const btn = fn.querySelector('button'); btn.disabled = true;
     try {
       await ctx.api.adicionarUsuario(email, nome, fn.querySelector('[name=papel]').value);
-      ctx.toast('Pessoa vinculada ✔ — agora libere os tanques dela', 'ok');
+      ctx.toast('Pessoa vinculada. Agora libere os tanques dela.', 'ok');
       renderEquipe(ctx, el);
     } catch (e) { erroNovo.textContent = e.message; erroNovo.hidden = false; btn.disabled = false; }
   });

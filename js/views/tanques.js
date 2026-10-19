@@ -1,4 +1,5 @@
 // Cadastro de tanques e lotes (dono e gerente). Precisa de internet.
+import { icone } from '../icons.js';
 import { esc, fmtData, fmtInt, fmtNum, hojeISO, num, ROTULO_TIPO } from '../util.js';
 
 const ESPECIES = ['Tilápia', 'Tambaqui', 'Tambacu', 'Pintado', 'Pirarucu', 'Matrinxã', 'Curimatã', 'Pacu', 'Carpa'];
@@ -16,7 +17,7 @@ export async function renderTanques(ctx, el) {
     <div class="card">
       ${tanques.length ? `<ul class="lista">${tanques.map((t) => {
         const n = lotes.filter((l) => l.tanque_id === t.id).length;
-        return `<li><a class="esq" href="#/tanque/${esc(t.id)}"><b>${esc(t.nome)}</b><small>${n ? n + ' lote(s) ativo(s)' : 'sem lote ativo'}</small></a><span class="mudo">›</span></li>`;
+        return `<li><a class="esq" href="#/tanque/${esc(t.id)}"><b>${esc(t.nome)}</b><small>${n ? n + ' lote(s) ativo(s)' : 'sem lote ativo'}</small></a><span class="seta">${icone('direita', 20)}</span></li>`;
       }).join('')}</ul>` : '<p class="mudo" style="margin:0">Nenhum tanque cadastrado ainda.</p>'}
     </div>
     <form id="f-novo" class="card form" novalidate>
@@ -38,7 +39,7 @@ export async function renderTanques(ctx, el) {
     try {
       await ctx.api.criarTanque(ctx.state.perfil.fazenda_id, nome);
       await ctx.atualizarRef();
-      ctx.toast('Tanque cadastrado ✔', 'ok');
+      ctx.toast('Tanque cadastrado', 'ok');
       renderTanques(ctx, el);
     } catch (e) {
       erro.textContent = e.message; erro.hidden = false; btn.disabled = false;
@@ -57,7 +58,7 @@ export async function renderTanque(ctx, el, id) {
   const hoje = hojeISO();
 
   el.innerHTML = `
-    <p><a href="#/tanques">‹ Todos os tanques</a></p>
+    <p class="no-print"><a class="voltar" href="#/tanques">${icone('voltar', 18)} Todos os tanques</a></p>
     <h1>${esc(tanque.nome)}</h1>
     ${avisoOffline()}
 
@@ -126,7 +127,7 @@ export async function renderTanque(ctx, el, id) {
     try {
       await ctx.api.criarLote({ tanque_id: id, tipo: f.querySelector('#tipo').value, especie, data_entrada: f.querySelector('#data').value, quantidade_inicial: qtd, peso_inicial_kg: peso });
       await ctx.atualizarRef();
-      ctx.toast('Lote cadastrado ✔', 'ok');
+      ctx.toast('Lote cadastrado', 'ok');
       renderTanque(ctx, el, id);
     } catch (e) { falha(e.message); btn.disabled = false; }
   });
@@ -151,7 +152,7 @@ export async function renderTanque(ctx, el, id) {
     try {
       await ctx.api.renomearTanque(id, nome);
       await ctx.atualizarRef();
-      ctx.toast('Nome salvo ✔', 'ok');
+      ctx.toast('Nome salvo', 'ok');
       renderTanque(ctx, el, id);
     } catch (err) { e.textContent = err.message; e.hidden = false; }
   });

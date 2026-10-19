@@ -76,7 +76,7 @@ export async function renderEstoque(ctx, el) {
         fazenda_id: ctx.state.perfil.fazenda_id, data_compra: f.querySelector('#data').value, quantidade_kg: t,
         custo_total: custo, fornecedor: f.querySelector('#forn').value.trim() || null,
       });
-      ctx.toast('Entrada registrada ✔', 'ok');
+      ctx.toast('Entrada registrada', 'ok');
       renderEstoque(ctx, el);
     } catch (e) { falha(e.message); btn.disabled = false; }
   });

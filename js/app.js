@@ -4,6 +4,8 @@ import { esc, parseHash, ROTULO_PAPEL, traduzErro, ehErroDeRede } from './util.j
 import { criarApi } from './api.js';
 import * as db from './db.js';
 import { sincronizar } from './sync.js';
+import { icone } from './icons.js';
+import { splashDoDia } from './splash.js';
 import { renderLogin } from './views/login.js';
 import { renderHome } from './views/home.js';
 import { renderLancar } from './views/lancar.js';
@@ -15,6 +17,7 @@ import { renderPendencias } from './views/pendencias.js';
 import { renderMais } from './views/mais.js';
 
 const root = document.getElementById('root');
+splashDoDia();
 const state = { user: null, perfil: null, ref: { tanques: [], lotes: [] }, pendentes: 0, semRede: false };
 let client = null;
 let api = null;
@@ -81,7 +84,7 @@ async function sincronizarAgora() {
   await atualizarPendentes();
   if (r.sessaoExpirada) { mostrarLogin('Sua sessão expirou. Entre novamente para enviar os lançamentos pendentes.'); return r; }
   if (r.enviados) {
-    toast(`${r.enviados} lançamento(s) enviado(s) ✔`, 'ok');
+    toast(`${r.enviados} lançamento(s) enviado(s)`, 'ok');
     atualizarRef().then(() => { if (rotaAtual === '') rotear(); });
   }
   if (r.falhas) toast(`${r.falhas} lançamento(s) com erro — veja em Pendentes`, 'erro');
@@ -109,7 +112,7 @@ function mostrarLogin(aviso) {
 }
 
 function mostrarMensagem(titulo, texto, comSair = true) {
-  root.innerHTML = `<main class="login"><div class="login-card"><div class="logo">🐟</div><h1>${esc(titulo)}</h1>
+  root.innerHTML = `<main class="login"><div class="login-card"><div class="logo">${icone('peixe', 44)}</div><h1>${esc(titulo)}</h1>
     <p class="aviso">${esc(texto)}</p>${comSair ? '<button class="btn grande" id="b-sair" type="button">Sair</button>' : ''}</div></main>`;
   const b = root.querySelector('#b-sair');
   if (b) b.addEventListener('click', () => sair(true));
@@ -185,16 +188,16 @@ function montarShell() {
   root.innerHTML = `
   <div class="app">
     <header class="topo">
-      <div class="marca"><span class="logo-sm">🐟</span>
+      <div class="marca"><span class="logo-sm">${icone('peixe', 26)}</span>
         <div><strong>${esc((p.fazendas && p.fazendas.nome) || 'Piscicultura')}</strong><small>${esc(p.nome)} · ${esc(ROTULO_PAPEL[p.papel] || p.papel)}</small></div></div>
       <a id="pill" class="pill" href="#/pendencias"></a>
     </header>
     <main id="view" class="view"></main>
     <nav class="abas">
-      <a data-aba="" href="#/"><span>🏠</span>Início</a>
-      <a data-aba="lancar" href="#/lancar"><span>✍️</span>Lançar</a>
-      <a data-aba="relatorio" href="#/relatorio"><span>📊</span>Relatórios</a>
-      <a data-aba="mais" href="#/mais"><span>☰</span>Mais</a>
+      <a data-aba="" href="#/"><span>${icone('inicio')}</span>Início</a>
+      <a data-aba="lancar" href="#/lancar"><span>${icone('lancar')}</span>Lançar</a>
+      <a data-aba="relatorio" href="#/relatorio"><span>${icone('relatorio')}</span>Relatórios</a>
+      <a data-aba="mais" href="#/mais"><span>${icone('mais')}</span>Mais</a>
     </nav>
   </div>`;
   atualizarPill();

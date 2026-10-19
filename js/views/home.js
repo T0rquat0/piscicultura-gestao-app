@@ -7,14 +7,19 @@ export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje) {
         const r = resumo[l.id];
         const dias = diasEntre(l.data_entrada, hoje);
         const vivos = r ? Math.max(0, l.quantidade_inicial - Number(r.mortos)) : null;
+        const pm = r && r.ultimo_peso_medio_kg != null ? fmtNum(r.ultimo_peso_medio_kg * 1000, 0) + '<em>g</em>' : '—';
         return `
-        <div class="dados">
-          <div><span class="mudo">Lote</span><b>${esc(ROTULO_TIPO[l.tipo] || l.tipo)} · ${esc(l.especie)}</b></div>
-          <div><span class="mudo">Dias no tanque</span><b>${fmtInt(dias)}</b></div>
-          <div><span class="mudo">Peixes vivos (estim.)</span><b>${fmtInt(vivos ?? l.quantidade_inicial)}</b></div>
-          <div><span class="mudo">Ração acumulada</span><b>${r ? fmtNum(r.racao_kg, 0) + ' kg' : '—'}</b></div>
-          <div><span class="mudo">Peso médio atual</span><b>${r && r.ultimo_peso_medio_kg != null ? fmtNum(r.ultimo_peso_medio_kg * 1000, 0) + ' g' : '—'}</b>
-            ${r && r.ultima_biometria ? `<small>em ${fmtData(r.ultima_biometria)}</small>` : ''}</div>
+        <div class="lote">
+          <p class="lote-nome"><span class="fase ${l.tipo === 'alevinagem' ? 'alev' : 'eng'}"></span>${esc(ROTULO_TIPO[l.tipo] || l.tipo)} · ${esc(l.especie)}</p>
+          <div class="destaques">
+            <div><span class="mudo">Peso médio atual</span><b class="grande-num">${pm}</b>
+              ${r && r.ultima_biometria ? `<small>em ${fmtData(r.ultima_biometria)}</small>` : ''}</div>
+            <div><span class="mudo">Ração acumulada</span><b class="grande-num">${r ? fmtNum(r.racao_kg, 0) + '<em>kg</em>' : '—'}</b></div>
+          </div>
+          <div class="dados">
+            <div><span class="mudo">Dias no tanque</span><b>${fmtInt(dias)}</b></div>
+            <div><span class="mudo">Peixes vivos (estim.)</span><b>${fmtInt(vivos ?? l.quantidade_inicial)}</b></div>
+          </div>
         </div>`;
       }).join('')
     : '<p class="mudo">Sem lote ativo neste tanque.</p>';
@@ -22,15 +27,15 @@ export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje) {
   const comLote = lotes.length > 0;
   const lancouHoje = lotes.some((l) => resumo[l.id] && resumo[l.id].ultima_racao === hoje) || racaoHojeLocal.has(tanque.id);
   const selo = !comLote ? '' : lancouHoje
-    ? '<span class="tag ok">Ração lançada hoje</span>'
-    : '<span class="tag alerta">Sem ração hoje</span>';
+    ? '<span class="tag ok"><i></i>Ração lançada hoje</span>'
+    : '<span class="tag alerta"><i></i>Sem ração hoje</span>';
 
   return `
   <article class="card">
     <header><h3>${esc(tanque.nome)}</h3>${selo}</header>
     ${blocos}
     ${comLote ? `<div class="acoes">
-      <a class="btn mini primario" href="#/lancar?tipo=racao&tanque=${esc(tanque.id)}">+ Ração</a>
+      <a class="btn mini primario" href="#/lancar?tipo=racao&tanque=${esc(tanque.id)}">Lançar ração</a>
       <a class="btn mini" href="#/lancar?tipo=biometria&tanque=${esc(tanque.id)}">Biometria</a>
       <a class="btn mini" href="#/lancar?tipo=mortalidade&tanque=${esc(tanque.id)}">Mortalidade</a>
     </div>` : ''}

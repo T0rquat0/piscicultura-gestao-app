@@ -1,11 +1,12 @@
 import { esc } from '../util.js';
+import { icone } from '../icons.js';
 
 export function renderLogin(ctx, root, aviso) {
   const pend = ctx.state.pendentes || 0;
   root.innerHTML = `
   <main class="login">
     <div class="login-card">
-      <div class="logo">🐟</div>
+      <div class="logo">${icone('peixe', 44)}</div>
       <h1>Gestão de Piscicultura</h1>
       ${aviso ? `<p class="aviso">${esc(aviso)}</p>` : ''}
       <form id="f-login" class="form" novalidate>
