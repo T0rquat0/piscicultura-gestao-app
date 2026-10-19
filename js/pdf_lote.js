@@ -6,7 +6,7 @@ import { fmtNum, fmtInt, fmtData, fmtBRL, ROTULO_TIPO, diasEntre } from './util.
 import { pesoMedioKg } from './calc.js';
 
 export const COR = {
-  tinta: [23, 33, 29], mudo: [118, 130, 123], linha: [226, 233, 229], rio: [14, 79, 69], fundo: [243, 248, 245],
+  tinta: [23, 33, 29], mudo: [118, 130, 123], linha: [214, 223, 218], rio: [14, 79, 69], fundo: [240, 246, 243], fundo2: [231, 240, 235],
   suave: [160, 184, 172], ambar: [168, 100, 8], branco: [255, 255, 255],
 };
 export const M = 16;
@@ -62,10 +62,13 @@ export function gerarPdfLote(jsPDF, d) {
   // ---------- títulos de seção ----------
   let num = 0;
   const secao = (titulo2, need = 30) => {
-    cabe(need); num += 1;
-    cor('fill', COR.rio); doc.circle(M + 1.6, y + 6.6, 1.6, 'F');
-    txt(titulo2, M + 6, y + 8, { size: 12.5, bold: true });
-    y += 15;
+    cabe(need + 6); num += 1;
+    if (num > 1) y += 4;
+    linha(M, y, 210 - M, y, 0.25);
+    cor('fill', COR.rio); doc.roundedRect(M, y - 0.5, 14, 1.1, 0.55, 0.55, 'F');
+    txt(String(num).padStart(2, '0'), M, y + 9, { size: 8.5, bold: true, color: COR.rio });
+    txt(titulo2, M + 8, y + 9, { size: 12.5, bold: true });
+    y += 17;
   };
 
   // ---------- 1. indicadores ----------
@@ -85,20 +88,22 @@ export function gerarPdfLote(jsPDF, d) {
     ind.push(['Custo de ração', c.custoRacao != null ? fmtBRL(c.custoRacao) : '-', '', c.custoRacao != null ? 'preço médio pago por kg' : 'sem valor nas compras']);
     ind.push(['Custo por kg ganho', custoKg != null ? fmtBRL(custoKg) : '-', '', 'ração / ganho de biomassa']);
   }
-  const cw = LARG / 4, ch = 25;
-  const linhas = Math.ceil(ind.length / 4);
+  const ch = 25, linhas = Math.ceil(ind.length / 4), cw = (LARG - 12) / 4;
+  cabe(linhas * ch + 6);
+  cor('fill', COR.fundo); doc.roundedRect(M, y, LARG, linhas * ch + 6, 5, 5, 'F');
   for (let r = 0; r < linhas; r++) {
-    cabe(ch);
     ind.slice(r * 4, r * 4 + 4).forEach((k, i) => {
-      const x = M + i * cw + (i ? 4 : 0);
-      caps(k[0], x, y + 5);
-      txt(k[1], x, y + 14, { size: 20 });
-      if (k[2]) txt(k[2], x + largura(k[1], 20, false) + 1.4, y + 14, { size: 8.5, color: COR.mudo });
-      txt(k[3], x, y + 20, { size: 7.5, color: COR.mudo });
+      const x = M + 6 + i * cw, yy = y + 3 + r * ch;
+      caps(k[0], x, yy + 6);
+      const tam = String(k[1]).startsWith('R$') ? 16 : largura(k[1], 20, false) > cw - 9 ? 15 : 20;
+      txt(k[1], x, yy + 15, { size: tam });
+      if (k[2]) txt(k[2], x + largura(k[1], tam, false) + 1.4, yy + 15, { size: 8.5, color: COR.mudo });
+      txt(k[3], x, yy + 21, { size: 7.5, color: COR.mudo });
+      if (i) { cor('draw', COR.branco); doc.setLineWidth(0.7); doc.line(M + 3 + i * cw, yy + 2, M + 3 + i * cw, yy + ch - 2); }
     });
-    y += ch + 1;
+    if (r) { cor('draw', COR.branco); doc.setLineWidth(0.7); doc.line(M + 4, y + 3 + r * ch, M + LARG - 4, y + 3 + r * ch); }
   }
-  y += 8;
+  y += linhas * ch + 6 + 8;
 
   // ---------- 2. observações ----------
   const obs = [];
@@ -120,7 +125,9 @@ export function gerarPdfLote(jsPDF, d) {
     cabe(ls.length * 4.6 + 4);
     caps(rot, M, y + 0.2, { color: corRot || COR.mudo });
     txt(ls, M + colEsq, y, { size: 9.5 });
-    y += ls.length * 4.6 + 3;
+    y += ls.length * 4.6 + 1.6;
+    linha(M, y, 210 - M, y, 0.12);
+    y += 4.6;
   };
   obs.forEach(([r, t]) => bloco(r, t));
   alertas.forEach((a) => bloco('Atenção', a, COR.ambar));
@@ -132,8 +139,9 @@ export function gerarPdfLote(jsPDF, d) {
   if (pts.length >= 2) {
     txt('Peso médio por biometria, em gramas. O primeiro ponto é a entrada do lote.', M, y, { size: 8, color: COR.mudo });
     y += 3;
-    grafico(doc, M, y, LARG, 58, pts.map((p) => ({ x: p.data, y: p.g })), (v) => (v === 0 ? '0' : n(v, v < 10 ? 1 : 0)), txt, caps);
-    y += 64;
+    cor('fill', COR.fundo); doc.roundedRect(M, y - 1, LARG, 62, 4, 4, 'F');
+    grafico(doc, M + 2, y, LARG - 4, 58, pts.map((p) => ({ x: p.data, y: p.g })), (v) => (v === 0 ? '0' : n(v, v < 10 ? 1 : 0)), txt, caps);
+    y += 66;
   } else { txt('São necessárias ao menos duas pesagens (a entrada conta como uma) para desenhar o gráfico.', M, y + 1, { size: 9, color: COR.mudo }); y += 9; }
 
   // ---------- 4. biometrias ----------
@@ -156,8 +164,9 @@ export function gerarPdfLote(jsPDF, d) {
   if (semanas.length) {
     txt('Total lançado de segunda a domingo, em kg. A última barra pode ser uma semana incompleta.', M, y, { size: 8, color: COR.mudo });
     y += 3;
-    barras(doc, M, y, LARG, 46, semanas.slice(-20).map((s) => ({ r: dm(s.inicio), v: s.kg })), txt);
-    y += 52;
+    cor('fill', COR.fundo); doc.roundedRect(M, y - 1, LARG, 50, 4, 4, 'F');
+    barras(doc, M + 2, y, LARG - 4, 46, semanas.slice(-20).map((s) => ({ r: dm(s.inicio), v: s.kg })), txt);
+    y += 56;
     const corpo = semanas.slice().reverse().map((s) => [`Semana de ${fmtData(s.inicio)}`, n(s.kg, 1), n(s.kg / kgSaco, 1), n(s.kg / 7, 1)]);
     tabela(doc, y, [['SEMANA', 'RAÇÃO (kg)', `SACOS DE ${n(kgSaco, 0)} kg`, 'MÉDIA (kg/dia)']], corpo, ['left', 'right', 'right', 'right']);
     y = doc.lastAutoTable.finalY + 9;
@@ -209,8 +218,8 @@ export function tabela(doc, y, head, body, align) {
   const colStyles = {}; align.forEach((a, i) => { colStyles[i] = { halign: a }; });
   doc.autoTable({
     startY: y, head, body, margin: { left: M, right: M, top: TOPO, bottom: 16 }, theme: 'plain',
-    styles: { font: FAM, fontSize: 9, cellPadding: { top: 2.2, bottom: 2.2, left: 1.5, right: 1.5 }, textColor: COR.tinta, lineColor: COR.linha, lineWidth: { bottom: 0.12 } },
-    headStyles: { font: FAM, fontStyle: 'bold', fontSize: 6.8, textColor: COR.mudo, fillColor: false, lineColor: COR.linha, lineWidth: { bottom: 0.12 }, cellPadding: { top: 1.6, bottom: 2, left: 1.5, right: 1.5 } },
+    styles: { font: FAM, fontSize: 9, cellPadding: { top: 2.2, bottom: 2.2, left: 2.5, right: 2.5 }, textColor: COR.tinta, lineColor: COR.linha, lineWidth: { bottom: 0.15 } },
+    headStyles: { font: FAM, fontStyle: 'bold', fontSize: 6.8, textColor: COR.mudo, fillColor: COR.fundo2, lineColor: COR.linha, lineWidth: { bottom: 0.12 }, cellPadding: { top: 2, bottom: 2, left: 2.5, right: 2.5 } },
     columnStyles: colStyles,
     didParseCell: (h) => { if (h.section === 'head') h.cell.styles.halign = align[h.column.index]; },
   });
