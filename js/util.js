@@ -1,0 +1,86 @@
+// Utilitários puros (sem DOM nem rede)
+
+export const esc = (s) =>
+  String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+export function hojeISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export function fmtData(iso) {
+  if (!iso) return '';
+  const [y, m, d] = String(iso).slice(0, 10).split('-');
+  return `${d}/${m}/${y}`;
+}
+
+const _num = (dec) => new Intl.NumberFormat('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+const _fmts = {};
+export function fmtNum(n, dec = 1) {
+  if (n === null || n === undefined || n === '' || Number.isNaN(Number(n))) return '—';
+  return (_fmts[dec] ||= _num(dec)).format(Number(n));
+}
+export const fmtInt = (n) => fmtNum(n, 0);
+export function fmtBRL(n) {
+  if (n === null || n === undefined || Number.isNaN(Number(n))) return '—';
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n));
+}
+
+export function uuid() {
+  if (globalThis.crypto && crypto.randomUUID) return crypto.randomUUID();
+  const b = new Uint8Array(16);
+  (globalThis.crypto || { getRandomValues: (a) => a.forEach((_, i) => (a[i] = Math.random() * 256)) }).getRandomValues(b);
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+// diferença em dias entre duas datas ISO (YYYY-MM-DD)
+export function diasEntre(a, b) {
+  const t = (s) => Date.UTC(...String(s).slice(0, 10).split('-').map((v, i) => (i === 1 ? Number(v) - 1 : Number(v))));
+  return Math.round((t(b) - t(a)) / 86400000);
+}
+
+// aceita "12,5" ou "12.5"
+export function num(v) {
+  if (typeof v === 'number') return v;
+  const s = String(v ?? '').trim().replace(',', '.');
+  if (s === '') return NaN; // campo vazio não vale como zero
+  const n = Number(s);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+// ---------- erros ----------
+export function ehErroDeRede(error) {
+  if (!error) return false;
+  if (error.code && String(error.code) !== '') return false;
+  return /fetch|network|abort|timeout|timed out|load failed|offline|ECONN/i.test(String(error.message || ''));
+}
+export function ehErroDeSessao(error) {
+  if (!error) return false;
+  const m = String(error.message || '');
+  return error.code === 'PGRST301' || error.status === 401 || /JWT|token.*expired|not authenticated/i.test(m);
+}
+export function traduzErro(error) {
+  const m = String((error && (error.message || error.msg)) || 'Erro desconhecido');
+  const c = error && error.code ? String(error.code) : '';
+  if (ehErroDeRede(error)) return 'Sem conexão com a internet';
+  if (ehErroDeSessao(error)) return 'Sessão expirada. Entre novamente.';
+  if (c === '42501' || /row-level security|permission denied/i.test(m)) return 'Sem permissão para esta ação';
+  if (c === '23505') return 'Este registro já existe';
+  if (c === '23503') return 'Registro relacionado não encontrado (ou ainda em uso)';
+  if (c === '23514') return 'Valor inválido';
+  if (/Invalid login credentials/i.test(m)) return 'E-mail ou senha incorretos';
+  if (/Email not confirmed/i.test(m)) return 'E-mail ainda não confirmado';
+  return m;
+}
+
+export function parseHash(h) {
+  const [path, query = ''] = String(h || '').replace(/^#\/?/, '').split('?');
+  const partes = path.split('/').filter(Boolean);
+  return { rota: partes[0] || '', partes: partes.slice(1), params: Object.fromEntries(new URLSearchParams(query)) };
+}
+
+export const ROTULO_PAPEL = { dono: 'Dono', gerente: 'Gerente', funcionario: 'Funcionário' };
+export const ROTULO_TIPO = { alevinagem: 'Alevinagem', engorda: 'Engorda' };
