@@ -39,7 +39,7 @@ begin
       continue when i = 2 and d = v_ini + 8;
       insert into racao_consumo (uuid_local, lote_id, tanque_id, data, quantidade_kg, registrado_por)
         values (gen_random_uuid(), v_lote, v_tq, d,
-                round((base_kg[i] * (1 + (d - v_ini) * 0.012) * (0.8 + 0.4 * ((abs(hashtext(i::text || d::text)) % 100) / 100.0)) / 2.5) * 2.5, 2),
+                greatest(2.5, round(base_kg[i] * (1 + (d - v_ini) * 0.012) * (0.8 + 0.4 * ((abs(hashtext(i::text || d::text)) % 100) / 100.0)) / 2.5) * 2.5),
                 v_user);
     end loop;
 
