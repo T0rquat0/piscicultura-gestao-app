@@ -26,6 +26,24 @@ function prepararFontes(doc, fontes) {
   FAM = 'Schibsted';
 }
 
+// Ferramentas de desenho compartilhadas com o relatório da fazenda
+export function ferramentas(doc, fontes) {
+  prepararFontes(doc, fontes);
+  const cor = (t, v) => doc[t === 'fill' ? 'setFillColor' : t === 'draw' ? 'setDrawColor' : 'setTextColor'](...v);
+  const fonte = (size, bold) => { doc.setFont(FAM, bold ? 'bold' : 'normal'); doc.setFontSize(size); };
+  const txt = (s2, x, yy, { size = 10, bold = false, color = COR.tinta, align = 'left', cs = 0 } = {}) => {
+    fonte(size, bold); cor('text', color);
+    doc.text(Array.isArray(s2) ? s2 : String(s2), x, yy, { align, charSpace: cs });
+  };
+  const caps = (s2, x, yy, o = {}) => txt(String(s2).toUpperCase(), x, yy, { size: 7, color: COR.mudo, cs: 0.35, ...o });
+  const linha = (x1, y1, x2, y2, w = 0.2, c2 = COR.linha) => { cor('draw', c2); doc.setLineWidth(w); doc.line(x1, y1, x2, y2); };
+  const largura = (s2, size, bold) => { fonte(size, bold); return doc.getTextWidth(String(s2)); };
+  const quebra = (s2, w, size, bold) => { fonte(size, bold); return doc.splitTextToSize(String(s2), w); };
+  return { cor, fonte, txt, caps, linha, largura, quebra };
+}
+
+export { rodape, TOPO, BASE };
+
 export function gerarPdfLote(jsPDF, d) {
   const { fazenda, lote, nomeTanque, c, bios, mort, evo, semanas, kgSaco, gerir, geradoEm, fontes } = d;
   const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
@@ -202,20 +220,20 @@ export function gerarPdfLote(jsPDF, d) {
 }
 
 // cabeçalho corrente (páginas 2+) e rodapé em todas as páginas
-function rodape(doc, fazenda, titulo, txt, caps, linha) {
+function rodape(doc, fazenda, titulo, txt, caps, linha, rotulo = 'Relatório do lote') {
   const total = doc.getNumberOfPages();
   for (let p = 1; p <= total; p++) {
     doc.setPage(p);
     if (p > 1) {
-      caps(fazenda, M, 14, { color: COR.rio, size: 7 }); caps(`Relatório do lote  ·  ${titulo}`, 210 - M, 14, { align: 'right' });
+      caps(fazenda, M, 14, { color: COR.rio, size: 7 }); caps(`${rotulo}  ·  ${titulo}`, 210 - M, 14, { align: 'right' });
     }
     txt('Gestão de Piscicultura', M, 291, { size: 7.5, color: COR.mudo });
     txt(`${p} / ${total}`, 210 - M, 291, { size: 7.5, color: COR.mudo, align: 'right' });
   }
 }
 
-export function tabela(doc, y, head, body, align) {
-  const colStyles = {}; align.forEach((a, i) => { colStyles[i] = { halign: a }; });
+export function tabela(doc, y, head, body, align, larguras = []) {
+  const colStyles = {}; align.forEach((a, i) => { colStyles[i] = { halign: a, ...(larguras[i] ? { cellWidth: larguras[i] } : {}) }; });
   doc.autoTable({
     startY: y, head, body, margin: { left: M, right: M, top: TOPO, bottom: 16 }, theme: 'plain',
     styles: { font: FAM, fontSize: 9, cellPadding: { top: 2.2, bottom: 2.2, left: 2.5, right: 2.5 }, textColor: COR.tinta, lineColor: COR.linha, lineWidth: { bottom: 0.15 } },

@@ -1,11 +1,12 @@
 // Relatórios por lote (precisam de internet: usam os dados já sincronizados no servidor).
-import { PESO_SACO_PADRAO_KG } from '../config.js';
+import { PESO_SACO_PADRAO_KG, ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS } from '../config.js';
 import { carregarGerador, carregarFontes, abrirVisualizador } from '../pdf_ui.js';
 import { gerarPdfLote } from '../pdf_lote.js';
+import { gerarPdfFazenda } from '../pdf_fazenda.js';
 import { confirmar } from '../dialogo.js';
 import { icone } from '../icons.js';
 import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, ROTULO_TIPO } from '../util.js';
-import { calcularLote, precoMedioKg, pontosPeso, pesoMedioKg, evolucaoPeso, racaoPorSemana, matrizRacao } from '../calc.js';
+import { calcularLote, precoMedioKg, pontosPeso, pesoMedioKg, evolucaoPeso, racaoPorSemana, matrizRacao, situacaoEstoque } from '../calc.js';
 
 export function svgPeso(pts) {
   if (pts.length < 2) return '<p class="mudo">O gráfico aparece a partir da primeira biometria.</p>';
@@ -56,6 +57,7 @@ export async function renderRelatorios(ctx, el) {
   const lotes = await ctx.api.lotes();
   const tanques = ctx.state.ref.tanques;
   el.innerHTML = `<h1>Relatórios</h1>
+    <button class="btn primario grande" id="b-pdf-fazenda" type="button" style="margin-bottom:1rem">PDF geral da fazenda</button>
     <a class="card atalho" href="#/relatorio/racao"><span class="item-ic">${icone('relatorio')}</span><span class="esq"><b>Ração por dia</b><small>Todos os tanques, dia a dia</small></span><span class="seta">${icone('direita', 20)}</span></a>
     ${tanques.length && lotes.length ? tanques.map((t) => {
       const ls = lotes.filter((l) => l.tanque_id === t.id);
@@ -65,6 +67,45 @@ export async function renderRelatorios(ctx, el) {
           <small>desde ${fmtData(l.data_entrada)} · ${fmtInt(l.quantidade_inicial)} peixes</small></a>
           <span class="tag ${l.ativo ? 'ok' : ''}">${l.ativo ? 'Ativo' : 'Encerrado'}</span></li>`).join('')}</ul></div>`;
     }).join('') : '<div class="card vazio"><p>Ainda não há lotes para mostrar.</p></div>'}`;
+
+  const bf = el.querySelector('#b-pdf-fazenda');
+  bf.addEventListener('click', async () => {
+    const texto = bf.textContent; bf.disabled = true; bf.textContent = 'Gerando PDF…';
+    try {
+      const gerir = ctx.podeGerir();
+      const hoje = hojeISO();
+      const kgS = ctx.state.ref.kgSaco || PESO_SACO_PADRAO_KG;
+      const d30 = new Date(`${hoje}T00:00:00Z`); d30.setUTCDate(d30.getUTCDate() - 29);
+      const desde = d30.toISOString().slice(0, 10);
+      const [[jsPDF, fontes], saldo, linhas, compras, contagens] = await Promise.all([
+        Promise.all([carregarGerador(), carregarFontes()]),
+        ctx.api.saldoRacao(), ctx.api.racaoPeriodo(desde),
+        gerir ? ctx.api.compras(true).catch(() => []) : Promise.resolve([]),
+        gerir ? ctx.api.contagens().catch(() => []) : Promise.resolve([]),
+      ]);
+      const precoKg = gerir ? precoMedioKg(compras) : null;
+      const nomeDe = (tid) => (tanques.find((t) => t.id === tid) || {}).nome || '';
+      const ativos = lotes.filter((l) => l.ativo);
+      const detalhes = await Promise.all(ativos.map(async (l) => {
+        const { bios, mort, rac } = await ctx.api.dadosLote(l.id);
+        return { nomeTanque: nomeDe(l.tanque_id), lote: l, c: calcularLote(l, bios, mort, rac, hoje, precoKg) };
+      }));
+      detalhes.sort((a, b) => String(a.nomeTanque).localeCompare(String(b.nomeTanque), 'pt-BR', { numeric: true, sensitivity: 'base' }));
+      const porDia = new Map(); const porTanque = new Map();
+      for (const r of linhas) { porDia.set(r.data, (porDia.get(r.data) || 0) + Number(r.quantidade_kg)); porTanque.set(r.tanque_id, (porTanque.get(r.tanque_id) || 0) + Number(r.quantidade_kg)); }
+      const racaoDia = [];
+      for (let i = 0; i < 30; i++) { const dd = new Date(d30); dd.setUTCDate(dd.getUTCDate() + i); const iso = dd.toISOString().slice(0, 10); racaoDia.push({ data: iso, kg: porDia.get(iso) || 0 }); }
+      const racaoTanque = tanques.filter((t) => porTanque.has(t.id)).map((t) => ({ nome: t.nome, kg: porTanque.get(t.id) }))
+        .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR', { numeric: true, sensitivity: 'base' }));
+      const doc = gerarPdfFazenda(jsPDF, {
+        fazenda: (ctx.state.perfil.fazendas && ctx.state.perfil.fazendas.nome) || 'Piscicultura', geradoEm: hoje, kgSaco: kgS, gerir, fontes, saldo: saldo || {},
+        sit: situacaoEstoque(saldo && saldo.saldo_kg, saldo && saldo.consumo_7d_kg, ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS),
+        lotes: detalhes, racaoDia, racaoTanque, precoKg, ultimaContagem: contagens[0] || null,
+      });
+      bf.disabled = false; bf.textContent = texto;
+      await abrirVisualizador({ blob: doc.output('blob'), nome: `relatorio-geral-${hoje}.pdf`, titulo: 'Relatório geral da fazenda', toast: ctx.toast });
+    } catch (e) { ctx.toast(e.message || 'Não foi possível gerar o PDF', 'erro'); bf.disabled = false; bf.textContent = texto; }
+  });
 }
 
 export async function renderRelatorioLote(ctx, el, id) {
