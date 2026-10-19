@@ -52,6 +52,7 @@ export async function renderLancar(ctx, el, params = {}) {
         <select id="tanque">${tanques.map((t) => `<option value="${esc(t.id)}"${t.id === tanqueInicial ? ' selected' : ''}>${esc(t.nome)}</option>`).join('')}</select>
       </label>
       <label id="lote-wrap">Lote <select id="lote"></select></label>
+      <p id="aviso-lotes" class="aviso" hidden></p>
       <label>Data <input id="data" type="date" value="${hoje}" max="${hoje}" required></label>
       ${camposDoTipo(tipo)}
       <p id="erro" class="erro" hidden></p>
@@ -73,11 +74,15 @@ export async function renderLancar(ctx, el, params = {}) {
     if (!doTanque.length) {
       selLote.innerHTML = '<option value="">— sem lote ativo —</option>';
       selLote.disabled = true;
+      f.querySelector('#aviso-lotes').hidden = true;
       mostrarErro('Este tanque não tem lote ativo. Peça ao gerente para cadastrar o lote.');
       return;
     }
     erro.hidden = true;
     selLote.disabled = false;
+    const avisoLotes = f.querySelector('#aviso-lotes');
+    avisoLotes.hidden = !(doTanque.length > 1 && tipo === 'racao');
+    avisoLotes.textContent = 'Este tanque tem mais de um lote ativo. A ração será contada só no lote escolhido acima.';
     selLote.innerHTML = doTanque.map((l) => `<option value="${esc(l.id)}">${esc(ROTULO_TIPO[l.tipo] || l.tipo)} · ${esc(l.especie)} · desde ${fmtData(l.data_entrada)}</option>`).join('');
   }
   selTanque.addEventListener('change', montarLotes);
