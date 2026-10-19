@@ -8,7 +8,7 @@ import { icone } from './icons.js';
 import { confirmar } from './dialogo.js';
 import { splashDoDia } from './splash.js';
 import { renderLogin } from './views/login.js';
-import { renderHome } from './views/home.js';
+import { renderHome, renderTanqueDetalhe } from './views/home.js';
 import { renderLancar } from './views/lancar.js';
 import { renderTanques, renderTanque } from './views/tanques.js';
 import { renderEstoque } from './views/estoque.js';
@@ -233,6 +233,7 @@ async function rotear() {
   window.scrollTo(0, 0);
   try {
     switch (rota) {
+      case 't': await renderTanqueDetalhe(ctx, el, partes[0]); break;
       case 'lancar': await renderLancar(ctx, el, params); break;
       case 'relatorio': await (partes[0] === 'racao' ? renderRacaoDia(ctx, el) : partes[0] ? renderRelatorioLote(ctx, el, partes[0]) : renderRelatorios(ctx, el)); break;
       case 'tanques': await renderTanques(ctx, el); break;

@@ -340,3 +340,28 @@ input.grande { font-size: 2rem; font-weight: 700; min-height: 72px; text-align: 
 .sucesso h2 { margin: 0 0 .6rem; font-size: 1.5rem; }
 .sucesso-res { font-size: 1.15rem; margin-bottom: .6rem; }
 @keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ----- início compacto ----- */
+.resumo { padding: .85rem 1rem; margin-bottom: .9rem; }
+.resumo b { font-size: 1.7rem; }
+.resumo span { font-size: .82rem; }
+.resumo button.atencao { margin: -.45rem -.4rem; padding: .45rem .7rem; }
+.grupo { margin-top: 1.1rem; }
+.grupo h2 { font-size: 1.05rem; margin-bottom: .6rem; }
+.minis { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; }
+@media (min-width: 640px) { .minis { grid-template-columns: repeat(3, 1fr); } }
+.mini { display: grid; gap: .15rem; align-content: start; text-decoration: none; color: inherit; background: var(--card); border-radius: 20px; padding: .85rem .95rem .8rem; box-shadow: 0 1px 2px rgba(14, 79, 69, .06), 0 8px 20px -12px rgba(14, 79, 69, .28); transition: transform .12s var(--ease); }
+.mini:active { transform: scale(.98); }
+.mini-topo { display: flex; align-items: center; justify-content: space-between; gap: .4rem; }
+.mini-topo b { font-size: 1.05rem; letter-spacing: -.01em; }
+.mini .ponto { width: 10px; height: 10px; border-radius: 50%; background: var(--ok); flex: none; }
+.mini.falta .ponto { background: #e39a22; }
+.mini-esp { font-size: .8rem; color: var(--tinta-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mini-num { font-size: 1.8rem; font-weight: 700; letter-spacing: -.03em; line-height: 1.15; margin-top: .35rem; color: var(--rio-2); }
+.mini-num em { font-style: normal; font-size: .5em; font-weight: 600; margin-left: .12em; color: var(--tinta-2); }
+.mini small { font-weight: 600; }
+.mini.ok small { color: var(--ok); }
+.mini.falta { background: #fff7e8; box-shadow: 0 0 0 2px #f0b252; }
+.mini.falta small { color: var(--alerta); }
+.mini.semlote { background: transparent; box-shadow: none; border: 2px dashed #b9c6bd; }
+.seg button { padding: .6rem .2rem; }

@@ -1,5 +1,6 @@
 import { esc, fmtInt, fmtNum, fmtData, hojeISO, diasEntre, ROTULO_TIPO } from '../util.js';
 import * as db from '../db.js';
+import { icone } from '../icons.js';
 
 export const ordemNatural = (a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR', { numeric: true, sensitivity: 'base' });
 
@@ -62,6 +63,38 @@ function resumoDia(comLote, faltam) {
   </section>`;
 }
 
+export function htmlTileTanque(tanque, lotesDoTanque, resumo, status) {
+  const l = lotesDoTanque[0];
+  const r = l ? resumo[l.id] : null;
+  const esp = !l ? 'Sem lote ativo' : lotesDoTanque.length > 1 ? `${lotesDoTanque.length} lotes ativos` : `${ROTULO_TIPO[l.tipo] || l.tipo} · ${l.especie}`;
+  const peso = r && r.ultimo_peso_medio_kg != null ? `${fmtNum(r.ultimo_peso_medio_kg * 1000, 0)}<em>g</em>` : '—';
+  const sub = status === 'ok' ? 'Alimentado hoje' : status === 'falta' ? 'Falta alimentar' : '';
+  return `<a class="mini ${status}" href="#/t/${esc(tanque.id)}">
+    <span class="mini-topo"><b>${esc(tanque.nome)}</b>${status === 'semlote' ? '' : '<i class="ponto"></i>'}</span>
+    <span class="mini-esp">${esc(esp)}</span>
+    ${status === 'semlote' ? '' : `<span class="mini-num">${peso}</span><small>${sub}</small>`}
+  </a>`;
+}
+
+// Tela de um tanque (todos os papéis): números do lote e atalhos para lançar
+export async function renderTanqueDetalhe(ctx, el, id) {
+  const { state } = ctx;
+  const tanque = state.ref.tanques.find((t) => t.id === id);
+  if (!tanque) { el.innerHTML = '<p><a class="voltar" href="#/">Início</a></p><div class="card vazio">Tanque não encontrado.</div>'; return; }
+  el.innerHTML = '<p class="carregando">Carregando…</p>';
+  const resumo = {};
+  let semDetalhe = !navigator.onLine;
+  if (navigator.onLine) { try { for (const r of await ctx.api.resumoLotes()) resumo[r.lote_id] = r; } catch { semDetalhe = true; } }
+  const hoje = hojeISO();
+  const fila = await db.filaList();
+  const racaoHojeLocal = new Set(fila.filter((i) => i.tabela === 'racao_consumo' && i.payload.data === hoje).map((i) => i.payload.tanque_id));
+  const meus = state.ref.lotes.filter((l) => l.tanque_id === id);
+  el.innerHTML = `<p class="no-print"><a class="voltar" href="#/">${icone('voltar', 18)} Início</a></p>
+    ${semDetalhe ? '<p class="aviso">Sem conexão: os totais aparecem quando houver internet.</p>' : ''}
+    ${htmlCardTanque(tanque, meus, resumo, racaoHojeLocal, hoje)}
+    ${meus.length ? `<a class="btn grande" href="#/relatorio/${esc(meus[0].id)}">Ver relatório do lote</a>` : ''}`;
+}
+
 export async function renderHome(ctx, el) {
   const { state } = ctx;
   const primeiro = (state.perfil.nome || '').split(' ')[0];
@@ -92,10 +125,10 @@ export async function renderHome(ctx, el) {
     ok: tanques.filter((t) => status[t.id] === 'ok').sort(ordemNatural),
     semlote: tanques.filter((t) => status[t.id] === 'semlote').sort(ordemNatural),
   };
-  const card = (t) => htmlCardTanque(t, lotes.filter((l) => l.tanque_id === t.id), resumo, racaoHojeLocal, hoje);
+  const card = (t) => htmlTileTanque(t, lotes.filter((l) => l.tanque_id === t.id), resumo, status[t.id]);
   const bloco = (chave, titulo, classe) => (grupos[chave].length ? `
     <section class="grupo ${classe}"><h2>${titulo} <span class="contagem">${grupos[chave].length}</span></h2>
-      <div class="grade">${grupos[chave].map(card).join('')}</div></section>` : '');
+      <div class="minis">${grupos[chave].map(card).join('')}</div></section>` : '');
   const faltam = grupos.falta.length;
 
   let filtro = 'todos';
