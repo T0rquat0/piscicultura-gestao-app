@@ -113,6 +113,26 @@ td { font-variant-numeric: tabular-nums; }
 .kpi b { display: block; font-size: 1.6rem; font-weight: 700; letter-spacing: -.025em; line-height: 1.2; }
 .kpi small { display: block; line-height: 1.3; }
 
+/* ----- relatório do lote ----- */
+.cab-lote { display: flex; align-items: center; gap: .5rem; margin: -.4rem 0 1.4rem; }
+.bloco { margin-top: 2.2rem; }
+.bloco h2 { margin: 0 0 .9rem; display: flex; align-items: center; gap: .6rem; }
+.contagem { font-size: .8rem; font-weight: 600; color: var(--tinta-2); background: #e6e9e0; border-radius: 999px; padding: .1rem .6rem; }
+.destaques3 { display: grid; gap: 0; padding: .3rem 1.2rem; }
+.destaque { padding: 1.1rem 0; }
+.destaque + .destaque { border-top: 1px solid var(--linha); }
+.destaque span { display: block; font-size: .9rem; color: var(--tinta-2); margin-bottom: .15rem; }
+.destaque b { display: block; font-size: 2.6rem; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; }
+.destaque b em { font-style: normal; font-size: .45em; font-weight: 600; margin-left: .2em; color: var(--tinta-2); letter-spacing: 0; }
+.destaque small { display: block; margin-top: .2rem; }
+.lista.numeros li, .lista.registros li { padding: 1rem 0; }
+.valor { font-weight: 700; font-size: 1.15rem; text-align: right; flex: none; }
+.valor small { display: block; font-weight: 400; }
+.registros li { gap: .9rem; }
+.registros .esq { flex: 1; }
+.nota { margin: .9rem .2rem 0; font-size: .9rem; }
+.bloco + .acoes, .acoes.no-print { margin-top: 2.2rem; }
+
 /* ----- botões ----- */
 .btn {
   appearance: none; border: 1.5px solid var(--linha); background: var(--card); color: var(--tinta); font: inherit; font-weight: 600;
@@ -219,3 +239,6 @@ summary { cursor: pointer; font-weight: 700; padding: .7rem 0; font-size: 1.05re
   details > summary { display: none; }
   details[open] > *, details > * { display: block; }
 }
+
+/* exclusão discreta nos registros */
+.registros .btn.perigo { border: 0; min-height: 40px; padding: 0 .4rem; font-size: .9rem; font-weight: 600; }

@@ -83,44 +83,49 @@ export async function renderRelatorioLote(ctx, el, id) {
   const c = calcularLote(lote, bios, mort, rac, fim, gerir ? precoMedioKg(compras) : null);
   const nomeTanque = lote.tanques ? lote.tanques.nome : '';
 
-  const kpi = (rotulo, valor, sub) => `<div class="kpi"><span>${rotulo}</span><b>${valor}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
-  const del = (tab, rid) => (gerir ? `<td><button class="btn mini perigo no-print" data-del="${tab}:${esc(rid)}" type="button">Excluir</button></td>` : '');
+  const unid = (v, u) => `${v}<em>${u}</em>`;
+  const destaque = (rotulo, valor, sub) => `<div class="destaque"><span>${rotulo}</span><b>${valor}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
+  const linhaNum = (rotulo, valor, sub) => `<li><div class="esq"><b>${rotulo}</b>${sub ? `<small>${sub}</small>` : ''}</div><span class="valor">${valor}</span></li>`;
+  const excluir = (tab, rid) => (gerir ? `<button class="btn mini perigo no-print" data-del="${tab}:${esc(rid)}" type="button">Excluir</button>` : '');
+  const registro = (data, quemId, valor, tab, rid) => `<li><div class="esq"><b>${fmtData(data)}</b><small>${esc(quem(quemId))}</small></div><span class="valor">${valor}</span>${excluir(tab, rid)}</li>`;
+  const secao = (titulo, itens, vazio) => `
+    <section class="bloco"><h2>${titulo} <span class="contagem">${itens.length}</span></h2>
+      <div class="card">${itens.length ? `<ul class="lista registros">${itens.join('')}</ul>` : `<p class="mudo" style="margin:0">${vazio}</p>`}</div></section>`;
 
   el.innerHTML = `
     <p class="no-print"><a class="voltar" href="#/relatorio">${icone('voltar', 18)} Relatórios</a></p>
     <h1>${esc(nomeTanque)} · ${esc(lote.especie)}</h1>
-    <p class="mudo">${esc(ROTULO_TIPO[lote.tipo] || lote.tipo)} · entrada em ${fmtData(lote.data_entrada)} · ${lote.ativo ? 'lote ativo' : 'lote encerrado'}</p>
+    <p class="mudo cab-lote"><span class="fase ${lote.tipo === 'alevinagem' ? 'alev' : 'eng'}"></span>${esc(ROTULO_TIPO[lote.tipo] || lote.tipo)} · entrada em ${fmtData(lote.data_entrada)} · ${lote.ativo ? 'lote ativo' : 'lote encerrado'}</p>
+
+    <div class="card destaques3">
+      ${destaque('Peso médio atual', c.pmAtualG != null ? unid(fmtNum(c.pmAtualG, 0), 'g') : '—', c.pmAtualG != null ? `em ${fmtData(c.dataUltimaBio)}` : 'sem biometria ainda')}
+      ${destaque('Ração fornecida', unid(fmtNum(c.racaoTotal, 0), 'kg'), c.racaoMediaDia != null ? `média ${fmtNum(c.racaoMediaDia, 1)} kg/dia` : '')}
+      ${destaque('Conversão alimentar', c.ca != null ? fmtNum(c.ca, 2) : '—', c.ca != null ? 'kg de ração por kg ganho' : 'precisa de biometria com ganho')}
+    </div>
+
+    <section class="bloco"><h2>Evolução do peso médio</h2>
+      <div class="card">${svgPeso(pontosPeso(lote, bios))}</div></section>
+
+    <section class="bloco"><h2>Situação do lote</h2>
+      <div class="card"><ul class="lista numeros">
+        ${linhaNum('Dias de cultivo', fmtInt(c.diasCultivo))}
+        ${linhaNum('Peixes vivos (estim.)', fmtInt(c.vivos), `${fmtNum(c.sobrevivencia, 1)}% de sobrevivência · ${fmtInt(c.mortos)} mortos`)}
+        ${linhaNum('Biomassa estimada', c.biomassaAtual != null ? fmtNum(c.biomassaAtual, 0) + ' kg' : '—', `na entrada: ${fmtNum(c.biomassaInicial, 0)} kg`)}
+        ${linhaNum('Peso médio na entrada', fmtNum(c.pmInicialG, 1) + ' g')}
+        ${linhaNum('Ganho diário', c.gpd != null ? fmtNum(c.gpd, 2) + ' g/dia' : '—', 'por peixe')}
+        ${gerir ? linhaNum('Custo de ração', c.custoRacao != null ? fmtBRL(c.custoRacao) : '—', c.custoRacao != null ? 'pelo preço médio pago por kg' : 'registre o valor nas compras') : ''}
+      </ul></div>
+      <p class="mudo nota">Valores estimados usam o peso médio da última biometria e a mortalidade registrada. Quanto mais biometrias, mais confiável.</p>
+    </section>
+
+    ${secao('Ração lançada', [...rac].reverse().map((r) => registro(r.data, r.registrado_por, `${fmtNum(r.quantidade_kg, 1)} kg`, 'racao_consumo', r.id)), 'Nenhuma ração lançada.')}
+    ${secao('Biometrias', [...bios].reverse().map((b) => registro(b.data, b.registrado_por, `${fmtNum(pesoMedioKg(b) * 1000, 0)} g<small>${fmtInt(b.quantidade_amostrada)} peixes · ${fmtNum(b.peso_amostra_kg, 3)} kg</small>`, 'biometrias', b.id)), 'Nenhuma biometria registrada.')}
+    ${secao('Mortalidade', [...mort].reverse().map((m) => registro(m.data, m.registrado_por, `${fmtInt(m.quantidade)} peixes`, 'mortalidade', m.id)), 'Nenhuma mortalidade registrada.')}
+
     <div class="acoes no-print">
-      <button class="btn mini" id="b-csv" type="button">Baixar planilha (CSV)</button>
-      <button class="btn mini" id="b-print" type="button">Imprimir / salvar PDF</button>
-    </div>
-
-    <div class="kpis" style="margin-top:.9rem">
-      ${kpi('Dias de cultivo', fmtInt(c.diasCultivo))}
-      ${kpi('Peixes vivos (estim.)', fmtInt(c.vivos), `${fmtNum(c.sobrevivencia, 1)}% de sobrevivência · ${fmtInt(c.mortos)} mortos`)}
-      ${kpi('Ração fornecida', fmtNum(c.racaoTotal, 0) + ' kg', c.racaoMediaDia != null ? `média ${fmtNum(c.racaoMediaDia, 1)} kg/dia` : '')}
-      ${kpi('Peso médio atual', c.pmAtualG != null ? fmtNum(c.pmAtualG, 0) + ' g' : '—', c.pmAtualG != null ? `em ${fmtData(c.dataUltimaBio)} · entrada: ${fmtNum(c.pmInicialG, 1)} g` : 'sem biometria ainda')}
-      ${kpi('Biomassa estimada', c.biomassaAtual != null ? fmtNum(c.biomassaAtual, 0) + ' kg' : '—', `entrada: ${fmtNum(c.biomassaInicial, 0)} kg`)}
-      ${kpi('Conversão alimentar', c.ca != null ? fmtNum(c.ca, 2) : '—', c.ca != null ? 'kg de ração por kg ganho (aprox.)' : 'precisa de biometria com ganho')}
-      ${kpi('Ganho diário', c.gpd != null ? fmtNum(c.gpd, 2) + ' g/dia' : '—', 'por peixe')}
-      ${gerir ? kpi('Custo de ração', c.custoRacao != null ? fmtBRL(c.custoRacao) : '—', c.custoRacao != null ? 'pelo preço médio pago por kg' : 'registre o valor nas compras') : ''}
-    </div>
-    <p class="mudo">Valores marcados como estimados usam o peso médio da última biometria e a mortalidade registrada. Quanto mais biometrias, mais confiável.</p>
-
-    <h2>Evolução do peso médio</h2>
-    <div class="card">${svgPeso(pontosPeso(lote, bios))}</div>
-
-    <details open><summary>Ração lançada (${rac.length})</summary>
-      <div class="card rolagem">${rac.length ? `<table><thead><tr><th>Data</th><th class="n">kg</th><th>Quem lançou</th>${gerir ? '<th></th>' : ''}</tr></thead>
-        <tbody>${[...rac].reverse().map((r) => `<tr><td>${fmtData(r.data)}</td><td class="n">${fmtNum(r.quantidade_kg, 1)}</td><td>${esc(quem(r.registrado_por))}</td>${del('racao_consumo', r.id)}</tr>`).join('')}</tbody></table>` : '<p class="mudo" style="margin:0">Nenhuma ração lançada.</p>'}</div></details>
-
-    <details open><summary>Biometrias (${bios.length})</summary>
-      <div class="card rolagem">${bios.length ? `<table><thead><tr><th>Data</th><th class="n">Amostra kg</th><th class="n">Peixes</th><th class="n">Médio g</th><th>Quem</th>${gerir ? '<th></th>' : ''}</tr></thead>
-        <tbody>${[...bios].reverse().map((b) => `<tr><td>${fmtData(b.data)}</td><td class="n">${fmtNum(b.peso_amostra_kg, 3)}</td><td class="n">${fmtInt(b.quantidade_amostrada)}</td><td class="n">${fmtNum(pesoMedioKg(b) * 1000, 0)}</td><td>${esc(quem(b.registrado_por))}</td>${del('biometrias', b.id)}</tr>`).join('')}</tbody></table>` : '<p class="mudo" style="margin:0">Nenhuma biometria registrada.</p>'}</div></details>
-
-    <details open><summary>Mortalidade (${mort.length})</summary>
-      <div class="card rolagem">${mort.length ? `<table><thead><tr><th>Data</th><th class="n">Peixes</th><th>Quem</th>${gerir ? '<th></th>' : ''}</tr></thead>
-        <tbody>${[...mort].reverse().map((m) => `<tr><td>${fmtData(m.data)}</td><td class="n">${fmtInt(m.quantidade)}</td><td>${esc(quem(m.registrado_por))}</td>${del('mortalidade', m.id)}</tr>`).join('')}</tbody></table>` : '<p class="mudo" style="margin:0">Nenhuma mortalidade registrada.</p>'}</div></details>`;
+      <button class="btn" id="b-csv" type="button">Baixar planilha (CSV)</button>
+      <button class="btn" id="b-print" type="button">Imprimir / salvar PDF</button>
+    </div>`;
 
   el.querySelector('#b-print').addEventListener('click', () => window.print());
   el.querySelector('#b-csv').addEventListener('click', () => {
