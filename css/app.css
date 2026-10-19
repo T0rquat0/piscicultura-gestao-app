@@ -317,3 +317,26 @@ summary { cursor: pointer; font-weight: 700; padding: .7rem 0; font-size: 1.05re
 .tanque-card.sem-lote > header { background: #e4e8e2; }
 
 .calc { white-space: pre-line; }
+
+/* ----- lançar: escolha de tanque em botões, campo grande, confirmação ----- */
+.campo { display: grid; gap: .5rem; }
+.rotulo { font-weight: 600; font-size: .95rem; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+.tile { appearance: none; border: 2px solid #c3d0c7; background: #fff; color: var(--tinta); font: inherit; font-weight: 700; border-radius: 18px; min-height: 64px; padding: .6rem .8rem; text-align: left; cursor: pointer; display: grid; align-content: center; transition: background .15s var(--ease), border-color .15s, transform .12s var(--ease); }
+.tile small { color: var(--tinta-2); font-weight: 500; min-height: 1em; }
+.tile.feito small { color: var(--ok); }
+.tile:active { transform: scale(.98); }
+.tile.on { background: var(--rio); border-color: var(--rio); color: #fff; }
+.tile.on small { color: #bfe3d6; }
+.lote-linha { margin: 0; color: var(--tinta-2); font-weight: 600; display: flex; align-items: center; gap: .5rem; }
+.lote-linha::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--rio); }
+.data-linha { display: flex; align-items: center; justify-content: space-between; gap: .6rem; color: var(--tinta-2); }
+.data-linha b { color: var(--tinta); }
+.link { appearance: none; border: 0; background: none; font: inherit; font-weight: 700; color: var(--rio); padding: .6rem .2rem; cursor: pointer; min-height: 44px; }
+input.grande { font-size: 2rem; font-weight: 700; min-height: 72px; text-align: center; letter-spacing: -.02em; }
+.chip { appearance: none; border: 0; background: var(--rio-claro); color: var(--rio-2); font: inherit; font-weight: 600; font-size: .9rem; border-radius: 999px; padding: .6rem 1rem; text-align: center; cursor: pointer; min-height: 44px; }
+.sucesso { text-align: center; padding: 1.6rem 1.2rem 1.3rem; }
+.sucesso-ic { width: 76px; height: 76px; border-radius: 50%; background: var(--ok-bg); color: var(--ok); display: grid; place-items: center; margin: 0 auto .8rem; animation: pop .35s var(--ease); }
+.sucesso h2 { margin: 0 0 .6rem; font-size: 1.5rem; }
+.sucesso-res { font-size: 1.15rem; margin-bottom: .6rem; }
+@keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }

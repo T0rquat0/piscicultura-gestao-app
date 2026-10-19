@@ -1,7 +1,9 @@
 // Lançamento de ração, biometria e mortalidade. Funciona sem internet:
 // o item é gravado na fila local (IndexedDB) e enviado quando houver conexão.
+import { icone } from '../icons.js';
 import { esc, hojeISO, fmtData, fmtNum, fmtInt, num, uuid, ROTULO_TIPO } from '../util.js';
 import * as db from '../db.js';
+import { ordemNatural } from './home.js';
 
 const TIPOS = {
   racao: { rotulo: 'Ração', tabela: 'racao_consumo' },
@@ -9,10 +11,13 @@ const TIPOS = {
   mortalidade: { rotulo: 'Mortalidade', tabela: 'mortalidade' },
 };
 
+const kgTxt = (v) => fmtNum(v, Number.isInteger(Number(v)) ? 0 : 2);
+
 function camposDoTipo(tipo) {
   if (tipo === 'racao') {
-    return `<label>Quantidade de ração (kg)
-      <input id="qtd" type="number" inputmode="decimal" step="0.01" min="0" placeholder="Ex.: 12,5" required></label>`;
+    return `<label>Quantos kg de ração?
+      <input id="qtd" class="grande" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0" required></label>
+      <button type="button" class="chip" id="b-ultima" hidden></button>`;
   }
   if (tipo === 'biometria') {
     return `
@@ -25,8 +30,8 @@ function camposDoTipo(tipo) {
       <div class="calc" id="pm">Peso médio: —</div>
       <p id="aviso-amostra" class="aviso" hidden>Amostra pequena: com menos de 30 peixes o peso médio fica pouco confiável. O ideal é pesar de 5% a 10% do lote.</p>`;
   }
-  return `<label>Quantidade de peixes mortos
-    <input id="qtd" type="number" inputmode="numeric" step="1" min="1" placeholder="Ex.: 3" required></label>`;
+  return `<label>Quantos peixes morreram?
+    <input id="qtd" class="grande" type="number" inputmode="numeric" step="1" min="1" placeholder="0" required></label>`;
 }
 
 export async function renderLancar(ctx, el, params = {}) {
@@ -49,15 +54,18 @@ export async function renderLancar(ctx, el, params = {}) {
       ${Object.entries(TIPOS).map(([k, v]) => `<button type="button" data-tipo="${k}" class="${k === tipo ? 'on' : ''}">${v.rotulo}</button>`).join('')}
     </div>
     <form id="f" class="form card" novalidate>
-      <label>Tanque
-        <select id="tanque">${tanques.map((t) => `<option value="${esc(t.id)}"${t.id === tanqueInicial ? ' selected' : ''}>${esc(t.nome)}</option>`).join('')}</select>
-      </label>
-      <label id="lote-wrap">Lote <select id="lote"></select></label>
+      <div class="campo"><span class="rotulo">Qual tanque?</span>
+        <div class="tiles" role="radiogroup" aria-label="Tanque">${[...tanques].sort(ordemNatural).map((t) => `<button type="button" class="tile${t.id === tanqueInicial ? ' on' : ''}" role="radio" aria-checked="${t.id === tanqueInicial}" data-tanque="${esc(t.id)}"><span>${esc(t.nome)}</span><small></small></button>`).join('')}</div>
+        <select id="tanque" hidden>${tanques.map((t) => `<option value="${esc(t.id)}"${t.id === tanqueInicial ? ' selected' : ''}>${esc(t.nome)}</option>`).join('')}</select>
+      </div>
+      <p id="lote-linha" class="lote-linha" hidden></p>
+      <label id="lote-wrap">Qual lote? <select id="lote"></select></label>
       <p id="aviso-lotes" class="aviso" hidden></p>
-      <label>Data <input id="data" type="date" value="${hoje}" max="${hoje}" required></label>
+      <div class="data-linha"><span>Data: <b id="data-txt">hoje</b></span><button type="button" class="link" id="b-data">Mudar</button></div>
+      <label id="data-wrap" hidden>Data <input id="data" type="date" value="${hoje}" max="${hoje}" required></label>
       ${camposDoTipo(tipo)}
       <p id="erro" class="erro" hidden></p>
-      <button class="btn primario grande" type="submit">Salvar lançamento</button>
+      <button class="btn primario grande" type="submit">Salvar ${TIPOS[tipo].rotulo.toLowerCase()}</button>
       <p class="mudo" style="margin:0;text-align:center">${navigator.onLine ? 'Será enviado ao servidor agora.' : 'Sem internet: será salvo no celular e enviado depois.'}</p>
     </form>`;
 
@@ -66,6 +74,19 @@ export async function renderLancar(ctx, el, params = {}) {
 
   const f = el.querySelector('#f');
   const selTanque = f.querySelector('#tanque');
+  f.querySelectorAll('.tile').forEach((b) => b.addEventListener('click', () => {
+    selTanque.value = b.dataset.tanque;
+    f.querySelectorAll('.tile').forEach((x) => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', String(on)); });
+    selTanque.dispatchEvent(new Event('change'));
+    mostrarUltima();
+  }));
+  const dataIn = f.querySelector('#data');
+  f.querySelector('#b-data').addEventListener('click', () => {
+    const w = f.querySelector('#data-wrap'); w.hidden = !w.hidden;
+    f.querySelector('#b-data').textContent = w.hidden ? 'Mudar' : 'Fechar';
+    if (!w.hidden) dataIn.focus();
+  });
+  dataIn.addEventListener('input', () => { f.querySelector('#data-txt').textContent = !dataIn.value || dataIn.value === hoje ? 'hoje' : fmtData(dataIn.value); });
   const selLote = f.querySelector('#lote');
   const erro = f.querySelector('#erro');
   const mostrarErro = (m) => { erro.textContent = m; erro.hidden = false; };
@@ -75,12 +96,18 @@ export async function renderLancar(ctx, el, params = {}) {
     if (!doTanque.length) {
       selLote.innerHTML = '<option value="">— sem lote ativo —</option>';
       selLote.disabled = true;
+      f.querySelector('#lote-wrap').hidden = false;
+      f.querySelector('#lote-linha').hidden = true;
       f.querySelector('#aviso-lotes').hidden = true;
       mostrarErro('Este tanque não tem lote ativo. Peça ao gerente para cadastrar o lote.');
       return;
     }
     erro.hidden = true;
     selLote.disabled = false;
+    f.querySelector('#lote-wrap').hidden = doTanque.length < 2;
+    const linha = f.querySelector('#lote-linha');
+    linha.hidden = doTanque.length !== 1;
+    if (doTanque.length === 1) linha.textContent = `${ROTULO_TIPO[doTanque[0].tipo] || doTanque[0].tipo} · ${doTanque[0].especie}`;
     const avisoLotes = f.querySelector('#aviso-lotes');
     avisoLotes.hidden = !(doTanque.length > 1 && tipo === 'racao');
     avisoLotes.textContent = 'Este tanque tem mais de um lote ativo. A ração será contada só no lote escolhido acima.';
@@ -114,6 +141,28 @@ export async function renderLancar(ctx, el, params = {}) {
       ctx.api.resumoLotes().then((r) => { mortos = Object.fromEntries(r.map((x) => [x.lote_id, Number(x.mortos)])); atualizaPm(); }).catch(() => {});
     }
   }
+
+  async function mostrarUltima() {
+    const b = f.querySelector('#b-ultima');
+    if (!b) return;
+    const m = (await db.kvGet('ultimaRacao')) || {};
+    const v = m[selTanque.value];
+    if (!(v > 0)) { b.hidden = true; return; }
+    b.hidden = false;
+    b.textContent = `Última vez neste tanque: ${kgTxt(v)} kg. Toque para usar`;
+    b.onclick = () => { f.querySelector('#qtd').value = String(v); f.querySelector('#qtd').focus(); };
+  }
+  mostrarUltima();
+
+  // marca os tanques que já receberam ração hoje (fila local + servidor, quando houver internet)
+  async function marcarAlimentados() {
+    const feitos = new Set((await db.filaList()).filter((i) => i.tabela === 'racao_consumo' && i.payload.data === hoje).map((i) => i.payload.tanque_id));
+    if (navigator.onLine) {
+      try { for (const r of await ctx.api.resumoLotes()) { if (r.ultima_racao === hoje) { const l = lotes.find((x) => x.id === r.lote_id); if (l) feitos.add(l.tanque_id); } } } catch { /* sem detalhe */ }
+    }
+    f.querySelectorAll('.tile').forEach((b) => { const ok = feitos.has(b.dataset.tanque); b.classList.toggle('feito', ok); b.querySelector('small').textContent = ok ? 'já recebeu hoje' : ''; });
+  }
+  if (tipo === 'racao') marcarAlimentados();
 
   f.addEventListener('submit', async (ev) => {
     ev.preventDefault();
@@ -153,13 +202,27 @@ export async function renderLancar(ctx, el, params = {}) {
       btn.disabled = false;
       return mostrarErro('Não foi possível salvar no aparelho: ' + (e && e.message ? e.message : 'armazenamento indisponível'));
     }
+    if (tipo === 'racao') {
+      try { const m = (await db.kvGet('ultimaRacao')) || {}; m[selTanque.value] = payload.quantidade_kg; await db.kvSet('ultimaRacao', m); } catch { /* opcional */ }
+    }
     await ctx.atualizarPendentes();
-    ctx.toast(navigator.onLine ? 'Salvo. Enviando…' : 'Salvo no celular. Será enviado quando houver internet.', 'ok');
-    // limpa só os campos de quantidade; mantém tanque/data para o próximo lançamento
-    f.querySelectorAll('#qtd, #peso, #amostra').forEach((i) => { i.value = ''; });
-    const pm = f.querySelector('#pm'); if (pm) pm.textContent = 'Peso médio: —';
-    const av = f.querySelector('#aviso-amostra'); if (av) av.hidden = true;
-    btn.disabled = false;
     ctx.sincronizarAgora(); // em segundo plano; não trava a tela
+    const nomeTanque = (tanques.find((t) => t.id === selTanque.value) || {}).nome || '';
+    const resumo = tipo === 'racao' ? `${kgTxt(payload.quantidade_kg)} kg de ração`
+      : tipo === 'biometria' ? `${fmtNum((payload.peso_amostra_kg / payload.quantidade_amostrada) * 1000, 0)} g de peso médio (${fmtInt(payload.quantidade_amostrada)} peixes pesados)`
+      : `${fmtInt(payload.quantidade)} peixe(s) morto(s)`;
+    ctx.toast(navigator.onLine ? 'Salvo. Enviando…' : 'Salvo no celular. Será enviado quando houver internet.', 'ok');
+    f.outerHTML = `
+      <div class="sucesso card" role="status">
+        <div class="sucesso-ic">${icone('check', 40)}</div>
+        <h2>${TIPOS[tipo].rotulo} salva</h2>
+        <p class="sucesso-res"><b>${esc(nomeTanque)}</b><br>${esc(resumo)}</p>
+        <p class="mudo">${navigator.onLine ? 'Enviando para o servidor.' : 'Sem internet: guardado no celular. Será enviado sozinho quando a internet voltar.'}</p>
+        <div class="dialogo-acoes">
+          <button type="button" class="btn primario grande" id="b-outro">Lançar em outro tanque</button>
+          <a class="btn grande" href="#/">Voltar ao início</a>
+        </div>
+      </div>`;
+    el.querySelector('#b-outro').addEventListener('click', () => renderLancar(ctx, el, { tipo }));
   });
 }
