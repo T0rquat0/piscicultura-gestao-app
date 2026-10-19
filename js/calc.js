@@ -126,3 +126,16 @@ export function matrizRacao(linhas, tanqueIds, dias, hoje) {
   });
   return { rows, totalTanque, total: rows.reduce((s, r) => s + r.total, 0) };
 }
+
+// Situação do estoque de ração: quantos dias dura no ritmo dos últimos 7 dias.
+// nivel: 'sem-dado' | 'ok' | 'atencao' | 'critico' | 'negativo'
+export function situacaoEstoque(saldoKg, consumo7dKg, atencaoDias = 15, criticoDias = 7) {
+  const saldo = Number(saldoKg) || 0;
+  const porDia = (Number(consumo7dKg) || 0) / 7;
+  if (saldo < 0) return { nivel: 'negativo', dias: null, porDia };
+  if (!(porDia > 0)) return { nivel: saldo === 0 ? 'critico' : 'sem-dado', dias: null, porDia };
+  const dias = saldo / porDia;
+  const d = Math.floor(dias);
+  const nivel = d <= criticoDias ? 'critico' : d <= atencaoDias ? 'atencao' : 'ok';
+  return { nivel, dias, porDia };
+}

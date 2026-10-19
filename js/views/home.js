@@ -1,6 +1,18 @@
 import { esc, fmtInt, fmtNum, fmtData, hojeISO, diasEntre, ROTULO_TIPO } from '../util.js';
 import * as db from '../db.js';
+import { situacaoEstoque } from '../calc.js';
+import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, PESO_SACO_PADRAO_KG } from '../config.js';
 import { icone } from '../icons.js';
+
+export function cartaoEstoque(s, kgS) {
+  if (!s) return '';
+  const kg = Number(s.saldo_kg) || 0;
+  const sit = situacaoEstoque(kg, s.consumo_7d_kg, ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS);
+  const txt = sit.nivel === 'negativo' ? 'confira o estoque' : sit.dias != null ? `dura ~${fmtNum(Math.floor(sit.dias), 0)} dias` : 'sem consumo recente';
+  return `<a class="est-card n-${sit.nivel}" href="#/estoque"><span class="est-ic">${icone('estoque', 22)}</span>
+    <span class="est-t"><small>Ração em estoque</small><b>${kg < 0 ? '−' : ''}${fmtNum(Math.abs(kg) / kgS, 0)} sacos</b></span>
+    <span class="est-d">${esc(txt)}</span></a>`;
+}
 
 export const ordemNatural = (a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR', { numeric: true, sensitivity: 'base' });
 
@@ -110,8 +122,11 @@ export async function renderHome(ctx, el) {
   el.innerHTML = `<h1>Olá, ${esc(primeiro)}</h1><p class="carregando">Carregando tanques…</p>`;
   const resumo = {};
   let semDetalhe = false;
+  let saldoRacao = null;
   if (navigator.onLine) {
+    const pSaldo = ctx.api.saldoRacao().catch(() => null);
     try { for (const r of await ctx.api.resumoLotes()) resumo[r.lote_id] = r; } catch { semDetalhe = true; }
+    saldoRacao = await pSaldo;
   } else { semDetalhe = true; }
 
   const hoje = hojeISO();
@@ -135,6 +150,7 @@ export async function renderHome(ctx, el) {
   el.innerHTML = `
     <h1>Olá, ${esc(primeiro)}</h1>
     ${resumoDia(grupos.falta.length + grupos.ok.length, faltam)}
+    ${cartaoEstoque(saldoRacao, state.ref.kgSaco || PESO_SACO_PADRAO_KG)}
     ${semDetalhe ? '<p class="aviso">Sem conexão: mostrando só os dados guardados no aparelho. Os totais aparecem quando houver internet.</p>' : ''}
     ${grupos.falta.length + grupos.ok.length ? `<div class="seg" style="--n:3" role="tablist">
       <button type="button" data-filtro="todos">Todos</button>

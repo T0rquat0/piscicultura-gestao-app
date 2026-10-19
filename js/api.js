@@ -9,7 +9,7 @@ export class ErroApi extends Error {
   }
 }
 
-const TABELAS_EXCLUIVEIS = new Set(['biometrias', 'mortalidade', 'racao_consumo', 'racao_estoque']);
+const TABELAS_EXCLUIVEIS = new Set(['biometrias', 'mortalidade', 'racao_consumo', 'racao_estoque', 'racao_contagens']);
 
 export function criarApi(client) {
   const ok = (res) => {
@@ -78,6 +78,15 @@ export function criarApi(client) {
     async saldoRacao() {
       const d = ok(await client.rpc('saldo_racao'));
       return Array.isArray(d) ? d[0] : d;
+    },
+    async consumoDiario(dias = 30) {
+      return ok(await client.rpc('consumo_diario', { p_dias: dias })) || [];
+    },
+    async contagens() {
+      return ok(await client.from('racao_contagens').select('id,data,contado_kg,saldo_sistema_kg,diferenca_kg,obs,criado_em').order('criado_em', { ascending: false }).limit(30)) || [];
+    },
+    async registrarContagem(kg, obs) {
+      return Number(ok(await client.rpc('registrar_contagem', { p_contado_kg: kg, p_obs: obs || null })));
     },
     async compras(podeGerir) {
       let lista;

@@ -387,3 +387,40 @@ input.grande { font-size: 2rem; font-weight: 700; min-height: 72px; text-align: 
 .tanque-atual b { display: block; overflow-wrap: anywhere; }
 .mini-topo b { min-width: 0; overflow-wrap: anywhere; line-height: 1.15; }
 .tile { overflow-wrap: anywhere; }
+
+/* ===== estoque de ração ===== */
+.estoque-hero { background: var(--rio); color: #fff; border-radius: var(--r-card); padding: 1.3rem 1.2rem; margin-bottom: 1rem; display: grid; gap: .2rem; }
+.estoque-hero span { font-size: .9rem; color: #b5d6cb; }
+.estoque-hero b { font-size: 3rem; font-weight: 700; letter-spacing: -.03em; line-height: 1.05; }
+.estoque-hero b em { font-style: normal; font-size: .4em; margin-left: .25em; color: #b5d6cb; font-weight: 600; letter-spacing: 0; }
+.estoque-hero small { font-size: 1rem; color: #d3e7df; }
+.estoque-hero small strong { color: #fff; }
+.estoque-hero p { margin: .6rem 0 0; padding: .55rem .8rem; border-radius: 12px; background: rgba(255,255,255,.14); font-weight: 600; font-size: .98rem; }
+.estoque-hero.n-atencao { background: #8a5a0b; }
+.estoque-hero.n-critico, .estoque-hero.n-negativo { background: #8f2d22; }
+.form-dobra { padding: 0; margin-bottom: .8rem; }
+.form-dobra > summary { padding: 1rem 1.1rem; font-weight: 700; cursor: pointer; list-style: none; }
+.form-dobra > summary::-webkit-details-marker { display: none; }
+.form-dobra > summary::after { content: '＋'; float: right; color: var(--rio-2); }
+.form-dobra[open] > summary::after { content: '−'; }
+.form-dobra > .form { padding: 0 1.1rem 1.1rem; }
+.extrato { list-style: none; margin: 0; padding: 0; }
+.extrato li { display: flex; align-items: center; gap: .6rem; padding: .7rem 0; border-bottom: 1px solid #e6ede8; }
+.extrato li:last-child { border-bottom: 0; }
+.ex-d { color: var(--tinta-2); font-size: .9rem; width: 2.8rem; flex: none; }
+.ex-t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.extrato b { white-space: nowrap; }
+.extrato b em { font-style: normal; font-weight: 500; color: var(--tinta-2); font-size: .85em; }
+.extrato li.entra b { color: var(--ok); }
+.est-card { display: flex; align-items: center; gap: .8rem; text-decoration: none; color: inherit; background: var(--card); border-radius: 20px; padding: .8rem 1rem; margin-bottom: 1rem; box-shadow: 0 1px 2px rgba(14,79,69,.06), 0 8px 20px -12px rgba(14,79,69,.28); border-left: 6px solid var(--ok); }
+.est-card.n-atencao { border-left-color: #e39a22; }
+.est-card.n-critico, .est-card.n-negativo { border-left-color: #c0392b; }
+.est-card .est-ic { color: var(--rio-2); display: flex; }
+.est-t { flex: 1; min-width: 0; display: grid; }
+.est-t small { color: var(--tinta-2); font-size: .85rem; }
+.est-t b { font-size: 1.3rem; letter-spacing: -.02em; }
+.est-d { font-size: .92rem; font-weight: 600; text-align: right; color: var(--tinta-2); }
+.est-card.n-atencao .est-d { color: #8a5a0b; }
+.est-card.n-critico .est-d, .est-card.n-negativo .est-d { color: #b03020; }
+.est-t small { white-space: nowrap; }
+.est-d { font-size: .85rem; max-width: 40%; }
