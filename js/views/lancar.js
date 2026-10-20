@@ -24,9 +24,14 @@ function camposDoTipo(tipo, kgSaco) {
   if (tipo === 'racao') {
     return `<label>Quantos sacos de ração?
       <input id="qtd" class="grande" type="number" inputmode="decimal" step="0.5" min="0" placeholder="0" required></label>
-      <p class="ajuda">Pode ser meio saco (0,5).</p>
       <div class="calc" id="conv">Cada saco = ${fmtNum(kgSaco, 0)} kg</div>
-      <button type="button" class="chip" id="b-ultima" hidden></button>`;
+      <button type="button" class="chip repetir" id="b-ultima" hidden></button>
+      <details class="como-det"><summary>Como lançar</summary>
+      <ol class="como">
+        <li>Conte os sacos de ração que foram dados hoje neste tanque.</li>
+        <li>Se foi meio saco, digite 0,5.</li>
+        <li>Cada saco vale ${fmtNum(kgSaco, 0)} kg (muda em Mais &gt; Peso do saco).</li>
+      </ol></details>`;
   }
   if (tipo === 'biometria') {
     return `
@@ -44,7 +49,12 @@ function camposDoTipo(tipo, kgSaco) {
       <p id="aviso-amostra" class="aviso" hidden>Poucos peixes pesados: com menos de 30 o peso médio fica pouco confiável.</p>`;
   }
   return `<label>Quantos peixes morreram?
-    <input id="qtd" class="grande" type="number" inputmode="numeric" step="1" min="1" placeholder="0" required></label>`;
+    <input id="qtd" class="grande" type="number" inputmode="numeric" step="1" min="1" placeholder="0" required></label>
+    <details class="como-det"><summary>Como lançar</summary>
+    <ol class="como">
+      <li>Conte os peixes mortos encontrados hoje neste tanque.</li>
+      <li>Digite o total e, se souber, escolha a causa abaixo.</li>
+    </ol></details>`;
 }
 
 export async function renderLancar(ctx, el, params = {}) {
@@ -190,7 +200,7 @@ export async function renderLancar(ctx, el, params = {}) {
     if (!(v > 0)) { b.hidden = true; return; }
     b.hidden = false;
     const sc = Math.round((v / kgSaco) * 100) / 100;
-    b.textContent = `Última vez neste tanque: ${sacosTxt(sc)}. Toque para usar`;
+    b.textContent = `↺ Repetir ${sacosTxt(sc)} (última vez)`;
     b.onclick = () => { f.querySelector('#qtd').value = String(sc); f.querySelector('#qtd').dispatchEvent(new Event('input')); f.querySelector('#qtd').focus(); };
   }
   mostrarUltima();

@@ -810,3 +810,16 @@ p.so-pc { display: none; } @media (min-width: 800px) { p.so-pc { display: block;
 .td-rel { width: 100%; }
 .seg[data-de] > button.on { background: transparent; }
 .tanque-card.tdet > header { background: none; padding: 0; margin: .2rem 0 1rem; }
+
+/* Lançar: "Como lançar" clicável + campos mais limpos */
+.como-det { margin: 0; }
+.como-det > summary { display: flex; align-items: center; gap: .5rem; padding: .65rem .85rem; border-radius: 14px; background: var(--rio-claro); color: var(--rio); font-weight: 600; min-height: 44px; transition: background .2s; }
+.como-det > summary::before { content: none; }
+.como-det > summary::after { content: ''; margin-left: auto; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translateY(-2px); transition: transform .25s; }
+.como-det[open] > summary { padding-bottom: .65rem; background: var(--rio-claro); }
+.como-det[open] > summary::after { transform: rotate(-135deg) translateY(-2px); }
+.como-det > summary:active { filter: brightness(.96); }
+.como-det > .como { margin: .6rem 0 .1rem; padding-left: 1.6rem; color: var(--tinta-2); font-size: .93rem; line-height: 1.45; }
+.como-det > summary > svg, .como-det > summary .ic { flex: none; }
+#f .chip.repetir { justify-self: stretch; width: 100%; text-align: center; border-radius: 14px; padding: .7rem .8rem; background: #fff; border: 1.5px dashed var(--rio); color: var(--rio); font-weight: 600; }
+#f .calc#conv { background: none; padding: 0; text-align: left; color: var(--tinta-2); font-size: .92rem; }
