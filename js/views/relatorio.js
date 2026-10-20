@@ -407,10 +407,10 @@ export async function renderRacaoDia(ctx, el) {
     <div class="seg no-print" style="--n:4" role="tablist">${[['hoje', 'Hoje'], ['ontem', 'Ontem'], ['7', '7 dias'], ['30', '30 dias']].map(([k, t]) => `<button type="button" data-per="${k}">${t}</button>`).join('')}</div>
     <label class="outro-dia no-print">Ou escolha um dia<input type="date" id="outro" max="${hoje}" value="${hoje}"></label>
     <div id="resumo"></div>
+    <div id="corpo"></div>
     <div class="msg-acoes no-print" id="acoes-racao">
       <button class="btn primario grande" id="b-pdf-racao" type="button">Enviar relatório (PDF)</button>
     </div>
-    <div id="corpo"></div>
     <p class="no-print" style="text-align:center;margin:1.2rem 0 .4rem"><button class="link" id="b-csv" type="button">Baixar planilha (CSV)</button></p>`;
 
   let r = null;
@@ -424,7 +424,7 @@ export async function renderRacaoDia(ctx, el) {
     const detalhe = r.um || !r.lista.length ? '' : `
       <h2>Dia a dia</h2>
       <div class="card">${grafico}</div>
-      <details class="so-cel lista-recolhe"><summary>Ver dia a dia (${r.linhasDia.length} dias)</summary>
+      <details class="so-cel lista-recolhe"><summary><span class="vd-ic">${icone('relatorio', 20)}</span><span class="vd-t"><b>Ver dia a dia</b><small>Toque para abrir os ${r.linhasDia.length} dias</small></span><span class="vd-seta">${icone('direita', 20)}</span></summary>
       <div class="card dias-lista">${r.linhasDia.map((d) => d.kg > 0 ? `
         <details class="dia-det"><summary><span>${diaCurto(d.data)}</span><b>${sacos(d.kg)} <small>sacos</small></b></summary>
           <ul>${r.lista.filter((t) => d.por[t.nome] != null).map((t) => `<li><span>${esc(t.nome)}</span><b>${kgTxt(d.por[t.nome])} kg</b></li>`).join('')}</ul></details>` : `
