@@ -390,7 +390,10 @@ export async function renderRacaoDia(ctx, el) {
     L.push('', `*Total: ${sacos(r.total)} sacos (${kgTxt(r.total)} kg)*`);
     if (!r.um) {
       L.push('', 'Por dia:');
-      r.linhasDia.slice().reverse().forEach((d) => L.push(`${diaCurto(d.data)}: ${d.kg > 0 ? `${sacos(d.kg)} sacos (${kgTxt(d.kg)} kg)` : 'nada lançado'}`));
+      const com = r.linhasDia.filter((d) => d.kg > 0).reverse();
+      com.forEach((d) => L.push(`${diaCurto(d.data)}: ${sacos(d.kg)} ${sacos(d.kg) === '1' ? 'saco' : 'sacos'} (${kgTxt(d.kg)} kg)`));
+      const sem = r.linhasDia.length - com.length;
+      if (sem) L.push(`(${sem} ${sem === 1 ? 'dia' : 'dias'} sem lançamento)`);
     }
     return L.filter((x) => x !== null).join('\n');
   }
@@ -401,11 +404,18 @@ export async function renderRacaoDia(ctx, el) {
     <div class="seg no-print" style="--n:4" role="tablist">${[['hoje', 'Hoje'], ['ontem', 'Ontem'], ['7', '7 dias'], ['30', '30 dias']].map(([k, t]) => `<button type="button" data-per="${k}">${t}</button>`).join('')}</div>
     <label class="outro-dia no-print">Ou escolha um dia<input type="date" id="outro" max="${hoje}" value="${hoje}"></label>
     <div id="corpo"></div>
-    <div class="acoes no-print">
-      <button class="btn primario grande" id="b-msg" type="button">Enviar por mensagem</button>
-      <button class="btn" id="b-pdf-racao" type="button">Gerar PDF</button>
-      <button class="btn" id="b-csv" type="button">Baixar planilha (CSV)</button>
-    </div>`;
+    <section class="msg-box no-print">
+      <div class="msg-acoes">
+        <button class="btn primario grande" id="b-msg" type="button">Enviar pelo WhatsApp</button>
+        <button class="btn" id="b-copiar" type="button">Copiar texto</button>
+      </div>
+      <details class="msg-ver"><summary>Ver a mensagem</summary><pre class="msg-previa" id="msg-previa"></pre></details>
+      <h2>Arquivos</h2>
+      <div class="msg-acoes duas-col">
+        <button class="btn" id="b-pdf-racao" type="button">Gerar PDF</button>
+        <button class="btn" id="b-csv" type="button">Planilha (CSV)</button>
+      </div>
+    </section>`;
 
   let r = null;
   function pintar() {
@@ -422,6 +432,7 @@ export async function renderRacaoDia(ctx, el) {
         <tfoot><tr><td>Total</td>${r.lista.map((t) => `<td class="n">${fmtNum(t.kg, 0)}</td>`).join('')}<td class="n total">${fmtNum(r.total, 0)} kg</td></tr></tfoot>
       </table></div>
       <p class="mudo nota">Valores em kg. “–” significa que nada foi lançado naquele dia.</p>`;
+    el.querySelector('#msg-previa').textContent = r.lista.length ? mensagem(r).replace(/\*/g, '') : 'Nada para enviar neste período.';
     el.querySelector('#corpo').innerHTML = !r.lista.length ? '<div class="card vazio">Nenhum tanque com lote ativo ou ração neste período.</div>' : `
       <div class="racao-total"><small>${esc(r.periodo)}</small><b>${sacos(r.total)} sacos</b><span>${kgTxt(r.total)} kg no total</span></div>
       <div class="card"><ul class="lista racao-lista">${ranque}</ul></div>${matriz}`;
@@ -430,13 +441,18 @@ export async function renderRacaoDia(ctx, el) {
   el.querySelector('#outro').addEventListener('change', (e) => { if (e.target.value) { outro = e.target.value > hoje ? hoje : e.target.value; per = 'dia'; pintar(); } });
   pintar();
 
-  el.querySelector('#b-msg').addEventListener('click', async () => {
+  // abre o WhatsApp direto com o texto pronto (texto puro; o menu "Compartilhar" do celular pode virar anexo .txt)
+  el.querySelector('#b-msg').addEventListener('click', () => {
+    if (!r.lista.length) return ctx.toast('Nada para enviar neste período.', 'erro');
+    window.open(`https://wa.me/?text=${encodeURIComponent(mensagem(r))}`, '_blank', 'noopener');
+  });
+  el.querySelector('#b-copiar').addEventListener('click', async () => {
     const texto = mensagem(r);
     try {
-      if (navigator.share) { await navigator.share({ text: texto }); return; }
-      if (navigator.clipboard) { await navigator.clipboard.writeText(texto); ctx.toast('Texto copiado. Cole na conversa para enviar.', 'ok'); return; }
-      window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
-    } catch (e) { if (e && e.name !== 'AbortError') ctx.toast('Não foi possível compartilhar: ' + e.message, 'erro'); }
+      if (navigator.clipboard) await navigator.clipboard.writeText(texto);
+      else { const t = document.createElement('textarea'); t.value = texto; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); }
+      ctx.toast('Texto copiado. Cole na conversa para enviar.', 'ok');
+    } catch { ctx.toast('Não consegui copiar. Segure o texto e copie.', 'erro'); }
   });
   const bp = el.querySelector('#b-pdf-racao');
   bp.addEventListener('click', async () => {
