@@ -735,3 +735,23 @@ p.so-pc { display: none; } @media (min-width: 800px) { p.so-pc { display: block;
 .seg-bolha.anim { transition: transform .34s cubic-bezier(.34, 1.35, .55, 1), width .3s var(--ease), height .3s var(--ease), opacity .15s; }
 @media (prefers-reduced-motion: reduce) { .seg-bolha.anim { transition: none; } }
 .seg:not([data-pronto="1"]) > button.on { background: var(--rio); }
+
+/* ----- animações sóbrias: visto ao salvar, resposta ao toque, carregamento em esqueleto ----- */
+#toast.ok { display: flex; align-items: center; gap: .5rem; }
+.toast-visto { width: 20px; height: 20px; flex: none; fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.toast-visto path { stroke-dasharray: 24; stroke-dashoffset: 24; }
+#toast.on .toast-visto path { animation: desenha .38s .12s cubic-bezier(.3, .7, .3, 1) forwards; }
+@keyframes desenha { to { stroke-dashoffset: 0; } }
+
+.btn, .hub-card, .item, .mini, .tile, .abas a, .link { transition: transform .14s var(--ease), background .2s var(--ease), filter .2s; }
+.btn:active, .hub-card:active, .item:active, .mini:active, .tile:active, .link:active { transform: scale(.97); }
+.seg > button:active { transform: scale(.97); }
+
+.carregando { display: grid; gap: .8rem; font-size: 0; color: transparent; padding: 0; margin: 1rem 0; text-align: initial; }
+.carregando::before, .carregando::after { content: ''; display: block; border-radius: 22px; background: linear-gradient(100deg, #f4f8f5 30%, #fff 50%, #f4f8f5 70%) 0 0 / 220% 100%; animation: brilho 1.35s linear infinite; }
+.carregando::before { height: 96px; }
+.carregando::after { height: 150px; animation-delay: .15s; }
+@keyframes brilho { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+.login-card .carregando { display: block; font-size: 1rem; color: var(--tinta-2); text-align: center; padding: 2rem 0; margin: 0; }
+.login-card .carregando::before, .login-card .carregando::after { content: none; }
+@media (prefers-reduced-motion: reduce) { .carregando::before, .carregando::after { animation: none; } #toast.on .toast-visto path { animation: none; stroke-dashoffset: 0; } }
