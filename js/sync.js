@@ -1,7 +1,8 @@
 // Envio da fila offline para o Supabase.
 // - Cada item já nasce com uuid_local (gerado no celular). Se o envio é repetido, o banco
 //   recusa com 23505 (único) e tratamos como "já enviado": não duplica.
-// - Rede caiu no meio: para e mantém o resto da fila intacto.
+// - Rede caiu, sinal ruim ou servidor instável (5xx): para e mantém tudo na fila; nada é descartado.
+//   O app tenta de novo sozinho (a cada 20 s com o app aberto, ao voltar a internet e ao reabrir).
 // - Só envia itens do usuário logado (o banco exige registrado_por = auth.uid()).
 import { filaList, filaPut, filaRemove } from './db.js';
 import { ehErroDeRede, ehErroDeSessao, traduzErro } from './util.js';
@@ -26,9 +27,9 @@ export async function sincronizar(client, userId) {
           await filaPut(it); r.falhas++;
           continue;
         }
-        let error = null;
+        let error = null, status = 0;
         try {
-          ({ error } = await client.from(it.tabela).insert(it.payload));
+          ({ error, status } = await client.from(it.tabela).insert(it.payload));
         } catch (e) {
           error = { message: String((e && e.message) || e), code: '' };
         }
@@ -37,7 +38,9 @@ export async function sincronizar(client, userId) {
           r.enviados++;
           continue;
         }
-        if (ehErroDeRede(error)) { r.semRede = true; return r; }
+        // rede fora, sinal ruim ou servidor sobrecarregado/instável (5xx, 408, 429): é temporário.
+        // Mantém o item como está (sem marcar erro) e tenta de novo mais tarde.
+        if (ehErroDeRede(error) || status >= 500 || status === 408 || status === 429) { r.semRede = true; return r; }
         if (ehErroDeSessao(error)) { r.sessaoExpirada = true; return r; }
         it.status = 'erro';
         it.erro = traduzErro(error);

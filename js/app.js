@@ -353,7 +353,7 @@ async function iniciar() {
     if (document.visibilityState === 'visible' && state.user && navigator.onLine) sincronizarAgora();
   });
   // rede pode voltar sem disparar o evento "online" (ex.: antena de satélite): tenta de tempos em tempos
-  setInterval(() => { if (state.user && state.pendentes && navigator.onLine) sincronizarAgora(); }, 45000);
+  setInterval(() => { if (state.user && state.pendentes && navigator.onLine) sincronizarAgora(); }, 20000);
 
   if (await tratarLinkDeEmail()) return;
   await restaurarSessao();
