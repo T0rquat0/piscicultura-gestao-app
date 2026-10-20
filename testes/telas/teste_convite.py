@@ -2,7 +2,7 @@
 import os
 # Onde o app está rodando (python -m http.server 5500 na pasta do projeto) e qual navegador usar.
 # NAVEGADOR=chrome usa o Chrome instalado; NAVEGADOR= (vazio) usa o Chromium do Playwright (playwright install chromium).
-_AQUI = os.getcwd()
+_AQUI = os.path.dirname(os.path.abspath(__file__))
 os.makedirs(os.path.join(_AQUI, 'saida'), exist_ok=True); os.chdir(os.path.join(_AQUI, 'saida'))
 _CANAL = os.environ.get('NAVEGADOR', 'chrome')
 LANCAR = {'channel': _CANAL} if _CANAL else {}
