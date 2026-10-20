@@ -13,7 +13,7 @@ function ajustar(seg, animar) {
 }
 
 export function iniciarSeg() {
-  if (iniciarSeg.feito) return; iniciarSeg.feito = true;
+  if (iniciarSeg.feito || typeof MutationObserver === 'undefined') return; iniciarSeg.feito = true; // sem o recurso, os botões seguem funcionando sem animação
   const pendentes = new Set(); let agendado = false;
   const rodar = () => { agendado = false; pendentes.forEach((seg) => { if (seg.isConnected) ajustar(seg, seg.dataset.pronto === '1'); seg.dataset.pronto = '1'; }); pendentes.clear(); };
   const marcar = (seg) => { pendentes.add(seg); if (!agendado) { agendado = true; requestAnimationFrame(rodar); } };
