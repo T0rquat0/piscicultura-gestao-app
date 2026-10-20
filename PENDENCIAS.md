@@ -40,7 +40,7 @@ Marque com [x] ao concluir. Tudo aqui foi deixado de propósito para depois do c
 - [x] Lembrete de contagem semanal (início e Estoque, dono/gerente, quando a última contagem tem 7 dias ou mais) e sugestão de compra (sacos para a ração durar 30 dias no ritmo dos últimos 7 dias). Ajustáveis em `js/config.js`.
 - [x] Aviso de lançamento duplicado (feito: ração com a mesma quantidade no dia ou lançada nos últimos 30 min; mortalidade igual; biometria no mesmo dia).
 - [ ] Ajustar a regra de duplicidade depois de ver como o cliente realmente alimenta (várias vezes ao dia?).
-- [ ] Formulários de estoque, biometria e mortalidade no mesmo estilo da tela Lançar.
+- [x] Formulários de estoque, biometria e mortalidade no mesmo estilo da tela Lançar (biometria e mortalidade já estavam nos passos do Lançar; contagem e compra do Estoque passaram para passos numerados).
 - [x] Tela "esqueci minha senha" (feita; o e-mail sai em inglês até configurar o SMTP próprio).
 - [ ] Rodar `sql/03`, `sql/04`, `sql/06` e `sql/07` em cada Supabase novo (ver README).
 - [ ] **URGENTE no Supabase atual:** rodar `sql/03_peso_do_saco.sql` e `sql/04_controle_de_estoque.sql`. Conferido em 19/10/26: no banco no ar falta a coluna `fazendas.kg_saco` e a tabela `racao_contagens`, então o peso do saco (Mais) e a contagem/extrato do estoque não funcionam. Conferir também se o `sql/06` já foi rodado.

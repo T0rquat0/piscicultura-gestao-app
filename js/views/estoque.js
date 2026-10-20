@@ -59,38 +59,51 @@ export async function renderEstoque(ctx, el) {
       : '<p class="aviso">Ainda não houve contagem. Não precisa contar tudo: conte por pilhas (camadas × sacos) ou espere o estoque ficar baixo, quando contar é rápido. É a contagem que deixa o saldo confiável.</p>') : ''}
 
     ${gerir ? `
-    <details class="card form-dobra" id="d-contagem">
+    <details class="form-dobra dobra-passos" id="d-contagem">
       <summary>Contar o estoque no galpão</summary>
-      <form id="f-contagem" class="form" novalidate>
-        <div class="pilhas" id="pilhas">
-          <b>Contar por pilhas</b>
-          <small class="mudo">Em cada pilha: quantas camadas de sacos e quantos sacos por camada.</small>
-          <div id="pilhas-linhas"></div>
-          <button type="button" class="btn mini" id="b-pilha">+ Adicionar pilha</button>
-          <label>Sacos soltos ou abertos <input id="avulsos" type="number" inputmode="decimal" step="0.5" min="0" placeholder="0"></label>
-          <div class="calc" id="tot-pilhas">Total das pilhas: —</div>
-          <button type="button" class="btn" id="b-usar-pilhas" hidden>Usar este total</button>
-        </div>
-        <label>Quantos sacos tem no galpão agora? <input id="contados" class="grande" type="number" inputmode="decimal" step="0.5" min="0" placeholder="0" required></label>
-        <div class="calc" id="prev-cont">O sistema calcula ${sc(kg)} sacos.</div>
-        <label>Observação — opcional <input id="obs" maxlength="120" placeholder="Ex.: 3 sacos molhados"></label>
+      <form id="f-contagem" class="form passos" novalidate>
+        <section class="passo tipo-estoque">
+          <h2 class="passo-t"><i>1</i> Conte as pilhas <small class="mudo">(ajuda opcional)</small></h2>
+          <div class="pilhas" id="pilhas">
+            <small class="mudo">Em cada pilha: quantas camadas de sacos e quantos sacos por camada.</small>
+            <div id="pilhas-linhas"></div>
+            <button type="button" class="btn mini" id="b-pilha">+ Adicionar pilha</button>
+            <label>Sacos soltos ou abertos <input id="avulsos" type="number" inputmode="decimal" step="0.5" min="0" placeholder="0"></label>
+            <div class="calc" id="tot-pilhas">Total das pilhas: —</div>
+            <button type="button" class="btn" id="b-usar-pilhas" hidden>Usar este total</button>
+          </div>
+        </section>
+        <section class="passo tipo-estoque">
+          <h2 class="passo-t"><i>2</i> Total no galpão</h2>
+          <label>Quantos sacos tem no galpão agora? <input id="contados" class="grande" type="number" inputmode="decimal" step="0.5" min="0" placeholder="0" required></label>
+          <p class="ajuda">Pode ser meio saco (0,5).</p>
+          <div class="calc" id="prev-cont">O sistema calcula ${sc(kg)} sacos.</div>
+          <label>Observação — opcional <input id="obs" maxlength="120" placeholder="Ex.: 3 sacos molhados"></label>
+        </section>
         <p id="erro-cont" class="erro" hidden></p>
-        <button class="btn primario" type="submit">Registrar contagem</button>
+        <button class="btn primario grande" type="submit">Registrar contagem</button>
       </form>
     </details>
-    <details class="card form-dobra" id="d-compra">
+    <details class="form-dobra dobra-passos" id="d-compra">
       <summary>Registrar compra / entrada de ração</summary>
-      <form id="f-compra" class="form" novalidate>
-        <label>Data <input id="data" type="date" value="${hoje}" max="${hoje}" required></label>
-        <div class="duas">
-          <label>Nº de sacos <input id="sacos" type="number" inputmode="numeric" step="1" min="1" required></label>
-          <label>kg por saco <input id="kgsaco" type="number" inputmode="decimal" step="0.1" min="0.1" value="${kgS}" required></label>
-        </div>
-        <div class="calc" id="total">Total: —</div>
-        <label>Valor total pago (R$) — opcional <input id="custo" type="number" inputmode="decimal" step="0.01" min="0"></label>
-        <label>Fornecedor — opcional <input id="forn" maxlength="80" placeholder="Ex.: Agropecuária Boa Vista"></label>
+      <form id="f-compra" class="form passos" novalidate>
+        <section class="passo tipo-estoque">
+          <h2 class="passo-t"><i>1</i> Quanto chegou</h2>
+          <div class="duas">
+            <label>Nº de sacos <input id="sacos" class="grande" type="number" inputmode="numeric" step="1" min="1" placeholder="0" required></label>
+            <label>kg por saco <input id="kgsaco" type="number" inputmode="decimal" step="0.1" min="0.1" value="${kgS}" required></label>
+          </div>
+          <div class="calc" id="total">Total: —</div>
+          <div class="data-linha"><span>Data: <b id="data-txt">hoje</b></span><button type="button" class="link" id="b-data">Mudar</button></div>
+          <label id="data-wrap" hidden>Data da compra <input id="data" type="date" value="${hoje}" max="${hoje}" required></label>
+        </section>
+        <section class="passo tipo-estoque">
+          <h2 class="passo-t"><i>2</i> Nota da compra <small class="mudo">(opcional)</small></h2>
+          <label>Valor total pago (R$) <input id="custo" type="number" inputmode="decimal" step="0.01" min="0"></label>
+          <label>Fornecedor <input id="forn" maxlength="80" placeholder="Ex.: Agropecuária Boa Vista"></label>
+        </section>
         <p id="erro" class="erro" hidden></p>
-        <button class="btn primario" type="submit">Registrar entrada</button>
+        <button class="btn primario grande" type="submit">Registrar entrada</button>
       </form>
     </details>` : ''}
 
@@ -192,6 +205,13 @@ export async function renderEstoque(ctx, el) {
   const total = () => { const s = num(f.querySelector('#sacos').value), k = num(f.querySelector('#kgsaco').value); return s > 0 && k > 0 ? s * k : null; };
   const atualiza = () => { const t = total(); f.querySelector('#total').textContent = t ? `Total: ${fmtNum(t, 1)} kg (${fmtInt(num(f.querySelector('#sacos').value))} sacos × ${fmtNum(num(f.querySelector('#kgsaco').value), 1)} kg)` : 'Total: —'; };
   f.querySelector('#sacos').addEventListener('input', atualiza);
+  const dataIn = f.querySelector('#data');
+  f.querySelector('#b-data').addEventListener('click', () => {
+    const w = f.querySelector('#data-wrap'); w.hidden = !w.hidden;
+    f.querySelector('#b-data').textContent = w.hidden ? 'Mudar' : 'Fechar';
+    if (!w.hidden) dataIn.focus();
+  });
+  dataIn.addEventListener('input', () => { f.querySelector('#data-txt').textContent = !dataIn.value || dataIn.value === hoje ? 'hoje' : fmtData(dataIn.value); });
   f.querySelector('#kgsaco').addEventListener('input', atualiza);
   atualiza();
 

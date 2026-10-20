@@ -617,3 +617,10 @@ body.sem-rolagem { overflow: hidden; }
 /* ===== avisos da tela inicial (plano e contagem) ===== */
 a.aviso-link { display: block; text-decoration: none; }
 a.aviso-link b { white-space: nowrap; }
+/* ===== Estoque: contagem e compra em passos (mesmo estilo da tela Lançar) ===== */
+.dobra-passos { background: none; box-shadow: none; padding: 0; }
+.dobra-passos > summary { background: var(--card); border-radius: 22px; box-shadow: 0 1px 0 rgba(0, 0, 0, .03), 0 6px 20px rgba(20, 60, 50, .06); }
+.dobra-passos > .form.passos { padding: .7rem 0 0; }
+.passo.tipo-estoque .passo-t i { background: #7a5a2e; }
+.passo .pilhas { background: var(--rio-claro); }
+.passo .data-linha { padding-top: .5rem; border-top: 1px solid #e3eae5; }
