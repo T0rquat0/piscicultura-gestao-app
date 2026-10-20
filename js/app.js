@@ -361,17 +361,25 @@ function renderErro(el, e) {
   el.querySelector('#b-retry').addEventListener('click', rotear);
 }
 
-// Entrada rápida da tela nova: desliza um pouco do lado da aba para onde se foi (ou sobe, dentro da mesma aba)
+// Entrada da tela nova: quando o conteúdo fica pronto, cada bloco (título, cartões, botões) sobe e aparece
+// em sequência, levemente puxado do lado da aba para onde se foi. Só quando a rota muda (não ao atualizar dados).
 let hashAnterior = null, abaAnterior = null;
 const ORDEM_ABAS = ['', 'lancar', 'relatorio', 'mais'];
-function animarEntrada(el, aba) {
+function planejarEntrada(aba) {
   const hash = location.hash || '#/';
-  const mudou = hashAnterior !== null && hash !== hashAnterior;
+  const mudou = hash !== hashAnterior;
   const de = abaAnterior === null ? 0 : ORDEM_ABAS.indexOf(abaAnterior), para = ORDEM_ABAS.indexOf(aba);
   hashAnterior = hash; abaAnterior = aba;
-  if (!mudou || !el.animate || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
-  const dx = para > de ? 22 : para < de ? -22 : 0, dy = dx ? 0 : 10;
-  el.animate([{ opacity: 0, transform: `translate(${dx}px, ${dy}px)` }, { opacity: 1, transform: 'none' }], { duration: 230, easing: 'cubic-bezier(.22,.8,.3,1)' });
+  const quieto = !document.body.animate || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  return { animar: mudou && !quieto, dx: para > de ? 14 : para < de ? -14 : 0 };
+}
+function cascata(el, dx) {
+  [...el.children].slice(0, 10).forEach((c, i) => {
+    try {
+      c.animate([{ opacity: 0, transform: `translate(${dx}px, 18px)` }, { opacity: 1, transform: 'none' }],
+        { duration: 360, delay: i * 45, easing: 'cubic-bezier(.2,.85,.3,1)', fill: 'backwards' });
+    } catch { /* sem animação */ }
+  });
 }
 
 async function rotear() {
@@ -385,7 +393,7 @@ async function rotear() {
 
   const el = document.createElement('div'); // contêiner novo por rota: renderizações atrasadas não sujam a tela atual
   view.replaceChildren(el);
-  animarEntrada(el, aba);
+  const entrada = planejarEntrada(aba);
   const meu = ++tokenRota;
   window.scrollTo(0, 0);
   try {
@@ -404,6 +412,7 @@ async function rotear() {
       case 'mais': renderMais(ctx, el); break;
       default: await renderHome(ctx, el);
     }
+    if (entrada.animar && meu === tokenRota) cascata(el, entrada.dx);
   } catch (e) {
     if (meu === tokenRota) renderErro(el, e);
   }
