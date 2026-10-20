@@ -6,10 +6,10 @@ Marque com [x] ao concluir. Tudo aqui foi deixado de propósito para depois do c
 - [ ] **Desligar o modo piloto**: `update config_sistema set valor = 'false' where chave = 'modo_piloto';` (hoje contratar pacote libera na hora, sem cobrar)
 - [ ] **Pagamento automático (Pix/boleto/cartão)**: escolher serviço (Asaas, Mercado Pago, Pagar.me), criar a cobrança ao contratar e chamar `confirmar_pagamento(id)` pelo aviso automático (webhook). O app e o banco já estão prontos para isso.
 - [ ] **Empresa aberta (CNPJ) e emissão de nota** de serviço: confirmar com contador.
-- [ ] **Termos de uso e política de privacidade (LGPD)**, com aceite no cadastro.
-- [ ] **Supabase separado do cliente** (o atual fica só para testes e demonstração).
-- [ ] **SMTP próprio** (ex.: Resend, precisa de domínio) no Supabase: tira o limite baixo de e-mails e permite traduzir os e-mails de confirmação para português (hoje saem em inglês).
-- [ ] **Comprar domínio** próprio e trocar Site URL / Redirect URLs no Supabase.
+- [ ] **Termos de uso e política de privacidade (LGPD)**, com aceite no cadastro. → **Preparado (20/10/26):** minutas em `termos.html` e `privacidade.html` + aceite no cadastro e no login, desligado até preencher, revisar com advogado e definir `TERMOS_VERSAO` em `js/config.js` (passo a passo em `docs/INFRA.md`).
+- [ ] **Supabase separado do cliente** (o atual fica só para testes e demonstração). → **Preparado:** `js/config.js` escolhe o banco pelo endereço do site (`AMBIENTES`); `python tools/sql_completo.py > banco_novo.sql` monta o banco novo de uma vez (testado em `testes/sql/teste_banco_novo.mjs`); `api/ping.js` aceita mais de um banco. Falta criar o projeto (ver `docs/INFRA.md`).
+- [ ] **SMTP próprio** (ex.: Resend, precisa de domínio) no Supabase: tira o limite baixo de e-mails e permite traduzir os e-mails de confirmação para português (hoje saem em inglês). → **Preparado:** e-mails em português prontos em `docs/emails/` (confirmação, senha nova, troca de e-mail). Falta a conta de envio e o domínio (ver `docs/INFRA.md`).
+- [ ] **Comprar domínio** próprio e trocar Site URL / Redirect URLs no Supabase. → passo a passo em `docs/INFRA.md`.
 
 ## Encontrado no levantamento do backoffice (20/10/26)
 - [x] Vencimento do plano no horário de Boa Vista (sql/13: `hoje_local()` no teste grátis, plano, pagamento e contratação; antes era UTC e podia vencer um dia antes/depois).
@@ -60,3 +60,4 @@ Marque com [x] ao concluir. Tudo aqui foi deixado de propósito para depois do c
   - **Atenção (segurança):** o login automático não roda em produção, mas o ARQUIVO vai junto para o site oficial e para o GitHub, que é público. Quem abrir o código lê o e-mail e a senha. E a conta fica no mesmo Supabase dos clientes. Recomendado: não preencher. Se preencher, usar só um **funcionário** de uma fazenda de demonstração, sem dado real, sabendo que a senha é pública.
 - [x] Testes no repositório (`testes/`, ver `testes/LEIAME.md`): `python testes/rodar_tudo.py` roda as telas (Supabase simulado) e os SQLs num Postgres de verdade, incluindo o teste de vazamento entre fazendas. Rodar antes de cada Pull Request.
 - [x] Revisão das telas do funcionário (20/10/26): aba Início acesa na tela do tanque, "peso médio" no cartão do tanque, conversão alimentar não mostra mais 0,00 quando não há ração até a biometria, "1 saco" no singular, ajuste de contagem só para dono/gerente, "Vai para o sistema na hora" no lugar de "servidor".
+- [x] 20/10/26: o `sw.js` ficou vazio no commit 8e16810 (o app deixava de abrir sem internet). Restaurado (cache v49) e criado `testes/telas/teste_offline.py`, que abre o app, corta a internet, recarrega e lança ração: falha se o `sw.js` estiver vazio ou faltar arquivo no cache.

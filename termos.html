@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Termos de uso · Gestão de Piscicultura</title>
+<link rel="stylesheet" href="css/legal.css">
+</head>
+<body>
+<main class="legal">
+  <p class="minuta" id="minuta" hidden><b>MINUTA</b> — texto em revisão, ainda não vale como documento oficial. Os campos entre colchetes [ ] precisam ser preenchidos.</p>
+  <p><a href="./">← Voltar ao app</a></p>
+  <h1>Termos de uso</h1>
+  <p class="versao">Versão: <span data-versao>[DATA DA VERSÃO]</span></p>
+
+  <p>Estes termos valem entre você e <b>[RAZÃO SOCIAL]</b>, CNPJ <b>[CNPJ]</b> ("nós"), responsável pelo app <b>Gestão de Piscicultura</b>. Ao criar a conta ou continuar usando o app, você concorda com eles e com a <a href="privacidade.html">Política de privacidade</a>.</p>
+
+  <h2>1. O que o app faz</h2>
+  <p>Ajuda a controlar a criação de peixes: tanques, lotes, ração, biometria, mortalidade, estoque de ração, compras e relatórios. Funciona no celular, inclusive sem internet: o que for lançado offline é enviado quando a conexão voltar.</p>
+
+  <h2>2. Sua conta</h2>
+  <ul>
+    <li>Use dados verdadeiros e mantenha sua senha em segredo. O que for feito com a sua conta é de sua responsabilidade.</li>
+    <li>O <b>dono</b> da fazenda decide quem entra na equipe (gerentes e funcionários), quais tanques cada um vê, e pode tirar o acesso a qualquer momento. O dono responde pelo uso que a equipe faz do app.</li>
+    <li>O app é para maiores de 18 anos e empresas.</li>
+  </ul>
+
+  <h2>3. Teste grátis, planos e pagamento</h2>
+  <ul>
+    <li>Fazenda nova tem <b>[30] dias de teste grátis</b>, sem limite de tanques.</li>
+    <li>Depois do teste, o uso é por pacote, de acordo com o número de <b>tanques em uso</b> (tanque com lote ativo). Os pacotes e preços em vigor aparecem em <b>Mais → Meu plano</b>.</li>
+    <li>O plano vale pelo período pago. Vencido o plano, há <b>5 dias de carência</b>. Depois disso, não é possível abrir lotes novos até a renovação. Os lançamentos do dia a dia continuam funcionando e os dados não são apagados.</li>
+    <li>Forma de pagamento, nota fiscal e reajustes: <b>[DEFINIR: serviço de pagamento, emissão de nota, regra de reajuste e aviso prévio]</b>.</li>
+  </ul>
+
+  <h2>4. O que não é permitido</h2>
+  <ul>
+    <li>Tentar acessar dados de outra fazenda, burlar limites do plano ou atrapalhar o funcionamento do app.</li>
+    <li>Usar o app para qualquer finalidade ilegal.</li>
+    <li>Copiar, revender ou fazer engenharia reversa do app sem autorização.</li>
+  </ul>
+
+  <h2>5. Seus dados são seus</h2>
+  <p>As informações que você lança pertencem à sua fazenda. O dono pode baixar uma cópia completa a qualquer momento (<b>Mais → Cópia de segurança dos dados</b>). O app, a marca e o código são nossos. Como tratamos dados pessoais está na <a href="privacidade.html">Política de privacidade</a>.</p>
+
+  <h2>6. Cálculos e decisões</h2>
+  <p>Peso médio, biomassa, conversão alimentar, duração do estoque e sugestão de compra são <b>estimativas</b> feitas a partir do que foi lançado. Elas ajudam, mas não substituem a avaliação do produtor ou de um técnico. As decisões de manejo, alimentação e venda são de responsabilidade de quem cria os peixes.</p>
+
+  <h2>7. Funcionamento e disponibilidade</h2>
+  <p>Fazemos o possível para manter o app sempre no ar, mas podem acontecer interrupções para manutenção ou por falhas de serviços de terceiros (internet, hospedagem, banco de dados). Lançamentos feitos sem internet ficam no celular até serem enviados: para não perdê-los, instale o app na tela inicial e não apague os dados do navegador antes de sincronizar.</p>
+
+  <h2>8. Suspensão e cancelamento</h2>
+  <ul>
+    <li>Você pode cancelar quando quiser, por <b>[CANAL DE ATENDIMENTO]</b>. Antes, baixe a cópia dos dados.</li>
+    <li>Podemos suspender o acesso de uma fazenda em caso de falta de pagamento depois da carência, ou de uso que viole estes termos. Na suspensão, os dados continuam guardados e o acesso volta quando a situação for resolvida.</li>
+    <li>Depois do cancelamento, os dados ficam guardados por <b>[PRAZO]</b> e então são apagados, como explicado na Política de privacidade.</li>
+  </ul>
+
+  <h2>9. Limite de responsabilidade</h2>
+  <p>Não respondemos por perdas indiretas, como lucros cessantes ou perda de produção, decorrentes do uso ou da impossibilidade de uso do app, nem por decisões tomadas com base nas estimativas. Quando houver responsabilidade nossa, ela fica limitada ao valor pago pela fazenda nos <b>[12] meses</b> anteriores ao fato, salvo quando a lei disser outra coisa. [REVISAR COM ADVOGADO, ESPECIALMENTE SE HOUVER CLIENTE PESSOA FÍSICA — CÓDIGO DE DEFESA DO CONSUMIDOR]</p>
+
+  <h2>10. Mudanças nestes termos</h2>
+  <p>Se os termos mudarem, a data da versão no topo muda, e o app pede um novo aceite no próximo acesso.</p>
+
+  <h2>11. Lei e foro</h2>
+  <p>Valem as leis do Brasil. Fica eleito o foro da comarca de <b>[CIDADE/UF]</b> para resolver qualquer questão, salvo quando a lei garantir outro foro ao cliente.</p>
+
+  <h2>12. Contato</h2>
+  <p><b>[E-MAIL / WHATSAPP DE ATENDIMENTO]</b></p>
+</main>
+<script type="module">
+  import { TERMOS_VERSAO } from './js/config.js';
+  if (!TERMOS_VERSAO) document.getElementById('minuta').hidden = false;
+  else document.querySelectorAll('[data-versao]').forEach((e) => { const [a, m, d] = TERMOS_VERSAO.split('-'); e.textContent = `${d}/${m}/${a}`; });
+</script>
+</body>
+</html>

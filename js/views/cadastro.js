@@ -1,7 +1,9 @@
 // Cadastro do dono: criar conta (e-mail + senha) e depois a fazenda.
 import { esc, fmtData, ROTULO_PAPEL } from '../util.js';
 import { icone } from '../icons.js';
-import { TESTE_DIAS } from '../config.js';
+import { TESTE_DIAS, TERMOS_VERSAO } from '../config.js';
+
+const LINKS_TERMOS = 'os <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> e a <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a>';
 
 const cabeca = (t, sub) => `<div class="logo">${icone('peixe', 44)}</div><h1>${esc(t)}</h1>${sub ? `<p class="mudo" style="margin:-1rem 0 1.4rem">${sub}</p>` : ''}`;
 
@@ -14,6 +16,7 @@ export function renderCadastro(ctx, root) {
       <label>Crie uma senha <input id="senha" type="password" autocomplete="new-password" minlength="8" required><small class="mudo">Pelo menos 8 caracteres.</small></label>
       <p id="erro" class="erro" hidden></p>
       <p id="ok" class="aviso" hidden></p>
+      ${TERMOS_VERSAO ? `<label class="linha-check aceite"><input type="checkbox" id="aceite"> <span>Li e aceito ${LINKS_TERMOS}</span></label>` : ''}
       <button class="btn primario grande" type="submit">Criar conta</button>
     </form>
     <p style="margin-top:1.2rem"><button class="btn" id="b-voltar" type="button">Já tenho conta</button></p>
@@ -27,6 +30,7 @@ export function renderCadastro(ctx, root) {
     const falha = (m) => { erro.textContent = m; erro.hidden = false; };
     if (!/^\S+@\S+\.\S+$/.test(email)) return falha('Informe um e-mail válido.');
     if (senha.length < 8) return falha('A senha precisa ter pelo menos 8 caracteres.');
+    if (TERMOS_VERSAO && !f.querySelector('#aceite').checked) return falha('Para criar a conta, marque que leu e aceita os termos e a política de privacidade.');
     const btn = f.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'Criando…';
     try {
       const r = await ctx.cadastrar(email, senha);
@@ -107,6 +111,29 @@ export async function renderAceitarConvite(ctx, root, user, token) {
     const btn = f.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'Entrando…';
     try { await ctx.aceitarConvite(token, nome, user); }
     catch (e) { falha(e.message || 'Não foi possível aceitar o convite.'); btn.disabled = false; btn.textContent = 'Entrar na fazenda'; }
+  });
+}
+
+// Termos novos (ou primeira vez): quem já tem conta aceita antes de entrar. Só aparece com TERMOS_VERSAO definido.
+export function renderAceiteTermos(ctx, root, user) {
+  root.innerHTML = `
+  <main class="login"><div class="login-card">
+    ${cabeca('Termos de uso e privacidade', 'Para continuar usando o app, leia e aceite.')}
+    <form id="f-termos" class="form" novalidate>
+      <label class="linha-check aceite"><input type="checkbox" id="aceite"> <span>Li e aceito ${LINKS_TERMOS}</span></label>
+      <p id="erro" class="erro" hidden></p>
+      <button class="btn primario grande" type="submit">Continuar</button>
+    </form>
+    <p style="margin-top:1rem"><button class="btn" id="b-sair" type="button">Sair</button></p>
+  </div></main>`;
+  const f = root.querySelector('#f-termos'), erro = root.querySelector('#erro');
+  root.querySelector('#b-sair').addEventListener('click', () => ctx.sair(true));
+  f.addEventListener('submit', async (ev) => {
+    ev.preventDefault(); erro.hidden = true;
+    if (!f.querySelector('#aceite').checked) { erro.textContent = 'Para continuar, marque que leu e aceita.'; erro.hidden = false; return; }
+    const btn = f.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'Salvando…';
+    try { await ctx.aceitarTermos(); }
+    catch (e) { erro.textContent = e.message || 'Não foi possível salvar o aceite.'; erro.hidden = false; btn.disabled = false; btn.textContent = 'Continuar'; }
   });
 }
 

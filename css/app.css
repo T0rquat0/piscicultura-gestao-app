@@ -782,3 +782,7 @@ p.so-pc { display: none; } @media (min-width: 800px) { p.so-pc { display: block;
 .causa-dica { margin: .7rem 0 0; padding: .6rem .8rem; border-radius: 12px; background: #f1f6f3; color: var(--tinta-2); font-size: .9rem; }
 .como-det { margin: -.35rem 0 -.25rem; }
 .sucesso-links a.link { text-decoration: none; font-weight: 600; color: var(--rio); }
+
+/* ===== aceite dos termos ===== */
+.linha-check.aceite { align-items: flex-start; font-weight: 500; font-size: .92rem; text-align: left; }
+.linha-check.aceite a { color: var(--rio); }

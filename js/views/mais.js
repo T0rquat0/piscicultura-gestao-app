@@ -2,7 +2,7 @@ import { esc, ROTULO_PAPEL, fmtData, hojeISO, diasEntre } from '../util.js';
 import { icone } from '../icons.js';
 import { confirmar } from '../dialogo.js';
 import { num, fmtNum } from '../util.js';
-import { PESO_SACO_PADRAO_KG } from '../config.js';
+import { PESO_SACO_PADRAO_KG, TERMOS_VERSAO, AMBIENTE_NOME } from '../config.js';
 import { reduzirLogo } from '../util.js';
 
 export function renderMais(ctx, el) {
@@ -59,6 +59,8 @@ export function renderMais(ctx, el) {
       </div>
       <input id="in-copia" type="file" accept=".json,application/json" hidden></div>` : ''}
 
+    ${TERMOS_VERSAO ? '<p class="mudo nota" style="text-align:center"><a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> · <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>' : ''}
+    ${state.admin ? `<p class="mudo nota" style="text-align:center">Banco em uso: ${esc(AMBIENTE_NOME)}</p>` : ''}
     <details class="card">
       <summary>Como instalar no celular</summary>
       <p><b>Android (Chrome):</b> menu (três pontos) → “Instalar app” ou “Adicionar à tela inicial”.</p>
