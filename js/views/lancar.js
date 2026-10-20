@@ -18,11 +18,6 @@ const kgTxt = (v) => fmtNum(Number(v), casas(Number(v)));
 
 const sacosTxt = (n) => `${fmtNum(n, casas(n))} ${n === 1 ? 'saco' : 'sacos'}`;
 
-const DESC = {
-  racao: 'Quanto de ração foi jogada em um tanque.',
-  biometria: 'Pese uma amostra para saber o peso médio do tanque.',
-  mortalidade: 'Peixes mortos encontrados em um tanque.',
-};
 const TITULO2 = { racao: 'Quantidade de ração', biometria: 'Pesagem dos peixes', mortalidade: 'Peixes mortos' };
 
 function camposDoTipo(tipo, kgSaco) {
@@ -35,11 +30,12 @@ function camposDoTipo(tipo, kgSaco) {
   }
   if (tipo === 'biometria') {
     return `
+      <details class="como-det"><summary>Como pesar</summary>
       <ol class="como">
         <li>Pegue alguns peixes do tanque, de 5% a 10% do lote.</li>
         <li>Pese todos juntos, de uma vez.</li>
         <li>Anote o peso total e quantos peixes foram pesados.</li>
-      </ol>
+      </ol></details>
       <label>Peso total dos peixes (kg)
         <input id="peso" type="number" inputmode="decimal" step="0.001" min="0" placeholder="Ex.: 2,4" required></label>
       <label>Quantos peixes foram pesados?
@@ -48,8 +44,7 @@ function camposDoTipo(tipo, kgSaco) {
       <p id="aviso-amostra" class="aviso" hidden>Poucos peixes pesados: com menos de 30 o peso médio fica pouco confiável.</p>`;
   }
   return `<label>Quantos peixes morreram?
-    <input id="qtd" class="grande" type="number" inputmode="numeric" step="1" min="1" placeholder="0" required></label>
-    <p class="ajuda">Conte os peixes mortos encontrados neste tanque.</p>`;
+    <input id="qtd" class="grande" type="number" inputmode="numeric" step="1" min="1" placeholder="0" required></label>`;
 }
 
 export async function renderLancar(ctx, el, params = {}) {
@@ -67,12 +62,12 @@ export async function renderLancar(ctx, el, params = {}) {
   const tanqueInicial = tanques.some((t) => t.id === params.tanque) ? params.tanque : (tanques.some((t) => t.id === ultimo) ? ultimo : tanques[0].id);
   const hoje = hojeISO();
 
+  el.classList.remove('modo-sucesso');
   el.innerHTML = `
     <h1>Lançar</h1>
     <div class="seg" role="tablist">
       ${Object.entries(TIPOS).map(([k, v]) => `<button type="button" data-tipo="${k}" class="${k === tipo ? 'on' : ''}">${v.rotulo}</button>`).join('')}
     </div>
-    <p class="tipo-desc">${DESC[tipo]}</p>
     <form id="f" class="form passos" novalidate>
       <section class="passo">
         <h2 class="passo-t"><i>1</i> Tanque</h2>
@@ -95,14 +90,15 @@ export async function renderLancar(ctx, el, params = {}) {
       ${tipo === 'mortalidade' ? `<section class="passo tipo-mortalidade">
         <h2 class="passo-t"><i>3</i> Causa provável <small class="mudo">(opcional)</small></h2>
         <div class="tiles compactos causas" id="causas">
-          ${CAUSAS_MORTE.map(([r, d]) => `<button type="button" class="tile" data-causa="${esc(r)}"><span>${esc(r)}</span><small>${esc(d)}</small></button>`).join('')}
-          <button type="button" class="tile" data-causa="outros"><span>Outra causa</span><small>escrever qual foi</small></button>
+          ${CAUSAS_MORTE.map(([r, d]) => `<button type="button" class="tile" data-causa="${esc(r)}"><span>${esc(r)}</span></button>`).join('')}
+          <button type="button" class="tile" data-causa="outros"><span>Outra causa</span></button>
         </div>
+        <p class="causa-dica" id="causa-dica" hidden></p>
         <label id="causa-outra-wrap" hidden>Qual foi a causa? <input id="causa-outra" maxlength="60" placeholder="Ex.: queda de energia no aerador"></label>
       </section>` : ''}
       <p id="erro" class="erro" hidden></p>
       <button class="btn primario grande" type="submit">Salvar ${TIPOS[tipo].rotulo.toLowerCase()}</button>
-      <p class="mudo" style="margin:0;text-align:center">${navigator.onLine ? 'Vai para o sistema na hora.' : 'Sem internet: será salvo no celular e enviado depois.'}</p>
+      ${navigator.onLine ? '' : '<p class="mudo" style="margin:0;text-align:center">Sem internet: será salvo no celular e enviado depois.</p>'}
     </form>`;
 
   el.querySelectorAll('.seg button').forEach((b) =>
@@ -249,6 +245,8 @@ export async function renderLancar(ctx, el, params = {}) {
     causaSel = b.classList.contains('on') ? '' : b.dataset.causa;
     f.querySelectorAll('#causas .tile').forEach((x) => x.classList.toggle('on', x.dataset.causa === causaSel));
     f.querySelector('#causa-outra-wrap').hidden = causaSel !== 'outros';
+    const dica = f.querySelector('#causa-dica'), par = CAUSAS_MORTE.find(([r]) => r === causaSel);
+    dica.textContent = par ? par[1] : ''; dica.hidden = !par; // a explicação aparece só da causa escolhida
     if (causaSel === 'outros') causaOutra.focus();
   }));
   function causaEscolhida() {
@@ -323,16 +321,16 @@ export async function renderLancar(ctx, el, params = {}) {
       const i = ordem.findIndex((t) => t.id === selTanque.value);
       proximo = [...ordem.slice(i + 1), ...ordem.slice(0, Math.max(i, 0))].find((t) => !feitos.has(t.id)) || null;
     }
+    el.classList.add('modo-sucesso'); // some título, abas e descrição: a tela fica só com a confirmação
     f.outerHTML = `
       <div class="sucesso card" role="status">
-        <div class="sucesso-ic">${icone('check', 40)}</div>
+        <div class="sucesso-ic">${icone('check', 34)}</div>
         <h2>${TIPOS[tipo].rotulo} salva</h2>
-        <p class="sucesso-res"><b>${esc(nomeTanque)}</b><br>${esc(resumo)}</p>
-        <p class="mudo">${navigator.onLine ? 'Enviando para o servidor.' : 'Sem internet: guardado no celular. Será enviado sozinho quando a internet voltar.'}</p>
-        <div class="dialogo-acoes">
-          ${proximo ? `<button type="button" class="btn primario grande" id="b-proximo">Próximo: ${esc(proximo.nome)}</button>` : ''}
-          <button type="button" class="btn ${proximo ? '' : 'primario '}grande" id="b-outro">${proximo ? 'Escolher outro tanque' : 'Lançar em outro tanque'}</button>
-          <a class="btn grande" href="#/">Voltar ao início</a>
+        <p class="sucesso-res"><b>${esc(nomeTanque)}</b> · ${esc(resumo)}</p>
+        ${navigator.onLine ? '' : '<p class="mudo nota">Sem internet: guardado no celular. Será enviado sozinho quando a internet voltar.</p>'}
+        <div class="sucesso-acoes">
+          ${proximo ? `<button type="button" class="btn primario grande" id="b-proximo">Próximo: ${esc(proximo.nome)}</button>` : `<button type="button" class="btn primario grande" id="b-outro">Lançar em outro tanque</button>`}
+          <div class="sucesso-links">${proximo ? '<button type="button" class="link" id="b-outro">Outro tanque</button><span aria-hidden="true">·</span>' : ''}<a class="link" href="#/">Voltar ao início</a></div>
         </div>
       </div>`;
     el.querySelector('#b-outro').addEventListener('click', () => renderLancar(ctx, el, { tipo, escolher: '1' }));
