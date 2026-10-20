@@ -18,6 +18,7 @@ import { renderRelatorios, renderRelatorioLote, renderRacaoDia } from './views/r
 import { renderEquipe } from './views/equipe.js';
 import { renderPlano } from './views/plano.js';
 import { renderHistorico } from './views/historico.js';
+import { renderAdmin } from './views/admin.js';
 import { renderPendencias } from './views/pendencias.js';
 import { renderMais } from './views/mais.js';
 
@@ -241,8 +242,10 @@ async function entrar(email, senha) {
 async function abrirApp(user) {
   state.user = user;
   let perfil = null;
+  let daRede = false;
   try {
     perfil = await api.perfil(user.id);
+    daRede = true;
     if (perfil) await db.kvSet('perfil', perfil);
   } catch (e) {
     const cache = await db.kvGet('perfil');
@@ -255,6 +258,15 @@ async function abrirApp(user) {
     setTimeout(() => toast('Convite não usado: esta conta já faz parte de uma fazenda.', 'erro'), 600);
   }
   if (perfil.ativo === false) { mostrarMensagem('Acesso desativado', 'Seu acesso a esta fazenda foi desativado. Fale com o dono.'); return; }
+  // fazenda bloqueada pelo administrador (sql/15): o perfil vem, mas a fazenda não aparece
+  if (daRede && perfil.fazenda_id && !perfil.fazendas) {
+    await db.kvDel('perfil');
+    mostrarMensagem('Acesso suspenso', 'O acesso desta fazenda ao sistema está suspenso. Os dados continuam guardados. Fale com o suporte para liberar.');
+    return;
+  }
+  // administrador do sistema (sql/15): guardado no aparelho para o menu aparecer também sem internet
+  if (daRede) { state.admin = await api.souAdmin(); await db.kvSet('admin', { id: user.id, admin: state.admin }); }
+  else { const a = await db.kvGet('admin'); state.admin = !!(a && a.id === user.id && a.admin); }
 
   state.perfil = perfil;
   await carregarRefLocal();
@@ -357,6 +369,7 @@ async function rotear() {
       case 'equipe': await renderEquipe(ctx, el); break;
       case 'plano': await renderPlano(ctx, el); break;
       case 'historico': await renderHistorico(ctx, el); break;
+      case 'admin': await renderAdmin(ctx, el); break;
       case 'pendencias': await renderPendencias(ctx, el); break;
       case 'mais': renderMais(ctx, el); break;
       default: await renderHome(ctx, el);

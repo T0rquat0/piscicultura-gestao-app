@@ -16,7 +16,7 @@ U = '11111111-1111-4111-8111-111111111111'; F = '22222222-2222-4222-8222-2222222
 T = '33333333-3333-4333-8333-333333333333'; L = '44444444-4444-4444-8444-444444444444'
 hoje = datetime.date.today().isoformat()
 ROTAS = ['#/', '#/t/' + T, '#/lancar', '#/lancar?tipo=biometria', '#/lancar?tipo=mortalidade', '#/relatorio', '#/relatorio/' + L, '#/relatorio/racao',
-         '#/tanques', '#/tanque/' + T, '#/estoque', '#/equipe', '#/plano', '#/historico', '#/pendencias', '#/mais']
+         '#/tanques', '#/tanque/' + T, '#/estoque', '#/equipe', '#/plano', '#/historico', '#/admin', '#/pendencias', '#/mais']
 DADOS = {
   'tanques': [{'id': T, 'nome': 'T1'}],
   'lotes': [{'id': L, 'tanque_id': T, 'tipo': 'engorda', 'especie': 'Tambaqui', 'data_entrada': '2026-09-01', 'quantidade_inicial': 1000, 'peso_inicial_kg': 50, 'ativo': True, 'tanques': {'nome': 'T1'}}],
