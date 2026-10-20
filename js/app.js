@@ -1,5 +1,6 @@
 // Ponto de entrada: sessão, perfil, roteamento, sincronização offline.
 import { SUPABASE_URL, SUPABASE_ANON_KEY, TIMEOUT_REDE_MS } from './config.js';
+import { iniciarSeg } from './seg.js';
 import { DEV_LOGIN, loginAutomaticoAtivo } from './dev-login.js';
 import { esc, parseHash, ROTULO_PAPEL, traduzErro, ehErroDeRede } from './util.js';
 import { criarApi } from './api.js';
@@ -360,6 +361,19 @@ function renderErro(el, e) {
   el.querySelector('#b-retry').addEventListener('click', rotear);
 }
 
+// Entrada rápida da tela nova: desliza um pouco do lado da aba para onde se foi (ou sobe, dentro da mesma aba)
+let hashAnterior = null, abaAnterior = null;
+const ORDEM_ABAS = ['', 'lancar', 'relatorio', 'mais'];
+function animarEntrada(el, aba) {
+  const hash = location.hash || '#/';
+  const mudou = hashAnterior !== null && hash !== hashAnterior;
+  const de = abaAnterior === null ? 0 : ORDEM_ABAS.indexOf(abaAnterior), para = ORDEM_ABAS.indexOf(aba);
+  hashAnterior = hash; abaAnterior = aba;
+  if (!mudou || !el.animate || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+  const dx = para > de ? 22 : para < de ? -22 : 0, dy = dx ? 0 : 10;
+  el.animate([{ opacity: 0, transform: `translate(${dx}px, ${dy}px)` }, { opacity: 1, transform: 'none' }], { duration: 230, easing: 'cubic-bezier(.22,.8,.3,1)' });
+}
+
 async function rotear() {
   const view = document.getElementById('view');
   if (!view || !state.perfil) return;
@@ -371,6 +385,7 @@ async function rotear() {
 
   const el = document.createElement('div'); // contêiner novo por rota: renderizações atrasadas não sujam a tela atual
   view.replaceChildren(el);
+  animarEntrada(el, aba);
   const meu = ++tokenRota;
   window.scrollTo(0, 0);
   try {
@@ -409,6 +424,7 @@ function criarCliente() {
 }
 
 async function iniciar() {
+  iniciarSeg();
   if (SUPABASE_ANON_KEY.startsWith('COLE_') || !window.supabase) {
     mostrarMensagem('Configuração pendente', 'A chave do Supabase ainda não foi configurada neste app (js/config.js).', false);
     return;

@@ -726,3 +726,12 @@ p.so-pc { display: none; } @media (min-width: 800px) { p.so-pc { display: block;
 @media (prefers-reduced-motion: reduce) { .abas-bolha.pronta { transition: none; } }
 /* Mais: botões lado a lado sem quebrar linha */
 .par-btns .btn { padding-left: .4rem; padding-right: .4rem; white-space: nowrap; }
+
+/* seletores em pílula: balão que desliza */
+.seg { position: relative; }
+.seg > button { position: relative; z-index: 1; }
+.seg > button.on { background: transparent; }
+.seg-bolha { position: absolute; left: 0; top: 0; width: 0; height: 0; border-radius: 999px; background: var(--rio); z-index: 0; pointer-events: none; opacity: 0; box-shadow: 0 5px 12px -6px rgba(14, 79, 69, .55); }
+.seg-bolha.anim { transition: transform .34s cubic-bezier(.34, 1.35, .55, 1), width .3s var(--ease), height .3s var(--ease), opacity .15s; }
+@media (prefers-reduced-motion: reduce) { .seg-bolha.anim { transition: none; } }
+.seg:not([data-pronto="1"]) > button.on { background: var(--rio); }
