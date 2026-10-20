@@ -45,7 +45,13 @@ let timerToast;
 function toast(msg, tipo = '') {
   const t = document.getElementById('toast');
   if (!t) return;
-  t.textContent = msg;
+  t.textContent = '';
+  if (tipo === 'ok') { // visto que se desenha: confirma o salvamento sem enfeite
+    const sv = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    sv.setAttribute('viewBox', '0 0 24 24'); sv.setAttribute('class', 'toast-visto'); sv.setAttribute('aria-hidden', 'true');
+    const pa = document.createElementNS('http://www.w3.org/2000/svg', 'path'); pa.setAttribute('d', 'M5 12.5l4.5 4.5L19 7.5'); sv.appendChild(pa); t.appendChild(sv);
+  }
+  t.appendChild(document.createTextNode(msg));
   t.className = `on ${tipo}`;
   clearTimeout(timerToast);
   timerToast = setTimeout(() => { t.className = ''; }, 3200);
