@@ -32,7 +32,8 @@ export function calcularLote(lote, bios, mort, rac, hoje, precoKg = null) {
   const ganhoBiomassa = biomassaAtual != null ? biomassaAtual - biomassaInicial : null;
 
   const racaoAteBio = ultima ? soma(rac.filter((r) => r.data <= ultima.data), 'quantidade_kg') : null;
-  const ca = ganhoBiomassa != null && ganhoBiomassa > 0 ? racaoAteBio / ganhoBiomassa : null;
+  // sem ração lançada até a última biometria não há conversão para calcular (mostrar 0,00 enganava)
+  const ca = ganhoBiomassa != null && ganhoBiomassa > 0 && racaoAteBio > 0 ? racaoAteBio / ganhoBiomassa : null;
 
   const diasCultivo = Math.max(0, diasEntre(lote.data_entrada, hoje));
   const diasAteBio = ultima ? diasEntre(lote.data_entrada, ultima.data) : null;

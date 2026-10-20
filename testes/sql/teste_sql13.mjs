@@ -1,0 +1,33 @@
+import { PGlite } from '@electric-sql/pglite';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+const DIR = process.env.SQL_DIR || fileURLToPath(new URL('../../sql/', import.meta.url));
+const db = new PGlite(); let ok = true;
+const checa = (c, m) => { console.log((c ? 'OK    ' : 'FALHA ') + m); ok = ok && c; };
+await db.exec(`create role anon; create role authenticated; create schema auth; create table auth.users (id uuid primary key, email text);
+  create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('teste.uid', true), '')::uuid $$; grant usage on schema auth to anon, authenticated;`);
+for (const f of ['01_schema','02_correcoes_e_funcoes','03_peso_do_saco','04_controle_de_estoque','06_cadastro_da_fazenda','07_planos_e_pacotes','08_causa_da_mortalidade','09_logo_da_fazenda','10_convites_e_nomes','11_trava_do_teste_gratis','12_historico_e_lixeira','13_datas_no_horario_local','13_datas_no_horario_local'])
+  await db.exec(readFileSync(DIR + f + '.sql', 'utf8'));
+checa(true, 'sql/01 a 13 rodaram (o 13 duas vezes)');
+await db.exec(`grant usage on schema public to anon, authenticated; grant select, insert, update, delete on all tables in schema public to anon, authenticated;`);
+const r = (await db.query(`select hoje_local()::text h, (now() at time zone 'America/Boa_Vista')::date::text bv`)).rows[0];
+checa(r.h === r.bv, `hoje_local() = data de Boa Vista (${r.h})`);
+const U = '00000000-0000-4000-8000-0000000000a1';
+await db.exec(`insert into auth.users values ('${U}','a'); set role authenticated; set teste.uid='${U}'; select criar_fazenda('Faz','Ana'); reset role; set teste.uid = '';`);
+const f = (await db.query(`select id, teste_ate::text t from fazendas`)).rows[0];
+checa(f.t === (await db.query(`select (hoje_local() + 30)::text t`)).rows[0].t, 'teste grátis termina 30 dias depois do dia de Boa Vista');
+await db.exec(`update fazendas set teste_ate = hoje_local()`);
+checa((await db.query(`select plano_da_fazenda('${f.id}')->>'estado' e`)).rows[0].e === 'teste', 'teste que termina hoje (Boa Vista) ainda vale hoje');
+await db.exec(`update fazendas set teste_ate = hoje_local() - 1`);
+checa((await db.query(`select plano_da_fazenda('${f.id}')->>'estado' e`)).rows[0].e === 'teste_acabou', 'teste que terminou ontem (Boa Vista) acabou');
+const src = (await db.query(`select string_agg(prosrc, ' ') s from pg_proc where proname in ('criar_fazenda','plano_da_fazenda','confirmar_pagamento','contratar_pacote')`)).rows[0].s;
+checa(!/current_date/.test(src), 'nenhuma das 4 funções usa mais current_date');
+await db.exec(`set role authenticated; set teste.uid='${U}';`);
+let erro = null; try { await db.query(`select confirmar_pagamento(gen_random_uuid(), 12)`); } catch (e) { erro = e.message; }
+await db.exec("reset role; set teste.uid = '';");
+checa(/permission denied/.test(erro || ''), 'confirmar_pagamento continua proibido para usuário do app depois de recriado');
+await db.exec(`set role authenticated; set teste.uid='${U}';`);
+const c = (await db.query(`select contratar_pacote(5) r`)).rows[0].r; await db.exec("reset role; set teste.uid = '';");
+const pago = (await db.query(`select pago_ate::text p, (hoje_local() + interval '12 months')::date::text esperado from assinaturas`)).rows[0];
+checa(c.acao === 'liberado' && pago.p === pago.esperado, 'modo piloto: contratar libera 12 meses a partir do dia de Boa Vista');
+console.log(ok ? 'RESULTADO: TUDO OK' : 'RESULTADO: COM FALHAS');
