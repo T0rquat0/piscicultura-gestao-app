@@ -845,3 +845,19 @@ p.so-pc { display: none; } @media (min-width: 800px) { p.so-pc { display: block;
 /* Ração fornecida: tocar num tanque abre o relatório só dele */
 .racao-lista li.clicavel { cursor: pointer; border-radius: 12px; }
 @media (hover: hover) { .racao-lista li.clicavel:hover { background: var(--rio-claro); } }
+/* Ração fornecida: caixinha ao lado de cada tanque para escolher quem entra no relatório */
+.racao-cab { display: flex; align-items: baseline; justify-content: space-between; gap: .8rem; }
+.marca-todos { display: inline-flex; align-items: center; gap: .45rem; font-size: .9rem; font-weight: 600; color: var(--rio); cursor: pointer; }
+.marca-todos input { width: 20px; height: 20px; accent-color: var(--rio); cursor: pointer; }
+.racao-lista.com-marca li { gap: .8rem; }
+.racao-lista .marca { flex: none; display: grid; place-items: center; cursor: pointer; }
+.racao-lista .marca input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.racao-lista .marca span { width: 26px; height: 26px; border-radius: 8px; border: 2px solid var(--rio); background: #fff; display: grid; place-items: center; transition: background .15s; }
+.racao-lista .marca input:checked + span { background: var(--rio); }
+.racao-lista .marca input:checked + span::after { content: ''; width: 7px; height: 12px; border: solid #fff; border-width: 0 3px 3px 0; transform: translateY(-1px) rotate(45deg); }
+.racao-lista .marca input:focus-visible + span { outline: 3px solid var(--rio-claro); outline-offset: 2px; }
+.racao-lista li.fora .esq, .racao-lista li.fora .valor, .racao-lista li.fora .tag { opacity: .45; }
+.racao-lista.com-marca li { justify-content: flex-start; }
+.racao-lista.com-marca li .esq { flex: 1; min-width: 0; text-align: left; }
+.racao-cab { align-items: center; margin: 1.6rem 0 .6rem; }
+.racao-cab h2 { margin: 0; }
