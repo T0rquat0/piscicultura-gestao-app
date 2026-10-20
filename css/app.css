@@ -599,3 +599,9 @@ body.sem-rolagem { overflow: hidden; }
   .abas a:not(.on):hover span { background: var(--rio-claro, #e8f3ee); }
 }
 :focus-visible { outline: 2px solid var(--rio-2, #1d7565); outline-offset: 2px; }
+
+/* botão "Novo tanque" na tela inicial */
+.mini.novo { border: 2px dashed var(--suave, #a9c4b8); background: transparent; box-shadow: none; justify-items: center; align-content: center; gap: .3rem; min-height: 92px; color: var(--rio); font: inherit; cursor: pointer; margin-top: .3rem; }
+.mini.novo b { font-size: .98rem; }
+.mini.novo .novo-ic { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--rio); color: #fff; }
+@media (hover: hover) { .mini.novo:hover { background: rgba(14, 79, 69, .05); } }

@@ -54,3 +54,46 @@ export function ocupado(texto = 'Aguarde…') {
   document.body.appendChild(f);
   return () => f.remove();
 }
+
+// Janela que pede um texto (ex.: nome do tanque). Devolve o texto ou null se cancelar.
+// validar(valor) devolve a mensagem de erro (ou '' se estiver certo); o erro aparece na própria janela.
+export function pedirTexto({ titulo, texto = '', rotulo = '', placeholder = '', ok = 'Salvar', cancelar = 'Cancelar', maxlength = 60, validar = null }) {
+  return new Promise((resolve) => {
+    const fundo = document.createElement('div');
+    fundo.className = 'dialogo com-campo';
+    fundo.setAttribute('role', 'dialog');
+    fundo.setAttribute('aria-modal', 'true');
+    fundo.innerHTML = `
+      <form class="dialogo-caixa" novalidate>
+        <h3>${esc(titulo)}</h3>
+        ${texto ? `<p>${esc(texto)}</p>` : ''}
+        <label class="dialogo-campo">${esc(rotulo)}
+          <input type="text" maxlength="${maxlength}" placeholder="${esc(placeholder)}" autocomplete="off" enterkeyhint="done"></label>
+        <p class="erro" hidden></p>
+        <div class="dialogo-acoes">
+          <button type="submit" class="btn primario">${esc(ok)}</button>
+          <button type="button" class="btn" data-cancelar>${esc(cancelar)}</button>
+        </div>
+      </form>`;
+    const campo = fundo.querySelector('input'), erro = fundo.querySelector('.erro');
+    const fechar = (v) => {
+      document.removeEventListener('keydown', tecla);
+      fundo.classList.add('sai'); setTimeout(() => fundo.remove(), 180);
+      resolve(v);
+    };
+    const tecla = (e) => { if (e.key === 'Escape') fechar(null); };
+    fundo.querySelector('form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const v = campo.value.trim().replace(/\s+/g, ' ');
+      const msg = !v ? 'Escreva um nome.' : validar ? validar(v) : '';
+      if (msg) { erro.textContent = msg; erro.hidden = false; campo.focus(); return; }
+      fechar(v);
+    });
+    campo.addEventListener('input', () => { erro.hidden = true; });
+    fundo.querySelector('[data-cancelar]').addEventListener('click', () => fechar(null));
+    fundo.addEventListener('click', (e) => { if (e.target === fundo) fechar(null); });
+    document.addEventListener('keydown', tecla);
+    document.body.appendChild(fundo);
+    campo.focus();
+  });
+}
