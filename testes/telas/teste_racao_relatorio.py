@@ -86,7 +86,7 @@ with sync_playwright() as pw:
     pg.click('[data-per="7"]'); pg.wait_for_timeout(500)
     nome, texto = baixar_pdf()
     checa(nome == f'Ração fornecida - Suvaco de cobra 2 - Tanque 2 - {(hoje - datetime.timedelta(days=6)):%d-%m-%Y} a {hoje:%d-%m-%Y}.pdf', f'nome do arquivo (7 dias, individual): {nome}')
-    checa('Dia a dia' in texto and 'VS. 7 DIAS ANTES' in texto.upper(), 'PDF 7 dias: dia a dia e comparação com os 7 dias antes')
+    checa('Dia a dia' in texto and 'VS.' not in texto.upper(), 'PDF 7 dias: dia a dia; sem dado anterior, não inventa comparação')
     pg.click('#b-todos'); pg.wait_for_timeout(500)
     checa(pg.input_value('#tanque-sel') == '' and pg.locator('#corpo .racao-lista li').count() == 3, '"Ver todos os tanques" volta para a fazenda toda')
     b.close()
