@@ -317,6 +317,19 @@ async function sair(forcar = false) {
   mostrarLogin();
 }
 
+// Balão verde da barra de baixo: desliza até a aba ativa (na primeira vez só se posiciona, sem animar)
+function moverBolha() {
+  const nav = document.querySelector('.abas'); if (!nav) return;
+  const bolha = nav.querySelector('.abas-bolha'); const alvo = nav.querySelector('a.on span');
+  if (!bolha || !alvo) return;
+  const r = alvo.getBoundingClientRect(), n = nav.getBoundingClientRect();
+  if (!r.width) return;
+  bolha.style.width = `${r.width}px`; bolha.style.height = `${r.height}px`;
+  bolha.style.top = `${r.top - n.top}px`; bolha.style.transform = `translateX(${r.left - n.left}px)`;
+  if (!bolha.classList.contains('pronta')) requestAnimationFrame(() => requestAnimationFrame(() => bolha.classList.add('pronta')));
+}
+window.addEventListener('resize', () => { const b = document.querySelector('.abas-bolha'); if (b) { b.classList.remove('pronta'); moverBolha(); } });
+
 // ---------- estrutura e rotas ----------
 function montarShell() {
   const p = state.perfil;
@@ -329,6 +342,7 @@ function montarShell() {
     </header>
     <main id="view" class="view"></main>
     <nav class="abas">
+      <i class="abas-bolha" aria-hidden="true"></i>
       <a data-aba="" href="#/"><span>${icone('inicio')}</span>Início</a>
       <a data-aba="lancar" href="#/lancar"><span>${icone('lancar')}</span>Lançar</a>
       <a data-aba="relatorio" href="#/relatorio"><span>${icone('relatorio')}</span>Relatórios</a>
@@ -353,6 +367,7 @@ async function rotear() {
   rotaAtual = rota;
   const aba = rota === 't' ? '' : ['', 'lancar', 'relatorio'].includes(rota) ? rota : 'mais'; // tela do tanque é aberta pelo Início
   document.querySelectorAll('.abas a').forEach((a) => a.classList.toggle('on', a.dataset.aba === aba));
+  moverBolha();
 
   const el = document.createElement('div'); // contêiner novo por rota: renderizações atrasadas não sujam a tela atual
   view.replaceChildren(el);

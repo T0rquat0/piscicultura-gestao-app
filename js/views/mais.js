@@ -25,9 +25,9 @@ export function renderMais(ctx, el) {
       <li><a class="item" href="${href}"><span class="item-ic">${icone(ic)}</span><span class="esq"><b>${esc(t)}</b><small>${esc(s)}</small></span><span class="seta">${icone('direita', 20)}</span></a></li>`).join('')}</ul></div>
 
     <div class="card">
-      <b>${esc(p.nome)}</b>
-      <small style="display:block">${esc(ROTULO_PAPEL[p.papel] || p.papel)} · ${esc((p.fazendas && p.fazendas.nome) || '')}</small>
-      <div class="acoes">
+      <div class="perfil-linha"><span class="avatar">${esc((p.nome || '?').trim().charAt(0).toUpperCase())}</span>
+        <div><b>${esc(p.nome)}</b><small style="display:block">${esc(ROTULO_PAPEL[p.papel] || p.papel)} · ${esc((p.fazendas && p.fazendas.nome) || '')}</small></div></div>
+      <div class="par-btns">
         <button class="btn" id="b-atualizar" type="button">Atualizar dados</button>
         <button class="btn perigo" id="b-sair" type="button">Sair</button>
       </div>
@@ -38,8 +38,9 @@ export function renderMais(ctx, el) {
     ${p.papel === 'dono' ? `<div class="card">
       <b>Peso do saco de ração</b>
       <small style="display:block">Usado para converter sacos em kg ao lançar a ração.</small>
-      <form id="f-saco" class="duas" style="margin-top:10px"><label>kg por saco <input id="kgsaco" type="number" inputmode="decimal" step="0.1" min="1" value="${state.ref.kgSaco || PESO_SACO_PADRAO_KG}" required></label>
-      <button class="btn" type="submit">Salvar</button></form></div>` : ''}
+      <form id="f-saco" class="saco-linha"><label class="saco-campo"><span>Quilos por saco</span>
+        <span class="com-sufixo"><input id="kgsaco" type="number" inputmode="decimal" step="0.1" min="1" value="${state.ref.kgSaco || PESO_SACO_PADRAO_KG}" required><em>kg</em></span></label>
+      <button class="btn primario" type="submit">Salvar</button></form></div>` : ''}
 
     ${p.papel === 'dono' ? `<div class="card">
       <b>Logo da fazenda</b>
