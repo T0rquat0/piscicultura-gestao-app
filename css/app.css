@@ -652,3 +652,27 @@ small.falta-nota { display: block; color: var(--alerta, #b5402e); font-size: .8r
 .msg-ver { margin-top: .8rem; }
 .msg-ver summary { cursor: pointer; font-weight: 600; color: var(--rio); padding: .4rem 0; }
 .msg-ver .msg-previa { margin-top: .4rem; }
+
+/* Ração fornecida: lista por dia no celular, tabela larga só no computador */
+.so-pc { display: none; }
+@media (min-width: 800px) { .so-pc { display: block; } .so-cel { display: none; } }
+p.so-pc { display: none; } @media (min-width: 800px) { p.so-pc { display: block; } }
+.dias-lista { padding: .3rem 1rem; }
+.dia-det { border-bottom: 1px solid var(--linha, #e1e9e4); }
+.dia-det:last-child { border-bottom: 0; }
+.dia-det summary, .dia-det.vazio { display: flex; justify-content: space-between; align-items: center; gap: .6rem; padding: .8rem 0; list-style: none; cursor: pointer; }
+.dia-det summary::-webkit-details-marker { display: none; }
+.dia-det summary b small { font-weight: 500; color: var(--tinta-2); }
+.dia-det summary::after { content: '›'; margin-left: .5rem; color: var(--tinta-2); transform: rotate(90deg); transition: transform .15s; }
+.dia-det[open] summary::after { transform: rotate(-90deg); }
+.dia-det summary span, .dia-det.vazio span { flex: 1; }
+.dia-det.vazio { cursor: default; color: var(--tinta-2); }
+.dia-det ul { list-style: none; margin: 0 0 .7rem; padding: .5rem .8rem; background: #f1f6f3; border-radius: 12px; display: grid; gap: .35rem; }
+.dia-det li { display: flex; justify-content: space-between; gap: 1rem; font-size: .93rem; }
+.grafico .barra.hoje { fill: var(--rio); }
+#acoes-racao { margin: .2rem 0 1rem; }
+
+.lista-recolhe > summary { cursor: pointer; font-weight: 600; color: var(--rio); padding: .2rem 0 .8rem; list-style: none; }
+.lista-recolhe > summary::-webkit-details-marker { display: none; }
+.lista-recolhe > summary::after { content: ' ›'; }
+.lista-recolhe[open] > summary::after { content: ' ‹'; }
