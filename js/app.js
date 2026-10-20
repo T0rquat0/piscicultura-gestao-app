@@ -1,5 +1,6 @@
 // Ponto de entrada: sessão, perfil, roteamento, sincronização offline.
 import { SUPABASE_URL, SUPABASE_ANON_KEY, TIMEOUT_REDE_MS } from './config.js';
+import { DEV_LOGIN, loginAutomaticoAtivo } from './dev-login.js';
 import { esc, parseHash, ROTULO_PAPEL, traduzErro, ehErroDeRede } from './util.js';
 import { criarApi } from './api.js';
 import * as db from './db.js';
@@ -199,6 +200,7 @@ async function criarFazenda(fazenda, nome, user) {
 }
 
 async function entrar(email, senha) {
+  try { sessionStorage.removeItem('sem-auto-login'); } catch { /* ignora */ }
   if (!navigator.onLine) throw new Error('Sem internet. Conecte-se para entrar.');
   const { data, error } = await client.auth.signInWithPassword({ email, password: senha });
   if (error) throw new Error(traduzErro(error));
@@ -243,6 +245,11 @@ async function restaurarSessao() {
   let session = null;
   try { ({ data: { session } } = await client.auth.getSession()); } catch { /* sem rede */ }
   if (session) return abrirApp(session.user);
+  // só em teste (PRs do Vercel / localhost): entra sozinho, a menos que a pessoa tenha clicado em Sair
+  let saiu = false; try { saiu = sessionStorage.getItem('sem-auto-login') === '1'; } catch { /* ignora */ }
+  if (!saiu && navigator.onLine && loginAutomaticoAtivo()) {
+    try { return await entrar(DEV_LOGIN.email, DEV_LOGIN.senha); } catch (e) { console.warn('login automático falhou:', e.message); }
+  }
   const perfil = await db.kvGet('perfil');
   if (perfil && !navigator.onLine) return abrirOffline(perfil);
   mostrarLogin();
@@ -252,6 +259,7 @@ async function sair(forcar = false) {
   await atualizarPendentes();
   if (!forcar && state.pendentes && !(await confirmar({ titulo: 'Há lançamentos sem enviar', texto: `${state.pendentes} lançamento(s) neste aparelho ainda não foram enviados. Eles continuam guardados e saem quando você entrar de novo. Sair mesmo assim?`, ok: 'Sair mesmo assim', cancelar: 'Ficar', perigo: true }))) return;
   saindo = true;
+  try { sessionStorage.setItem('sem-auto-login', '1'); } catch { /* ignora */ }
   try { await client.auth.signOut(); } catch { /* ignora */ }
   // se estiver sem internet o signOut falha e a sessão local ficaria: limpa na mão
   try { Object.keys(localStorage).filter((k) => k.startsWith('sb-')).forEach((k) => localStorage.removeItem(k)); } catch { /* ignora */ }
