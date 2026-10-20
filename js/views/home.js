@@ -120,7 +120,7 @@ async function novoTanque(ctx, el) {
   try {
     await ctx.api.criarTanque(ctx.state.perfil.fazenda_id, nome);
     await ctx.atualizarRef();
-    ctx.toast(`Tanque "${nome}" criado. Toque nele para cadastrar o lote.`, 'ok');
+    ctx.toast(`Tanque ${nome} criado`, 'ok');
     renderHome(ctx, el);
   } catch (e) { ctx.toast(e.message || 'Não foi possível criar o tanque', 'erro'); }
 }

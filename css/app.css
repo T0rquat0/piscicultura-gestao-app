@@ -755,3 +755,6 @@ p.so-pc { display: none; } @media (min-width: 800px) { p.so-pc { display: block;
 .login-card .carregando { display: block; font-size: 1rem; color: var(--tinta-2); text-align: center; padding: 2rem 0; margin: 0; }
 .login-card .carregando::before, .login-card .carregando::after { content: none; }
 @media (prefers-reduced-motion: reduce) { .carregando::before, .carregando::after { animation: none; } #toast.on .toast-visto path { animation: none; stroke-dashoffset: 0; } }
+/* aviso: largura própria (antes ficava só na metade da tela e quebrava o texto) */
+#toast { width: max-content; max-width: min(92vw, 420px); border-radius: 22px; line-height: 1.3; }
+#toast.ok { text-align: left; }
