@@ -6,7 +6,7 @@ import { gerarPdfFazenda } from '../pdf_fazenda.js';
 import { gerarPdfRacao } from '../pdf_racao.js';
 import { confirmar, formulario } from '../dialogo.js';
 import { icone } from '../icons.js';
-import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num, ROTULO_TIPO } from '../util.js';
+import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num, ROTULO_TIPO, nomeArquivo, dataArquivo } from '../util.js';
 import { calcularLote, precoMedioKg, pontosPeso, pesoMedioKg, evolucaoPeso, racaoPorSemana, matrizRacao, situacaoEstoque } from '../calc.js';
 
 export function svgPeso(pts) {
@@ -111,7 +111,7 @@ export async function renderRelatorios(ctx, el) {
         lotes: detalhes, racaoDia, racaoTanque, precoKg, ultimaContagem: contagens[0] || null,
       });
       bf.disabled = false; bf.innerHTML = texto;
-      await abrirVisualizador({ blob: doc.output('blob'), nome: `relatorio-geral-${hoje}.pdf`, titulo: 'Relatório geral da fazenda', toast: ctx.toast });
+      await abrirVisualizador({ blob: doc.output('blob'), nome: nomeArquivo(['Relatório geral', (ctx.state.perfil.fazendas && ctx.state.perfil.fazendas.nome) || 'Piscicultura', dataArquivo(hoje)], 'pdf'), titulo: 'Relatório geral da fazenda', toast: ctx.toast });
     } catch (e) { ctx.toast(e.message || 'Não foi possível gerar o PDF', 'erro'); bf.disabled = false; bf.innerHTML = texto; }
   });
 }
@@ -289,12 +289,12 @@ export async function renderRelatorioLote(ctx, el, id) {
         evo: evolucaoPeso(lote, bios), semanas: racaoPorSemana(rac), kgSaco: kgS, gerir, geradoEm: hoje, fontes,
       });
       const blob = doc.output('blob');
-      const nome = `relatorio-${(nomeTanque || 'tanque').replace(/\W+/g, '-')}-${(lote.especie || '').replace(/\W+/g, '-')}-${hoje}.pdf`;
+      const nome = nomeArquivo(['Relatório do lote', nomeTanque || 'Tanque', lote.especie, dataArquivo(hoje)], 'pdf');
       bpdf.disabled = false; bpdf.textContent = texto;
       await abrirVisualizador({ blob, nome, titulo: `${nomeTanque} · ${lote.especie}`, toast: ctx.toast });
     } catch (e) { ctx.toast(e.message || 'Não foi possível gerar o PDF', 'erro'); bpdf.disabled = false; bpdf.textContent = texto; }
   });
-  el.querySelector('#b-csv').addEventListener('click', () => baixarCsv(`relatorio-${(nomeTanque || 'tanque').replace(/\W+/g, '-')}-${lote.data_entrada}.csv`, montarCsv(lote, nomeTanque, c, bios, mort, rac, quem)));
+  el.querySelector('#b-csv').addEventListener('click', () => baixarCsv(nomeArquivo(['Relatório do lote', nomeTanque || 'Tanque', lote.especie, dataArquivo(hojeISO())], 'csv'), montarCsv(lote, nomeTanque, c, bios, mort, rac, quem)));
 }
 
 function baixarCsv(nome, texto) {
@@ -355,7 +355,22 @@ export async function renderRacaoDia(ctx, el) {
   const fazenda = (ctx.state.perfil.fazendas && ctx.state.perfil.fazendas.nome) || 'Piscicultura';
   const hoje = hojeISO();
   const somaDias = (iso, n) => { const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
-  const linhas = await ctx.api.racaoPeriodo(somaDias(hoje, -59));
+  const [linhas, resumoLista] = await Promise.all([ctx.api.racaoPeriodo(somaDias(hoje, -59)), ctx.api.resumoLotes().catch(() => [])]);
+  const resumo = Object.fromEntries((resumoLista || []).map((x) => [x.lote_id, x]));
+  // lote e peso estimado dos peixes de cada tanque (para "% do peso vivo")
+  const infoTanque = (tid) => {
+    const ls = lotesAtivos.filter((l) => l.tanque_id === tid);
+    if (!ls.length) return { lote: '', vivos: null, biomassaKg: null };
+    const lote = ls.length > 1 ? `${ls.length} lotes` : `${ls[0].especie} · ${(ROTULO_TIPO[ls[0].tipo] || ls[0].tipo || '').toLowerCase()}`;
+    let vivos = 0, bio = 0, temPeso = true;
+    for (const l of ls) {
+      const r0 = resumo[l.id];
+      const v = Math.max(0, Number(l.quantidade_inicial) - Number((r0 && r0.mortos) || 0));
+      vivos += v;
+      if (r0 && r0.ultimo_peso_medio_kg != null) bio += v * Number(r0.ultimo_peso_medio_kg); else temPeso = false;
+    }
+    return { lote, vivos, biomassaKg: temPeso && bio > 0 ? bio : null };
+  };
   const nat = (a, b) => String(a).localeCompare(String(b), 'pt-BR', { numeric: true, sensitivity: 'base' });
   const diaSemana = (iso) => new Intl.DateTimeFormat('pt-BR', { weekday: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`)).replace(/^./, (c) => c.toUpperCase());
   const diaCurto = (iso) => {
@@ -367,7 +382,7 @@ export async function renderRacaoDia(ctx, el) {
   const kgTxt = (v) => fmtNum(v, v % 1 ? 1 : 0);
   const kg = (v) => (v == null ? '<span class="vazio-cel">–</span>' : kgTxt(v));
 
-  let per = 'hoje'; let outro = hoje;
+  let per = 'hoje'; let outro = hoje; const desmarcados = new Set(); // tanques fora do relatório (vazio = todos)
   const intervalo = () => {
     if (per === 'hoje') return [hoje, hoje];
     if (per === 'ontem') return [somaDias(hoje, -1), somaDias(hoje, -1)];
@@ -387,8 +402,12 @@ export async function renderRacaoDia(ctx, el) {
       const m = porDia.get(r.data) || new Map(); m.set(r.tanque_id, (m.get(r.tanque_id) || 0) + q); porDia.set(r.data, m);
     }
     const ativosIds = new Set(lotesAtivos.map((l) => l.tanque_id));
-    const lista = tanques.filter((t) => porTanque.has(t.id) || ativosIds.has(t.id))
-      .map((t) => ({ id: t.id, nome: t.nome, kg: porTanque.get(t.id) || 0, ativo: ativosIds.has(t.id) })).sort((a, b) => nat(a.nome, b.nome));
+    const todos = tanques.filter((t) => porTanque.has(t.id) || ativosIds.has(t.id))
+      .map((t) => {
+        const kg = porTanque.get(t.id) || 0; const inf = infoTanque(t.id);
+        return { id: t.id, nome: t.nome, kg, ativo: ativosIds.has(t.id), ...inf, pesoVivoPct: inf.biomassaKg ? ((kg / dias.length) / inf.biomassaKg) * 100 : null };
+      }).sort((a, b) => nat(a.nome, b.nome));
+    const lista = todos.filter((t) => !desmarcados.has(t.id));
     const linhasDia = dias.map((d) => {
       const m = porDia.get(d) || new Map(); const por = {}; let tot = 0;
       lista.forEach((t) => { por[t.nome] = m.has(t.id) ? m.get(t.id) : null; tot += m.get(t.id) || 0; });
@@ -398,7 +417,17 @@ export async function renderRacaoDia(ctx, el) {
     const um = ini === fim;
     const rotulo = um ? (fim === hoje ? 'Hoje' : fim === somaDias(hoje, -1) ? 'Ontem' : diaSemana(fim)) : `Últimos ${dias.length} dias`;
     const periodo = um ? `${diaSemana(fim)}, ${fmtData(fim)}` : `${fmtData(ini).slice(0, 5)} a ${fmtData(fim)}`;
-    return { ini, fim, dias, lista, linhasDia, total, um, rotulo, periodo, colunas: lista.map((t) => t.nome) };
+    // mesmo tamanho de período, logo antes (para comparar)
+    const antFim = somaDias(ini, -1), antIni = somaDias(ini, -dias.length);
+    const idsLista = new Set(lista.map((t) => t.id));
+    const antKg = linhas.filter((x) => x.data >= antIni && x.data <= antFim && idsLista.has(x.tanque_id)).reduce((t, x) => t + (Number(x.quantidade_kg) || 0), 0);
+    const anterior = { kg: antKg, rotulo: um ? 'Vs. dia anterior' : `Vs. ${dias.length} dias antes` };
+    const individual = lista.length === 1 && todos.length > 1;
+    const parcial = lista.length > 1 && lista.length < todos.length;
+    const nomePer = um ? (fim === hoje ? 'Ração de hoje' : fim === somaDias(hoje, -1) ? 'Ração de ontem' : 'Ração do dia') : `Ração dos últimos ${dias.length} dias`;
+    const titulo = individual ? lista[0].nome : nomePer;
+    const periodoPdf = individual ? `${nomePer} · ${periodo}` : parcial ? `${periodo} · ${lista.length} de ${todos.length} tanques` : periodo;
+    return { ini, fim, dias, todos, lista, linhasDia, total, um, rotulo, periodo, colunas: lista.map((t) => t.nome), anterior, individual, parcial, titulo, periodoPdf };
   }
 
   el.innerHTML = `
@@ -417,8 +446,9 @@ export async function renderRacaoDia(ctx, el) {
   function pintar() {
     el.querySelectorAll('[data-per]').forEach((b) => b.classList.toggle('on', b.dataset.per === per));
     r = calcular();
-    const ranque = r.lista.map((t) => `
-      <li><span class="esq"><b>${esc(t.nome)}</b>${t.kg > 0 ? `<small>${kgTxt(t.kg)} kg</small>` : ''}</span>
+    const marcado = (t) => !desmarcados.has(t.id);
+    const ranque = r.todos.map((t) => `
+      <li class="racao-item${marcado(t) ? '' : ' fora'}"><label class="marca no-print" title="Incluir no relatório"><input type="checkbox" data-marca="${esc(t.id)}"${marcado(t) ? ' checked' : ''}><span></span></label><span class="esq"><b>${esc(t.nome)}</b>${t.kg > 0 || t.lote ? `<small>${[t.kg > 0 ? `${kgTxt(t.kg)} kg` : '', t.lote, t.pesoVivoPct != null && t.kg > 0 ? `${fmtNum(t.pesoVivoPct, 1)}% do peso vivo` : ''].filter(Boolean).map(esc).join(' · ')}</small>` : ''}</span>
       ${t.kg > 0 ? `<b class="valor">${sacos(t.kg)} <small>sacos</small></b>` : `<span class="tag ${t.ativo ? 'aviso' : ''}">${t.ativo ? 'sem lançamento' : '–'}</span>`}</li>`).join('');
     const grafico = r.um || !r.lista.length ? '' : svgDias(r.linhasDia);
     const detalhe = r.um || !r.lista.length ? '' : `
@@ -436,14 +466,29 @@ export async function renderRacaoDia(ctx, el) {
       </table></div>
       <p class="mudo nota so-pc">Valores em kg. “–” significa que nada foi lançado naquele dia.</p>
       <p class="mudo nota so-cel">Toque num dia para ver a ração de cada tanque. A tabela completa vai no PDF.</p>`;
-    el.querySelector('#resumo').innerHTML = !r.lista.length ? '' : `<div class="racao-total"><small>${esc(r.periodo)}</small><b>${sacos(r.total)} sacos</b><span>${kgTxt(r.total)} kg no total</span></div>`;
-    el.querySelector('#acoes-racao').hidden = !r.lista.length;
-    el.querySelector('#corpo').innerHTML = !r.lista.length ? '<div class="card vazio">Nenhum tanque com lote ativo ou ração neste período.</div>' : `
-      <h2>Por tanque</h2>
-      <div class="card"><ul class="lista racao-lista">${ranque}</ul></div>${detalhe}`;
+    const quem = r.individual ? r.lista[0].nome : r.parcial ? `${r.lista.length} de ${r.todos.length} tanques` : r.todos.length > 1 ? 'todos os tanques' : '';
+    el.querySelector('#resumo').innerHTML = !r.todos.length ? '' : `<div class="racao-total"><small>${esc(r.periodo)}${quem ? ` · ${esc(quem)}` : ''}</small><b>${sacos(r.total)} sacos</b><span>${kgTxt(r.total)} kg no total</span></div>`;
+    el.querySelector('#acoes-racao').hidden = !r.todos.length;
+    const bpdf = el.querySelector('#b-pdf-racao'); bpdf.disabled = !r.lista.length;
+    el.querySelector('#b-csv').disabled = !r.lista.length;
+    const todosMarcados = r.lista.length === r.todos.length;
+    el.querySelector('#corpo').innerHTML = !r.todos.length ? '<div class="card vazio">Nenhum tanque com lote ativo ou ração neste período.</div>' : `
+      <div class="racao-cab"><h2>Por tanque</h2>${r.todos.length > 1 ? `<label class="marca-todos no-print"><input type="checkbox" id="marca-todos"${todosMarcados ? ' checked' : ''}> Marcar todos</label>` : ''}</div>
+      <div class="card"><ul class="lista racao-lista com-marca">${ranque}</ul></div>
+      <p class="mudo nota no-print">${!r.lista.length ? 'Marque pelo menos um tanque para gerar o relatório.' : r.individual ? `Relatório só do <b>${esc(r.lista[0].nome)}</b>.` : r.parcial ? `Relatório com ${r.lista.length} de ${r.todos.length} tanques marcados.` : 'Desmarque os tanques que não quer no relatório. Deixe só um marcado para o relatório individual.'}</p>${r.lista.length ? detalhe : ''}`;
+    el.querySelectorAll('[data-marca]').forEach((c) => c.addEventListener('change', () => {
+      if (c.checked) desmarcados.delete(c.dataset.marca); else desmarcados.add(c.dataset.marca);
+      pintar();
+    }));
+    const mt = el.querySelector('#marca-todos');
+    if (mt) {
+      mt.indeterminate = !todosMarcados && r.lista.length > 0;
+      mt.addEventListener('change', () => { desmarcados.clear(); if (!mt.checked) r.todos.forEach((t) => desmarcados.add(t.id)); pintar(); });
+    }
   }
   el.querySelectorAll('[data-per]').forEach((b) => b.addEventListener('click', () => { per = b.dataset.per; pintar(); }));
   el.querySelector('#outro').addEventListener('change', (e) => { if (e.target.value) { outro = e.target.value > hoje ? hoje : e.target.value; per = 'dia'; pintar(); } });
+  const nomeRacao = (ext) => nomeArquivo(['Ração fornecida', fazenda, r.individual ? r.lista[0].nome : r.parcial ? `${r.lista.length} tanques` : '', r.um ? dataArquivo(r.fim) : `${dataArquivo(r.ini)} a ${dataArquivo(r.fim)}`], ext);
   pintar();
 
   const bp = el.querySelector('#b-pdf-racao');
@@ -451,15 +496,16 @@ export async function renderRacaoDia(ctx, el) {
     const t0 = bp.textContent; bp.disabled = true; bp.textContent = 'Montando o relatório…';
     try {
       const [jsPDF, fontes] = await Promise.all([carregarGerador(), carregarFontes()]);
-      const doc = gerarPdfRacao(jsPDF, { logo: ctx.state.ref.logo || null, fazenda, geradoEm: hoje, kgSaco: kgS, fontes, rotulo: r.rotulo, periodo: r.periodo, dias: r.dias.length, tanques: r.lista, linhasDia: r.linhasDia, colunas: r.colunas });
+      const agora = new Date();
+      const doc = gerarPdfRacao(jsPDF, { logo: ctx.state.ref.logo || null, fazenda, geradoEm: hoje, geradoHora: `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`, geradoPor: ctx.state.perfil.nome, kgSaco: kgS, fontes, titulo: r.titulo, periodo: r.periodoPdf, dias: r.dias.length, individual: r.individual, tanques: r.lista, linhasDia: r.linhasDia, colunas: r.colunas, anterior: r.anterior });
       bp.disabled = false; bp.textContent = t0;
-      await abrirVisualizador({ blob: doc.output('blob'), nome: `racao-${r.ini}${r.um ? '' : '_a_' + r.fim}.pdf`, titulo: `Ração · ${r.periodo}`, toast: ctx.toast });
+      await abrirVisualizador({ blob: doc.output('blob'), nome: nomeRacao('pdf'), titulo: `Ração fornecida · ${r.individual ? r.lista[0].nome + ' · ' : ''}${r.periodo}`, toast: ctx.toast });
     } catch (e) { ctx.toast(e.message || 'Não foi possível gerar o PDF', 'erro'); bp.disabled = false; bp.textContent = t0; }
   });
   el.querySelector('#b-csv').addEventListener('click', () => {
-    const L = [['Ração fornecida (kg)'], [r.periodo], [], ['Dia', ...r.colunas, 'Total']];
+    const L = [[`Ração fornecida (kg)${r.individual ? ' · ' + r.lista[0].nome : ''}`], [r.periodo], [], ['Dia', ...r.colunas, 'Total']];
     r.linhasDia.forEach((d) => L.push([fmtData(d.data), ...r.lista.map((t) => (d.por[t.nome] == null ? '' : String(d.por[t.nome]).replace('.', ','))), String(d.kg).replace('.', ',')]));
     L.push(['Total', ...r.lista.map((t) => String(t.kg).replace('.', ',')), String(r.total).replace('.', ',')]);
-    baixarCsv(`racao-${r.ini}${r.um ? '' : '_a_' + r.fim}.csv`, '\ufeff' + L.map((l) => l.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n'));
+    baixarCsv(nomeRacao('csv'), '\ufeff' + L.map((l) => l.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n'));
   });
 }

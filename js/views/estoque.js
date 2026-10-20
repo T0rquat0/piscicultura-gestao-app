@@ -40,6 +40,8 @@ export async function renderEstoque(ctx, el) {
     ...consumo.map((c) => ({ d: c.data, o: 0, t: 'Ração dada aos peixes', kg: -Number(c.quantidade_kg) })),
     ...contagens.filter((c) => c.data >= corte).map((c) => ({ d: c.data, o: 2, t: Number(c.diferenca_kg) < 0 ? 'Contagem: faltou ração' : Number(c.diferenca_kg) > 0 ? 'Contagem: sobrou a mais' : 'Contagem: bateu certinho', kg: Number(c.diferenca_kg), cid: c.id })),
   ].sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : b.o - a.o));
+  const totEntradas = extrato.filter((x) => x.kg > 0).reduce((t, x) => t + x.kg, 0);
+  const totSaidas = -extrato.filter((x) => x.kg < 0).reduce((t, x) => t + x.kg, 0);
   const sinal = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${sc(Math.abs(v))}`;
 
   el.innerHTML = `
@@ -110,9 +112,13 @@ export async function renderEstoque(ctx, el) {
     </details>` : ''}
 
     <h2>Movimento dos últimos 30 dias</h2>
+    ${extrato.length ? `<div class="ex-resumo">
+      <div class="ex-tot entra"><span>Entradas</span><b>+${sc(totEntradas)}<em> sacos</em></b><small>${fmtNum(totEntradas, 0)} kg · compras e sobras de contagem</small></div>
+      <div class="ex-tot sai"><span>Saídas</span><b>−${sc(totSaidas)}<em> sacos</em></b><small>${fmtNum(totSaidas, 0)} kg · ração dada e faltas de contagem</small></div>
+    </div>` : ''}
     <div class="card">
       ${extrato.length ? `<ul class="extrato">${extrato.map((x) => `<li class="${x.kg < 0 ? 'sai' : 'entra'}">
-        <span class="ex-d">${fmtData(x.d).slice(0, 5)}</span><span class="ex-t">${esc(x.t)}</span>
+        <span class="ex-d">${fmtData(x.d).slice(0, 5)}</span><span class="ex-t">${esc(x.t)}<i class="ex-tag ${x.kg < 0 ? 'sai' : 'entra'}">${x.kg < 0 ? 'Saída' : 'Entrada'}</i></span>
         <b>${sinal(x.kg)}<em> sacos</em></b>
         ${x.cid && ctx.state.perfil.papel === 'dono' ? `<button class="btn mini perigo" data-delc="${esc(x.cid)}" type="button">Excluir</button>` : ''}</li>`).join('')}</ul>`
         : '<p class="mudo" style="margin:0">Nenhum movimento nos últimos 30 dias.</p>'}
