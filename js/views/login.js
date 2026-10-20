@@ -15,11 +15,13 @@ export function renderLogin(ctx, root, aviso) {
         <p id="erro" class="erro" hidden></p>
         <button class="btn primario grande" type="submit">Entrar</button>
       </form>
+      <p style="margin-top:1rem;text-align:center"><button class="link" id="b-esqueci" type="button">Esqueci minha senha</button></p>
       <p style="margin-top:1.2rem"><button class="btn" id="b-criar" type="button">Criar conta da minha fazenda</button></p>
       ${pend ? `<p class="aviso">Há ${pend} lançamento(s) salvo(s) neste aparelho aguardando envio. Entre para enviar.</p>` : ''}
       ${navigator.onLine ? '' : '<p class="aviso">Sem internet. O primeiro acesso precisa de conexão.</p>'}
     </div>
   </main>`;
+  root.querySelector('#b-esqueci').addEventListener('click', () => ctx.mostrarRecuperar());
   root.querySelector('#b-criar').addEventListener('click', () => ctx.mostrarCadastro());
   const f = root.querySelector('#f-login');
   const erro = root.querySelector('#erro');

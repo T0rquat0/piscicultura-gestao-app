@@ -103,6 +103,13 @@ export function criarApi(client) {
       ok(await client.from('lotes').update({ ativo: false }).eq('id', id));
     },
 
+    // lançamentos já gravados no mesmo dia (para avisar de duplicidade ao lançar)
+    async registrosDoDia(tipo, pl) {
+      if (tipo === 'racao') return ok(await client.from('racao_consumo').select('quantidade_kg,criado_em').eq('tanque_id', pl.tanque_id).eq('data', pl.data)) || [];
+      const tab = tipo === 'mortalidade' ? 'mortalidade' : 'biometrias';
+      return ok(await client.from(tab).select(tipo === 'mortalidade' ? 'quantidade,criado_em' : 'criado_em').eq('lote_id', pl.lote_id).eq('data', pl.data)) || [];
+    },
+
     // ----- ração: estoque -----
     async saldoRacao() {
       const d = ok(await client.rpc('saldo_racao'));

@@ -3,6 +3,7 @@
 import { icone } from '../icons.js';
 import { esc, hojeISO, fmtData, fmtNum, fmtInt, num, uuid, ROTULO_TIPO } from '../util.js';
 import * as db from '../db.js';
+import { confirmar } from '../dialogo.js';
 import { ordemNatural } from './home.js';
 import { PESO_SACO_PADRAO_KG } from '../config.js';
 
@@ -189,6 +190,31 @@ export async function renderLancar(ctx, el, params = {}) {
   let feitosHoje = null;
   if (tipo === 'racao') marcarAlimentados();
 
+  // Procura um lançamento parecido, na fila do aparelho e (com internet) no servidor.
+  // Ração: mesmo tanque e dia com a mesma quantidade, ou qualquer um nos últimos 30 minutos.
+  // Mortalidade: mesmo lote, dia e quantidade. Biometria: mesmo lote e dia.
+  async function acharParecido(tp, pl) {
+    try {
+      const tab = TIPOS[tp].tabela;
+      const locais = (await db.filaList()).filter((i) => i.tabela === tab && i.payload.data === pl.data && (tp === 'racao' ? i.payload.tanque_id === pl.tanque_id : i.payload.lote_id === pl.lote_id));
+      let regs = locais.map((i) => ({ q: tp === 'racao' ? i.payload.quantidade_kg : i.payload.quantidade, em: i.criado_em }));
+      if (navigator.onLine) {
+        const rem = await Promise.race([ctx.api.registrosDoDia(tp, pl), new Promise((r) => setTimeout(() => r([]), 2500))]).catch(() => []);
+        regs = regs.concat(rem.map((r) => ({ q: tp === 'racao' ? r.quantidade_kg : r.quantidade, em: r.criado_em })));
+      }
+      const agora = Date.now();
+      const hora = (em) => new Date(em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      if (tp === 'racao') {
+        const igual = regs.find((r) => Math.abs(Number(r.q) - pl.quantidade_kg) < 0.01);
+        const recente = regs.find((r) => r.em && agora - new Date(r.em).getTime() < 30 * 60000);
+        const r = igual || recente; if (!r) return null;
+        return `Este tanque já recebeu ${sacosTxt(Number(r.q) / kgSaco)} neste dia${r.em ? ` (às ${hora(r.em)})` : ''}.`;
+      }
+      if (tp === 'mortalidade') { const r = regs.find((x) => Number(x.q) === pl.quantidade); return r ? `Já há ${fmtInt(pl.quantidade)} peixe(s) morto(s) lançado(s) neste lote nesta data${r.em ? ` (às ${hora(r.em)})` : ''}.` : null; }
+      return regs.length ? 'Já existe uma biometria deste lote nesta data.' : null;
+    } catch { return null; }
+  }
+
   f.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     erro.hidden = true;
@@ -216,8 +242,14 @@ export async function renderLancar(ctx, el, params = {}) {
       payload = { ...base, quantidade: q };
     }
 
+    // possível lançamento duplicado (dois toques, ou duas pessoas lançando o mesmo)
     const btn = f.querySelector('button[type=submit]');
     btn.disabled = true;
+    const parecido = await acharParecido(tipo, payload);
+    if (parecido) {
+      const ok = await confirmar({ titulo: 'Isso já foi lançado?', texto: `${parecido} Lançar de novo mesmo assim?`, ok: 'Lançar mesmo assim', cancelar: 'Não lançar' });
+      if (!ok) { btn.disabled = false; return; }
+    }
     try {
       await db.filaAdd({
         uuid_local: id, tabela: TIPOS[tipo].tabela, payload,

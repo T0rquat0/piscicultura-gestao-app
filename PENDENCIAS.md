@@ -25,8 +25,9 @@ Marque com [x] ao concluir. Tudo aqui foi deixado de propósito para depois do c
 - [ ] Confirmar com o cliente se "50 mil" de ração é em kg (cerca de 2.000 sacos) ou em sacos.
 - [ ] Conferência de recebimento na compra de ração (conferir quantos sacos chegaram).
 - [ ] Lembrete para contagem semanal do estoque e sugestão de compra.
-- [ ] Aviso de lançamento duplicado (mesma ração, mesmo tanque, mesmo dia).
+- [x] Aviso de lançamento duplicado (feito: ração com a mesma quantidade no dia ou lançada nos últimos 30 min; mortalidade igual; biometria no mesmo dia).
+- [ ] Ajustar a regra de duplicidade depois de ver como o cliente realmente alimenta (várias vezes ao dia?).
 - [ ] Formulários de estoque, biometria e mortalidade no mesmo estilo da tela Lançar.
-- [ ] Tela "esqueci minha senha".
+- [x] Tela "esqueci minha senha" (feita; o e-mail sai em inglês até configurar o SMTP próprio).
 - [ ] Rodar `sql/03`, `sql/04`, `sql/06` e `sql/07` em cada Supabase novo (ver README).
 - [ ] `sql/05_dados_de_demonstracao.sql` é só para demonstração. Não rodar no banco do cliente.

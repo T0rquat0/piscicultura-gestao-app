@@ -8,7 +8,7 @@ import { icone } from './icons.js';
 import { confirmar } from './dialogo.js';
 import { splashDoDia } from './splash.js';
 import { renderLogin } from './views/login.js';
-import { renderCadastro, renderCriarFazenda } from './views/cadastro.js';
+import { renderCadastro, renderCriarFazenda, renderRecuperar, renderNovaSenha } from './views/cadastro.js';
 import { renderHome, renderTanqueDetalhe } from './views/home.js';
 import { renderLancar } from './views/lancar.js';
 import { renderTanques, renderTanque } from './views/tanques.js';
@@ -117,6 +117,9 @@ const ctx = {
   criarFazenda,
   mostrarLogin: () => mostrarLogin(),
   mostrarCadastro,
+  mostrarRecuperar,
+  pedirRecuperacao,
+  definirNovaSenha,
 };
 
 // ---------- login / sessão ----------
@@ -134,6 +137,40 @@ function mostrarMensagem(titulo, texto, comSair = true) {
 }
 
 function mostrarCadastro() { renderCadastro(ctx, root); }
+function mostrarRecuperar() { renderRecuperar(ctx, root); }
+
+async function pedirRecuperacao(email) {
+  if (!navigator.onLine) throw new Error('Sem internet. Conecte-se para continuar.');
+  const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  if (error) throw new Error(traduzErro(error));
+}
+
+async function definirNovaSenha(senha) {
+  const { data, error } = await client.auth.updateUser({ password: senha });
+  if (error) throw new Error(traduzErro(error));
+  history.replaceState(null, '', location.pathname + '#/');
+  await abrirApp(data.user);
+}
+
+// O link do e-mail (confirmar conta ou recuperar senha) volta ao app com os dados na parte "#..." do endereço.
+async function tratarLinkDeEmail() {
+  const h = location.hash || '';
+  if (!/(access_token|error_code|error=)/.test(h) || h.startsWith('#/')) return false;
+  const q = new URLSearchParams(h.slice(1));
+  history.replaceState(null, '', location.pathname + '#/');
+  if (q.get('error') || q.get('error_code')) {
+    mostrarLogin(/expired|otp_expired/i.test(`${q.get('error_code')} ${q.get('error_description')}`) ? 'O link do e-mail expirou ou já foi usado. Peça um novo.' : 'Não foi possível validar o link do e-mail.');
+    return true;
+  }
+  if (!q.get('access_token') || !q.get('refresh_token')) return false;
+  try {
+    const { data, error } = await client.auth.setSession({ access_token: q.get('access_token'), refresh_token: q.get('refresh_token') });
+    if (error || !data.session) throw error || new Error('sessão inválida');
+    if (q.get('type') === 'recovery') { renderNovaSenha(ctx, root); return true; }
+    await abrirApp(data.session.user);
+    return true;
+  } catch { mostrarLogin('O link do e-mail expirou ou já foi usado. Peça um novo.'); return true; }
+}
 
 async function cadastrar(email, senha) {
   if (!navigator.onLine) throw new Error('Sem internet. Conecte-se para criar a conta.');
@@ -318,6 +355,7 @@ async function iniciar() {
   // rede pode voltar sem disparar o evento "online" (ex.: antena de satélite): tenta de tempos em tempos
   setInterval(() => { if (state.user && state.pendentes && navigator.onLine) sincronizarAgora(); }, 45000);
 
+  if (await tratarLinkDeEmail()) return;
   await restaurarSessao();
 }
 

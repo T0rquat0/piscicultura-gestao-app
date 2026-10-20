@@ -68,3 +68,55 @@ export function renderCriarFazenda(ctx, root, user) {
     catch (e) { falha(e.message || 'Não foi possível criar a fazenda.'); btn.disabled = false; btn.textContent = 'Criar minha fazenda'; }
   });
 }
+
+export function renderRecuperar(ctx, root) {
+  root.innerHTML = `
+  <main class="login"><div class="login-card">
+    ${cabeca('Esqueci minha senha', 'Informe seu e-mail. Enviaremos um link para criar uma senha nova.')}
+    <form id="f-rec" class="form" novalidate>
+      <label>E-mail <input id="email" type="email" autocomplete="username" inputmode="email" autocapitalize="none" required></label>
+      <p id="erro" class="erro" hidden></p>
+      <p id="ok" class="aviso" hidden></p>
+      <button class="btn primario grande" type="submit">Enviar link</button>
+    </form>
+    <p style="margin-top:1.2rem"><button class="btn" id="b-voltar" type="button">Voltar ao login</button></p>
+  </div></main>`;
+  const f = root.querySelector('#f-rec'), erro = root.querySelector('#erro'), okp = root.querySelector('#ok');
+  root.querySelector('#b-voltar').addEventListener('click', () => ctx.mostrarLogin());
+  f.addEventListener('submit', async (ev) => {
+    ev.preventDefault(); erro.hidden = true; okp.hidden = true;
+    const email = f.querySelector('#email').value.trim();
+    if (!/^\S+@\S+\.\S+$/.test(email)) { erro.textContent = 'Informe um e-mail válido.'; erro.hidden = false; return; }
+    const btn = f.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'Enviando…';
+    try {
+      await ctx.pedirRecuperacao(email);
+      okp.textContent = 'Se este e-mail tiver conta, enviamos um link. Abra o e-mail (olhe também o spam) e toque no link.';
+      okp.hidden = false; btn.textContent = 'Enviar de novo'; btn.disabled = false;
+    } catch (e) { erro.textContent = e.message || 'Não foi possível enviar.'; erro.hidden = false; btn.disabled = false; btn.textContent = 'Enviar link'; }
+  });
+}
+
+// Tela aberta pelo link do e-mail de recuperação.
+export function renderNovaSenha(ctx, root) {
+  root.innerHTML = `
+  <main class="login"><div class="login-card">
+    ${cabeca('Crie uma senha nova')}
+    <form id="f-nova" class="form" novalidate>
+      <label>Senha nova <input id="senha" type="password" autocomplete="new-password" minlength="8" required><small class="mudo">Pelo menos 8 caracteres.</small></label>
+      <label>Repita a senha <input id="senha2" type="password" autocomplete="new-password" minlength="8" required></label>
+      <p id="erro" class="erro" hidden></p>
+      <button class="btn primario grande" type="submit">Salvar e entrar</button>
+    </form>
+  </div></main>`;
+  const f = root.querySelector('#f-nova'), erro = root.querySelector('#erro');
+  f.addEventListener('submit', async (ev) => {
+    ev.preventDefault(); erro.hidden = true;
+    const a = f.querySelector('#senha').value, b = f.querySelector('#senha2').value;
+    const falha = (m) => { erro.textContent = m; erro.hidden = false; };
+    if (a.length < 8) return falha('A senha precisa ter pelo menos 8 caracteres.');
+    if (a !== b) return falha('As duas senhas são diferentes.');
+    const btn = f.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'Salvando…';
+    try { await ctx.definirNovaSenha(a); }
+    catch (e) { falha(e.message || 'Não foi possível salvar a senha.'); btn.disabled = false; btn.textContent = 'Salvar e entrar'; }
+  });
+}
