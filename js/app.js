@@ -9,7 +9,7 @@ import { icone } from './icons.js';
 import { confirmar } from './dialogo.js';
 import { splashDoDia } from './splash.js';
 import { renderLogin } from './views/login.js';
-import { renderCadastro, renderCriarFazenda, renderRecuperar, renderNovaSenha } from './views/cadastro.js';
+import { renderCadastro, renderCriarFazenda, renderRecuperar, renderNovaSenha, renderAceitarConvite } from './views/cadastro.js';
 import { renderHome, renderTanqueDetalhe } from './views/home.js';
 import { renderLancar } from './views/lancar.js';
 import { renderTanques, renderTanque } from './views/tanques.js';
@@ -30,7 +30,7 @@ document.addEventListener('touchend', (e) => {
   if (t - ultimoToque < 350 && !(e.target.closest && e.target.closest('input, select, textarea'))) e.preventDefault();
   ultimoToque = t;
 }, { passive: false });
-const state = { user: null, perfil: null, ref: { tanques: [], lotes: [] }, pendentes: 0, semRede: false };
+const state = { user: null, perfil: null, ref: { tanques: [], lotes: [] }, pendentes: 0, semRede: false, convite: null };
 let client = null;
 let api = null;
 let saindo = false;
@@ -125,6 +125,8 @@ const ctx = {
   sair,
   cadastrar,
   criarFazenda,
+  aceitarConvite,
+  descartarConvite,
   mostrarLogin: () => mostrarLogin(),
   mostrarCadastro,
   mostrarRecuperar,
@@ -135,6 +137,7 @@ const ctx = {
 // ---------- login / sessão ----------
 function mostrarLogin(aviso) {
   state.user = null;
+  if (!aviso && state.convite) aviso = 'Você recebeu um convite para entrar numa fazenda. Se já tem conta, entre. Se não tem, toque em "Criar conta" abaixo.';
   atualizarPendentes();
   renderLogin(ctx, root, aviso);
 }
@@ -184,7 +187,9 @@ async function tratarLinkDeEmail() {
 
 async function cadastrar(email, senha) {
   if (!navigator.onLine) throw new Error('Sem internet. Conecte-se para criar a conta.');
-  const { data, error } = await client.auth.signUp({ email, password: senha });
+  // com convite pendente, o link de confirmação do e-mail volta trazendo o convite (serve até se abrir em outro navegador)
+  const opcoes = state.convite ? { emailRedirectTo: `${location.origin}${location.pathname}?convite=${encodeURIComponent(state.convite)}` } : undefined;
+  const { data, error } = await client.auth.signUp({ email, password: senha, options: opcoes });
   if (error) throw new Error(traduzErro(error));
   // e-mail já cadastrado: o Supabase não avisa (evita descobrir quem tem conta) e devolve usuário sem identidades
   if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) throw new Error('Este e-mail já tem conta. Toque em "Já tenho conta" e entre.');
@@ -196,6 +201,32 @@ async function cadastrar(email, senha) {
 async function criarFazenda(fazenda, nome, user) {
   await api.criarFazenda(fazenda, nome);
   await abrirApp(user);
+}
+
+// ---------- convite por link (sql/10) ----------
+// O link é .../#/convite/<token>. Guarda o token no aparelho para sobreviver ao cadastro e à confirmação do e-mail.
+function capturarConvite() {
+  const m = /^#\/convite\/([A-Za-z0-9]{16,128})/.exec(location.hash || '');
+  const daBusca = new URLSearchParams(location.search).get('convite');
+  const token = (m && m[1]) || (daBusca && /^[A-Za-z0-9]{16,128}$/.test(daBusca) ? daBusca : null);
+  if (m) history.replaceState(null, '', location.pathname + '#/');
+  else if (daBusca) history.replaceState(null, '', location.pathname + location.hash); // mantém o #access_token da confirmação
+  if (token) { try { localStorage.setItem('convite', token); } catch { /* sem armazenamento: vale só nesta aba */ } }
+  let guardado = token;
+  if (!guardado) { try { guardado = localStorage.getItem('convite'); } catch { /* ignora */ } }
+  state.convite = guardado || null;
+}
+
+function descartarConvite() {
+  state.convite = null;
+  try { localStorage.removeItem('convite'); } catch { /* ignora */ }
+}
+
+async function aceitarConvite(token, nome, user) {
+  await api.aceitarConvite(token, nome);
+  descartarConvite();
+  await abrirApp(user);
+  toast('Você entrou na fazenda. O dono vai liberar os tanques que você vai usar.', 'ok');
 }
 
 async function entrar(email, senha) {
@@ -217,7 +248,11 @@ async function abrirApp(user) {
     if (cache && cache.id === user.id) perfil = cache; // sem rede: usa o perfil guardado
     else { mostrarMensagem('Não foi possível carregar seu perfil', e.message || 'Tente novamente.'); return; }
   }
-  if (!perfil) { renderCriarFazenda(ctx, root, user); return; }
+  if (!perfil) { if (state.convite) renderAceitarConvite(ctx, root, user, state.convite); else renderCriarFazenda(ctx, root, user); return; }
+  if (state.convite) { // conta já está numa fazenda: o convite não serve para ela
+    descartarConvite();
+    setTimeout(() => toast('Convite não usado: esta conta já faz parte de uma fazenda.', 'erro'), 600);
+  }
   if (perfil.ativo === false) { mostrarMensagem('Acesso desativado', 'Seu acesso a esta fazenda foi desativado. Fale com o dono.'); return; }
 
   state.perfil = perfil;
@@ -373,6 +408,7 @@ async function iniciar() {
   // rede pode voltar sem disparar o evento "online" (ex.: antena de satélite): tenta de tempos em tempos
   setInterval(() => { if (state.user && state.pendentes && navigator.onLine) sincronizarAgora(); }, 20000);
 
+  capturarConvite();
   if (await tratarLinkDeEmail()) return;
   await restaurarSessao();
 }

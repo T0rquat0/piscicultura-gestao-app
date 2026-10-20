@@ -1,10 +1,12 @@
 // Equipe (somente dono): vincular pessoas, definir papel, liberar tanques, desativar acesso.
-import { esc, ROTULO_PAPEL } from '../util.js';
+import { esc, fmtData, ROTULO_PAPEL } from '../util.js';
+import { confirmar } from '../dialogo.js';
 
 export async function renderEquipe(ctx, el) {
   if (ctx.state.perfil.papel !== 'dono') { el.innerHTML = '<div class="card vazio">Somente o dono gerencia a equipe.</div>'; return; }
   el.innerHTML = '<h1>Equipe</h1><p class="carregando">Carregando…</p>';
-  const [{ usuarios, vinculos }, tanques] = await Promise.all([ctx.api.equipe(), ctx.api.tanques()]);
+  const [{ usuarios, vinculos }, tanques, convites] = await Promise.all([ctx.api.equipe(), ctx.api.tanques(), ctx.api.convitesAbertos()]);
+  const linkDe = (token) => `${location.origin}${location.pathname}#/convite/${token}`;
   const meuId = ctx.state.perfil.id;
 
   el.innerHTML = `
@@ -35,6 +37,21 @@ export async function renderEquipe(ctx, el) {
     }).join('')}
 
     <h2>Adicionar pessoa</h2>
+    ${convites ? `<div class="card form" id="convite">
+      <b>Convidar por link</b>
+      <p class="mudo" style="margin:0">Gere um link e mande pelo WhatsApp. A pessoa cria a conta (ou entra) e já cai nesta fazenda. Cada link serve para uma pessoa e vale 7 dias.</p>
+      <label>Papel <select id="conv-papel"><option value="funcionario">Funcionário</option><option value="gerente">Gerente</option></select></label>
+      <button class="btn primario" id="b-convite" type="button">Gerar link de convite</button>
+      <div id="conv-novo" hidden>
+        <input id="conv-link" type="text" readonly>
+        <div class="acoes"><button class="btn" id="b-copiar" type="button">Copiar link</button><a class="btn primario" id="b-whats" target="_blank" rel="noopener">Enviar no WhatsApp</a></div>
+      </div>
+      <p id="erro-conv" class="erro" hidden></p>
+      ${convites.length ? `<div><b>Convites em aberto</b><ul class="lista">${convites.map((c) => `<li><div class="esq"><b>${esc(ROTULO_PAPEL[c.papel] || c.papel)}</b><small>gerado em ${fmtData(c.criado_em)} · vale até ${fmtData(c.expira_em)}</small></div>
+        <span class="acoes-reg"><button class="btn mini" data-copiar="${esc(c.token)}" type="button">Copiar</button><button class="btn mini perigo" data-cancelar-conv="${esc(c.token)}" type="button">Cancelar</button></span></li>`).join('')}</ul></div>` : ''}
+      <p class="mudo" style="margin:0">Depois que a pessoa entrar, ela aparece na lista acima: libere os tanques dela.</p>
+    </div>` : ''}
+    <details class="avancado"${convites ? '' : ' open'}><summary>${convites ? 'A pessoa já tem conta? Vincular pelo e-mail' : 'Vincular pelo e-mail'}</summary>
     <form id="f-novo" class="card form" novalidate>
       <p class="mudo" style="margin:0">Primeiro a pessoa cria a própria conta no app, na tela de entrada (botão <b>Criar conta da minha fazenda</b>), com o e-mail dela, e confirma pelo e-mail recebido. Ela para na tela "Cadastre sua fazenda": não precisa preencher. Depois, vincule aqui com o mesmo e-mail:</p>
       <label>E-mail do login <input name="email" type="email" inputmode="email" autocapitalize="none" required></label>
@@ -42,7 +59,37 @@ export async function renderEquipe(ctx, el) {
       <label>Papel <select name="papel"><option value="funcionario">Funcionário</option><option value="gerente">Gerente</option></select></label>
       <p id="erro-novo" class="erro" hidden></p>
       <button class="btn primario" type="submit">Vincular à fazenda</button>
-    </form>`;
+    </form></details>`;
+
+  // ---- convite por link ----
+  const copiar = async (texto) => {
+    try { await navigator.clipboard.writeText(texto); ctx.toast('Link copiado', 'ok'); }
+    catch { ctx.toast('Não deu para copiar. Segure o dedo no link e copie.', 'erro'); }
+  };
+  const bc = el.querySelector('#b-convite');
+  if (bc) bc.addEventListener('click', async () => {
+    const erro = el.querySelector('#erro-conv'); erro.hidden = true;
+    if (!navigator.onLine) { erro.textContent = 'Sem internet.'; erro.hidden = false; return; }
+    const papel = el.querySelector('#conv-papel').value;
+    bc.disabled = true;
+    try {
+      const link = linkDe(await ctx.api.criarConvite(papel));
+      const fazenda = (ctx.state.perfil.fazendas && ctx.state.perfil.fazendas.nome) || 'nossa fazenda';
+      const msg = `Olá! Este é o seu convite para entrar na ${fazenda} no app de gestão da piscicultura, como ${ROTULO_PAPEL[papel].toLowerCase()}. Abra o link, crie sua conta (ou entre) e pronto: ${link}`;
+      el.querySelector('#conv-link').value = link;
+      el.querySelector('#b-whats').href = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+      el.querySelector('#conv-novo').hidden = false;
+      el.querySelector('#b-copiar').onclick = () => copiar(link);
+      bc.textContent = 'Gerar outro link';
+    } catch (e) { erro.textContent = e.message; erro.hidden = false; }
+    bc.disabled = false;
+  });
+  el.querySelectorAll('[data-copiar]').forEach((b) => b.addEventListener('click', () => copiar(linkDe(b.dataset.copiar))));
+  el.querySelectorAll('[data-cancelar-conv]').forEach((b) => b.addEventListener('click', async () => {
+    if (!(await confirmar({ titulo: 'Cancelar este convite?', texto: 'O link deixa de funcionar. Quem já entrou continua na equipe.', ok: 'Cancelar convite', cancelar: 'Voltar', perigo: true }))) return;
+    try { await ctx.api.cancelarConvite(b.dataset.cancelarConv); ctx.toast('Convite cancelado', 'ok'); renderEquipe(ctx, el); }
+    catch (e) { ctx.toast(e.message, 'erro'); }
+  }));
 
   el.querySelectorAll('form[data-form]').forEach((f) =>
     f.addEventListener('submit', async (ev) => {
