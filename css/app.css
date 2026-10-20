@@ -640,3 +640,6 @@ small.falta-nota { display: block; color: var(--alerta, #b5402e); font-size: .8r
 .adm-faz .acoes, .adm-cob .acoes { margin-top: .4rem; }
 .adm-piloto { display: grid; gap: .3rem; border-left: 4px solid var(--rio); }
 .adm-piloto.ligado { border-left-color: var(--ambar, #c98a1b); }
+/* ===== aceite dos termos ===== */
+.linha-check.aceite { align-items: flex-start; font-weight: 500; font-size: .92rem; text-align: left; }
+.linha-check.aceite a { color: var(--rio); }

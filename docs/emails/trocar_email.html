@@ -1,0 +1,10 @@
+<!-- Supabase > Authentication > Emails > "Change email address"
+     Assunto: Confirme o novo e-mail da sua conta -->
+<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#13241f">
+  <h2 style="margin:0 0 12px;color:#0e4f45">Confirme o novo e-mail</h2>
+  <p style="font-size:16px;line-height:1.5">Foi pedida a troca do e-mail da sua conta no <b>Gestão de Piscicultura</b> de <b>{{ .Email }}</b> para <b>{{ .NewEmail }}</b>.</p>
+  <p style="margin:24px 0">
+    <a href="{{ .ConfirmationURL }}" style="background:#0e4f45;color:#ffffff;text-decoration:none;padding:14px 22px;border-radius:999px;font-weight:bold;display:inline-block">Confirmar o novo e-mail</a>
+  </p>
+  <p style="font-size:14px;line-height:1.5;color:#4a5c56">Se não foi você, ignore este e-mail e troque sua senha.</p>
+</div>

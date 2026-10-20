@@ -1,5 +1,5 @@
 // Ponto de entrada: sessão, perfil, roteamento, sincronização offline.
-import { SUPABASE_URL, SUPABASE_ANON_KEY, TIMEOUT_REDE_MS } from './config.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, TIMEOUT_REDE_MS, TERMOS_VERSAO } from './config.js';
 import { DEV_LOGIN, loginAutomaticoAtivo } from './dev-login.js';
 import { esc, parseHash, ROTULO_PAPEL, traduzErro, ehErroDeRede } from './util.js';
 import { criarApi } from './api.js';
@@ -9,7 +9,7 @@ import { icone } from './icons.js';
 import { confirmar } from './dialogo.js';
 import { splashDoDia } from './splash.js';
 import { renderLogin } from './views/login.js';
-import { renderCadastro, renderCriarFazenda, renderRecuperar, renderNovaSenha, renderAceitarConvite } from './views/cadastro.js';
+import { renderCadastro, renderCriarFazenda, renderRecuperar, renderNovaSenha, renderAceitarConvite, renderAceiteTermos } from './views/cadastro.js';
 import { renderHome, renderTanqueDetalhe } from './views/home.js';
 import { renderLancar } from './views/lancar.js';
 import { renderTanques, renderTanque } from './views/tanques.js';
@@ -129,6 +129,7 @@ const ctx = {
   criarFazenda,
   aceitarConvite,
   descartarConvite,
+  aceitarTermos,
   mostrarLogin: () => mostrarLogin(),
   mostrarCadastro,
   mostrarRecuperar,
@@ -190,7 +191,9 @@ async function tratarLinkDeEmail() {
 async function cadastrar(email, senha) {
   if (!navigator.onLine) throw new Error('Sem internet. Conecte-se para criar a conta.');
   // com convite pendente, o link de confirmação do e-mail volta trazendo o convite (serve até se abrir em outro navegador)
-  const opcoes = state.convite ? { emailRedirectTo: `${location.origin}${location.pathname}?convite=${encodeURIComponent(state.convite)}` } : undefined;
+  const opcoes = state.convite ? { emailRedirectTo: `${location.origin}${location.pathname}?convite=${encodeURIComponent(state.convite)}` } : {};
+  // aceite dos termos fica registrado na própria conta (versão e data), junto com o cadastro
+  if (TERMOS_VERSAO) opcoes.data = { termos_versao: TERMOS_VERSAO, termos_aceito_em: new Date().toISOString() };
   const { data, error } = await client.auth.signUp({ email, password: senha, options: opcoes });
   if (error) throw new Error(traduzErro(error));
   // e-mail já cadastrado: o Supabase não avisa (evita descobrir quem tem conta) e devolve usuário sem identidades
@@ -231,6 +234,12 @@ async function aceitarConvite(token, nome, user) {
   toast('Você entrou na fazenda. O dono vai liberar os tanques que você vai usar.', 'ok');
 }
 
+async function aceitarTermos() {
+  const { data, error } = await client.auth.updateUser({ data: { termos_versao: TERMOS_VERSAO, termos_aceito_em: new Date().toISOString() } });
+  if (error) throw new Error(traduzErro(error));
+  await abrirApp(data.user);
+}
+
 async function entrar(email, senha) {
   try { sessionStorage.removeItem('sem-auto-login'); } catch { /* ignora */ }
   if (!navigator.onLine) throw new Error('Sem internet. Conecte-se para entrar.');
@@ -252,6 +261,8 @@ async function abrirApp(user) {
     if (cache && cache.id === user.id) perfil = cache; // sem rede: usa o perfil guardado
     else { mostrarMensagem('Não foi possível carregar seu perfil', e.message || 'Tente novamente.'); return; }
   }
+  // termos novos: quem ainda não aceitou esta versão aceita antes de entrar (só com internet, para não travar o campo)
+  if (TERMOS_VERSAO && daRede && (user.user_metadata || {}).termos_versao !== TERMOS_VERSAO) { state.user = user; renderAceiteTermos(ctx, root, user); return; }
   if (!perfil) { if (state.convite) renderAceitarConvite(ctx, root, user, state.convite); else renderCriarFazenda(ctx, root, user); return; }
   if (state.convite) { // conta já está numa fazenda: o convite não serve para ela
     descartarConvite();

@@ -1,0 +1,14 @@
+/* Páginas de termos de uso e política de privacidade: texto simples, legível no celular. */
+@font-face { font-family: 'Schibsted Grotesk'; src: url('../fonts/schibsted-grotesk.woff2') format('woff2'); font-weight: 400 900; font-display: swap; }
+:root { --tinta: #13241f; --tinta-2: #4a5c56; --fundo: #f4f7f5; --rio: #0e4f45; --alerta-bg: #fdecc8; --alerta: #7a4b00; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.6 'Schibsted Grotesk', system-ui, sans-serif; }
+.legal { max-width: 720px; margin: 0 auto; padding: 1.2rem 16px 3rem; }
+.legal h1 { font-size: 1.9rem; line-height: 1.2; margin: .4rem 0 .2rem; }
+.legal h2 { font-size: 1.15rem; margin: 1.8rem 0 .4rem; }
+.legal p, .legal li { color: var(--tinta); }
+.legal ul { padding-left: 1.2rem; }
+.legal li { margin: .3rem 0; }
+.legal a { color: var(--rio); font-weight: 600; }
+.legal .versao { color: var(--tinta-2); margin-top: 0; }
+.legal .minuta { background: var(--alerta-bg); color: var(--alerta); padding: .8rem 1rem; border-radius: 12px; }

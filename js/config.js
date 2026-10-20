@@ -1,8 +1,22 @@
 // Configuração do projeto Supabase.
 // A chave "anon public" é pública por desenho (fica no navegador de qualquer jeito);
 // quem protege os dados é o RLS no banco. NUNCA coloque aqui a chave "service_role".
-export const SUPABASE_URL = 'https://ppvliseblxpsepmeknnl.supabase.co';
-export const SUPABASE_ANON_KEY = 'sb_publishable_ckz6Ih2NnJ_xOb4i4_ea8w_uBGQyW3t';
+//
+// UM BANCO POR ENDEREÇO DO SITE: o banco atual é de TESTE e DEMONSTRAÇÃO. Quando os clientes tiverem
+// um banco só deles (ver docs/INFRA.md), crie o projeto no Supabase, rode os sql/ e acrescente aqui
+// o endereço do site dos clientes com a URL e a chave pública (publishable/anon) desse projeto novo.
+// Endereço que não estiver na lista usa o "padrao" (testes, prévias da Vercel e localhost).
+const AMBIENTES = {
+  padrao: { nome: 'testes e demonstração', url: 'https://ppvliseblxpsepmeknnl.supabase.co', chave: 'sb_publishable_ckz6Ih2NnJ_xOb4i4_ea8w_uBGQyW3t' },
+  // 'app.seudominio.com.br': { nome: 'clientes', url: 'https://XXXXXXXX.supabase.co', chave: 'sb_publishable_XXXXXXXX' },
+};
+export function ambienteDo(host) {
+  return AMBIENTES[String(host || '').toLowerCase()] || AMBIENTES.padrao;
+}
+const AMBIENTE = ambienteDo(typeof location !== 'undefined' ? location.hostname : '');
+export const AMBIENTE_NOME = AMBIENTE.nome;
+export const SUPABASE_URL = AMBIENTE.url;
+export const SUPABASE_ANON_KEY = AMBIENTE.chave;
 
 // Peso padrão de um saco de ração (kg), usado ao registrar compras.
 export const PESO_SACO_PADRAO_KG = 25;
@@ -35,3 +49,10 @@ export const CAUSAS_MORTE = [
   ['Predadores', 'aves, lontra, jacaré'],
   ['Manejo', 'despesca, transporte, estresse'],
 ];
+
+// Termos de uso e política de privacidade (termos.html e privacidade.html).
+// null = desligado: as páginas existem como MINUTA, mas o app não pede aceite nem mostra os links.
+// Para ligar: preencha os dados da empresa nas duas páginas, revise com um advogado e coloque aqui a data
+// da versão (ex.: '2026-11-01'). Quem já tem conta verá o pedido de aceite no próximo acesso;
+// quem criar conta marca o aceite no cadastro. Mudou o texto? Troque a data: todos aceitam de novo.
+export const TERMOS_VERSAO = null;

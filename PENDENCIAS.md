@@ -6,10 +6,10 @@ Marque com [x] ao concluir. Tudo aqui foi deixado de propósito para depois do c
 - [ ] **Desligar o modo piloto**: `update config_sistema set valor = 'false' where chave = 'modo_piloto';` (hoje contratar pacote libera na hora, sem cobrar)
 - [ ] **Pagamento automático (Pix/boleto/cartão)**: escolher serviço (Asaas, Mercado Pago, Pagar.me), criar a cobrança ao contratar e chamar `confirmar_pagamento(id)` pelo aviso automático (webhook). O app e o banco já estão prontos para isso.
 - [ ] **Empresa aberta (CNPJ) e emissão de nota** de serviço: confirmar com contador.
-- [ ] **Termos de uso e política de privacidade (LGPD)**, com aceite no cadastro.
-- [ ] **Supabase separado do cliente** (o atual fica só para testes e demonstração).
-- [ ] **SMTP próprio** (ex.: Resend, precisa de domínio) no Supabase: tira o limite baixo de e-mails e permite traduzir os e-mails de confirmação para português (hoje saem em inglês).
-- [ ] **Comprar domínio** próprio e trocar Site URL / Redirect URLs no Supabase.
+- [ ] **Termos de uso e política de privacidade (LGPD)**, com aceite no cadastro. → **Preparado (20/10/26):** minutas em `termos.html` e `privacidade.html` + aceite no cadastro e no login, desligado até preencher, revisar com advogado e definir `TERMOS_VERSAO` em `js/config.js` (passo a passo em `docs/INFRA.md`).
+- [ ] **Supabase separado do cliente** (o atual fica só para testes e demonstração). → **Preparado:** `js/config.js` escolhe o banco pelo endereço do site (`AMBIENTES`); `python tools/sql_completo.py > banco_novo.sql` monta o banco novo de uma vez (testado em `testes/sql/teste_banco_novo.mjs`); `api/ping.js` aceita mais de um banco. Falta criar o projeto (ver `docs/INFRA.md`).
+- [ ] **SMTP próprio** (ex.: Resend, precisa de domínio) no Supabase: tira o limite baixo de e-mails e permite traduzir os e-mails de confirmação para português (hoje saem em inglês). → **Preparado:** e-mails em português prontos em `docs/emails/` (confirmação, senha nova, troca de e-mail). Falta a conta de envio e o domínio (ver `docs/INFRA.md`).
+- [ ] **Comprar domínio** próprio e trocar Site URL / Redirect URLs no Supabase. → passo a passo em `docs/INFRA.md`.
 
 ## Encontrado no levantamento do backoffice (20/10/26)
 - [x] Vencimento do plano no horário de Boa Vista (sql/13: `hoje_local()` no teste grátis, plano, pagamento e contratação; antes era UTC e podia vencer um dia antes/depois).

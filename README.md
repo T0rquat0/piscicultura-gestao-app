@@ -37,3 +37,6 @@ Para tornar alguém administrador (a pessoa precisa ter login no app), no SQL Ed
 ```sql
 insert into administradores (usuario_id) select id from auth.users where email = 'email@exemplo.com' on conflict do nothing;
 ```
+
+## Infraestrutura (domínio, banco dos clientes, e-mail, termos)
+Passo a passo em `docs/INFRA.md`. Para montar um Supabase novo de uma vez: `python tools/sql_completo.py > banco_novo.sql` e colar no SQL Editor.
