@@ -37,3 +37,6 @@ Marque com [x] ao concluir. Tudo aqui foi deixado de propósito para depois do c
 - [ ] Peixe da abertura (tambaqui do Tripo, assets/peixe/; fonte original de 1 milhão de triângulos fica fora do repositório): conferir se o plano do Tripo permite uso comercial do modelo antes de vender o app.
 
 - [ ] Rodar `sql/09_logo_da_fazenda.sql` no Supabase (coluna `fazendas.logo`). Sem isso, "Logo da fazenda" em Mais avisa e não salva.
+- [ ] Rodar `sql/10_convites_e_nomes.sql` no Supabase (convite por link + nomes da equipe no relatório). Sem ele, a Equipe mostra só o "vincular pelo e-mail".
+- [ ] Rodar `sql/11_trava_do_teste_gratis.sql` no Supabase. **Segurança:** sem ele, o dono consegue mudar `fazendas.teste_ate` pela API (chave pública) e usar de graça para sempre.
+- [x] Varredura de segredos no código e em todo o histórico do Git (20/10/26): nenhuma chave secreta; só a publishable, que é pública por desenho. O repositório é público, então o RLS é a única barreira: testado com 73 cenários de acesso entre fazendas/papéis num Postgres real (único furo achado: o do sql/11).

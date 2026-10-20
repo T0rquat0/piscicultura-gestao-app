@@ -171,8 +171,10 @@ export function criarApi(client) {
     async racaoPeriodo(desde) {
       return todos(() => client.from('racao_consumo').select('id,data,tanque_id,quantidade_kg').gte('data', desde).order('data').order('id'));
     },
+    // nomes de toda a equipe (sql/10). Sem o sql/10, cai na tabela: o funcionário só enxerga o próprio nome.
     async nomesUsuarios() {
-      const lista = ok(await client.from('usuarios').select('id,nome'));
+      const r = await client.rpc('nomes_equipe');
+      const lista = r.error ? ok(await client.from('usuarios').select('id,nome')) : r.data || [];
       return Object.fromEntries(lista.map((u) => [u.id, u.nome]));
     },
     async excluir(tabela, id) {
@@ -203,6 +205,25 @@ export function criarApi(client) {
     },
     async atualizarUsuario(id, campos) {
       ok(await client.from('usuarios').update(campos).eq('id', id));
+    },
+    // ----- convites por link (sql/10) -----
+    async convitesAbertos() {
+      const { data, error } = await client.from('convites').select('token,papel,criado_em,expira_em')
+        .is('usado_em', null).eq('cancelado', false).gt('expira_em', new Date().toISOString()).order('criado_em', { ascending: false });
+      return error ? null : data || []; // null = sql/10 ainda não rodado
+    },
+    async criarConvite(papel) {
+      return ok(await client.rpc('criar_convite', { p_papel: papel }));
+    },
+    async cancelarConvite(token) {
+      ok(await client.rpc('cancelar_convite', { p_token: token }));
+    },
+    async verConvite(token) {
+      const d = ok(await client.rpc('ver_convite', { p_token: token }));
+      return Array.isArray(d) ? d[0] : d;
+    },
+    async aceitarConvite(token, nome) {
+      return ok(await client.rpc('aceitar_convite', { p_token: token, p_nome: nome }));
     },
     async salvarVinculos(usuarioId, adicionar, remover) {
       if (adicionar.length) ok(await client.from('usuario_tanques').insert(adicionar.map((t) => ({ usuario_id: usuarioId, tanque_id: t }))));
