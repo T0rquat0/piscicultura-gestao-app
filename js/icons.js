@@ -11,7 +11,7 @@ const P = {
   direita: '<path d="m9.5 6 6 6-6 6"/>',
   voltar: '<path d="m14.5 6-6 6 6 6"/>',
   check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
-  peixe: '<path d="M2.8 12c2.6-4.6 8.4-6.2 12.4-3.2l4.4-3.3v13l-4.4-3.3c-4 3-9.8 1.4-12.4-3.2z"/><circle cx="8.2" cy="11" r=".9" fill="currentColor" stroke="none"/>',
+  peixe: '<g fill="currentColor" stroke="none"><path d="M1.4 4.6 7.2 12l-5.8 7.4L3.6 12z"/><rect x="8.2" y="9.5" width="2.4" height="5" rx="1.2"/><rect x="11.4" y="7" width="2.4" height="10" rx="1.2"/><rect x="14.6" y="5.5" width="2.4" height="13" rx="1.2"/><path fill-rule="evenodd" d="M17.8 9.7a1.2 1.2 0 0 1 2.4 0v4.6a1.2 1.2 0 0 1-2.4 0zM18.2 10.9a.8.8 0 1 0 1.6 0 .8.8 0 1 0-1.6 0z"/></g>',
 };
 export function icone(nome, tam = 24) {
   return `<svg class="ic" width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[nome] || ''}</svg>`;
