@@ -573,3 +573,9 @@ body.sem-rolagem { overflow: hidden; }
 .logo-previa { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
 .logo-previa .caixa { width: 64px; height: 64px; border-radius: 14px; border: 1px solid var(--linha, #d6dfda); background: #fff; display: grid; place-items: center; overflow: hidden; flex: none; color: var(--rio); }
 .logo-previa .caixa img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+/* telas de entrada: cabeçalho e textos centralizados (campos seguem alinhados à esquerda) */
+.login-card .logo { display: flex; justify-content: center; }
+.login-card .logo svg { width: 56px; height: 56px; }
+.login-card h1 { text-align: center; }
+.login-card > p, .login-card .aviso { text-align: center; }
