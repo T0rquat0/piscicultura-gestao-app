@@ -18,26 +18,38 @@ const kgTxt = (v) => fmtNum(Number(v), casas(Number(v)));
 
 const sacosTxt = (n) => `${fmtNum(n, casas(n))} ${n === 1 ? 'saco' : 'sacos'}`;
 
+const DESC = {
+  racao: 'Quanto de ração foi jogada em um tanque.',
+  biometria: 'Pese uma amostra para saber o peso médio do tanque.',
+  mortalidade: 'Peixes mortos encontrados em um tanque.',
+};
+const TITULO2 = { racao: 'Quantidade de ração', biometria: 'Pesagem dos peixes', mortalidade: 'Peixes mortos' };
+
 function camposDoTipo(tipo, kgSaco) {
   if (tipo === 'racao') {
     return `<label>Quantos sacos de ração?
       <input id="qtd" class="grande" type="number" inputmode="decimal" step="0.5" min="0" placeholder="0" required></label>
+      <p class="ajuda">Pode ser meio saco (0,5).</p>
       <div class="calc" id="conv">Cada saco = ${fmtNum(kgSaco, 0)} kg</div>
       <button type="button" class="chip" id="b-ultima" hidden></button>`;
   }
   if (tipo === 'biometria') {
     return `
-      <div class="duas">
-        <label>Peso de todos os peixes pesados juntos (kg)
-          <input id="peso" type="number" inputmode="decimal" step="0.001" min="0" placeholder="Ex.: 2,4" required></label>
-        <label>Quantos peixes foram pesados
-          <input id="amostra" type="number" inputmode="numeric" step="1" min="1" placeholder="Ex.: 10" required></label>
-      </div>
-      <div class="calc" id="pm">Peso médio: —</div>
-      <p id="aviso-amostra" class="aviso" hidden>Amostra pequena: com menos de 30 peixes o peso médio fica pouco confiável. O ideal é pesar de 5% a 10% do lote.</p>`;
+      <ol class="como">
+        <li>Pegue alguns peixes do tanque, de 5% a 10% do lote.</li>
+        <li>Pese todos juntos, de uma vez.</li>
+        <li>Anote o peso total e quantos peixes foram pesados.</li>
+      </ol>
+      <label>Peso total dos peixes (kg)
+        <input id="peso" type="number" inputmode="decimal" step="0.001" min="0" placeholder="Ex.: 2,4" required></label>
+      <label>Quantos peixes foram pesados?
+        <input id="amostra" type="number" inputmode="numeric" step="1" min="1" placeholder="Ex.: 10" required></label>
+      <div class="calc resultado" id="pm">Peso médio: —</div>
+      <p id="aviso-amostra" class="aviso" hidden>Poucos peixes pesados: com menos de 30 o peso médio fica pouco confiável.</p>`;
   }
   return `<label>Quantos peixes morreram?
-    <input id="qtd" class="grande" type="number" inputmode="numeric" step="1" min="1" placeholder="0" required></label>`;
+    <input id="qtd" class="grande" type="number" inputmode="numeric" step="1" min="1" placeholder="0" required></label>
+    <p class="ajuda">Conte os peixes mortos encontrados neste tanque.</p>`;
 }
 
 export async function renderLancar(ctx, el, params = {}) {
@@ -60,19 +72,26 @@ export async function renderLancar(ctx, el, params = {}) {
     <div class="seg" role="tablist">
       ${Object.entries(TIPOS).map(([k, v]) => `<button type="button" data-tipo="${k}" class="${k === tipo ? 'on' : ''}">${v.rotulo}</button>`).join('')}
     </div>
-    <form id="f" class="form card" novalidate>
-      <div class="campo">
-        <div class="tanque-atual"><div><span class="rotulo">Tanque</span><b id="tanque-nome">${esc((tanques.find((t) => t.id === tanqueInicial) || {}).nome || '')}</b></div>
-          ${tanques.length > 1 ? `<button type="button" class="btn mini" id="b-trocar">${params.escolher ? 'Fechar' : 'Trocar'}</button>` : ''}</div>
-        <div class="tiles compactos" id="tiles" role="radiogroup" aria-label="Escolha o tanque"${params.escolher ? '' : ' hidden'}>${[...tanques].sort(ordemNatural).map((t) => `<button type="button" class="tile${t.id === tanqueInicial ? ' on' : ''}" role="radio" aria-checked="${t.id === tanqueInicial}" data-tanque="${esc(t.id)}"><span>${esc(t.nome)}</span><i class="ponto"></i></button>`).join('')}</div>
-        <select id="tanque" hidden>${tanques.map((t) => `<option value="${esc(t.id)}"${t.id === tanqueInicial ? ' selected' : ''}>${esc(t.nome)}</option>`).join('')}</select>
-      </div>
-      <p id="lote-linha" class="lote-linha" hidden></p>
-      <label id="lote-wrap">Qual lote? <select id="lote"></select></label>
-      <p id="aviso-lotes" class="aviso" hidden></p>
-      <div class="data-linha"><span>Data: <b id="data-txt">hoje</b></span><button type="button" class="link" id="b-data">Mudar</button></div>
-      <label id="data-wrap" hidden>Data <input id="data" type="date" value="${hoje}" max="${hoje}" required></label>
-      ${camposDoTipo(tipo, kgSaco)}
+    <p class="tipo-desc">${DESC[tipo]}</p>
+    <form id="f" class="form passos" novalidate>
+      <section class="passo">
+        <h2 class="passo-t"><i>1</i> Tanque</h2>
+        <div class="campo">
+          <div class="tanque-atual"><div><b id="tanque-nome">${esc((tanques.find((t) => t.id === tanqueInicial) || {}).nome || '')}</b></div>
+            ${tanques.length > 1 ? `<button type="button" class="btn mini" id="b-trocar">${params.escolher ? 'Fechar' : 'Trocar'}</button>` : ''}</div>
+          <div class="tiles compactos" id="tiles" role="radiogroup" aria-label="Escolha o tanque"${params.escolher ? '' : ' hidden'}>${[...tanques].sort(ordemNatural).map((t) => `<button type="button" class="tile${t.id === tanqueInicial ? ' on' : ''}" role="radio" aria-checked="${t.id === tanqueInicial}" data-tanque="${esc(t.id)}"><span>${esc(t.nome)}</span><i class="ponto"></i></button>`).join('')}</div>
+          <select id="tanque" hidden>${tanques.map((t) => `<option value="${esc(t.id)}"${t.id === tanqueInicial ? ' selected' : ''}>${esc(t.nome)}</option>`).join('')}</select>
+        </div>
+        <p id="lote-linha" class="lote-linha" hidden></p>
+        <label id="lote-wrap">Qual lote? <select id="lote"></select></label>
+        <p id="aviso-lotes" class="aviso" hidden></p>
+      </section>
+      <section class="passo tipo-${tipo}">
+        <h2 class="passo-t"><i>2</i> ${TITULO2[tipo]}</h2>
+        ${camposDoTipo(tipo, kgSaco)}
+        <div class="data-linha"><span>Data: <b id="data-txt">hoje</b></span><button type="button" class="link" id="b-data">Mudar</button></div>
+        <label id="data-wrap" hidden>Data <input id="data" type="date" value="${hoje}" max="${hoje}" required></label>
+      </section>
       <p id="erro" class="erro" hidden></p>
       <button class="btn primario grande" type="submit">Salvar ${TIPOS[tipo].rotulo.toLowerCase()}</button>
       <p class="mudo" style="margin:0;text-align:center">${navigator.onLine ? 'Será enviado ao servidor agora.' : 'Sem internet: será salvo no celular e enviado depois.'}</p>

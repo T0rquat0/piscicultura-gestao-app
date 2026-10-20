@@ -510,3 +510,27 @@ body.sem-rolagem { overflow: hidden; }
 .barra-uso span { display: block; height: 100%; background: var(--rio); border-radius: 99px; }
 .pacote { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
 .pacote.atual { border: 2px solid var(--rio); }
+
+/* ===== Lançar em passos e Relatórios em atalhos ===== */
+.tipo-desc { margin: -.5rem 0 .8rem; color: var(--tinta-2); font-size: .95rem; }
+.passos { display: grid; gap: .7rem; background: none; box-shadow: none; padding: 0; border: 0; }
+.passo { display: grid; gap: .6rem; background: var(--card); border-radius: 22px; padding: .85rem 1rem 1rem; box-shadow: 0 1px 0 rgba(0, 0, 0, .03), 0 6px 20px rgba(20, 60, 50, .06); }
+.passo-t { display: flex; align-items: center; gap: .6rem; margin: 0; font-size: 1.02rem; }
+.passo-t i { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--rio); color: #fff; font-style: normal; font-size: .85rem; font-weight: 700; }
+.passo.tipo-biometria .passo-t i { background: #2f6f9a; }
+.passo.tipo-mortalidade .passo-t i { background: #b5402e; }
+.passo.tipo-racao .passo-t i { background: #b8801f; }
+.ajuda { margin: -.4rem 0 0; color: var(--mudo, #667); font-size: .9rem; }
+.como { margin: 0; padding: 0 0 0 1.2rem; color: var(--tinta-2); display: grid; gap: .2rem; font-size: .92rem; }
+.como li::marker { color: #2f6f9a; font-weight: 700; }
+.calc.resultado { font-size: 1.15rem; text-align: center; }
+.hub { display: grid; gap: .8rem; margin-bottom: 1.4rem; }
+.hub-card { appearance: none; width: 100%; font: inherit; text-align: left; border: 0; cursor: pointer; display: flex; align-items: center; gap: .95rem; background: var(--card); color: inherit; text-decoration: none; border-radius: 22px; padding: 1rem 1.1rem; box-shadow: 0 1px 0 rgba(0, 0, 0, .03), 0 6px 20px rgba(20, 60, 50, .06); }
+.hub-card .esq { flex: 1; }
+.hub-card .esq b { display: block; font-size: 1.05rem; }
+.hub-card .esq small { display: block; color: var(--tinta-2); margin-top: .15rem; }
+.hub-card[disabled] { opacity: .6; }
+
+.passo .tanque-atual { margin: 0; }
+.passo .data-linha { font-size: .92rem; }
+.passo .lote-linha { margin: -.2rem 0 0; font-size: .92rem; }

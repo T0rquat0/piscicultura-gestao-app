@@ -57,21 +57,28 @@ export async function renderRelatorios(ctx, el) {
   }
   const lotes = await ctx.api.lotes();
   const tanques = ctx.state.ref.tanques;
+  const nat = (x, y) => String(x).localeCompare(String(y), 'pt-BR', { numeric: true, sensitivity: 'base' });
+  const nomeDe = (tid) => (tanques.find((t) => t.id === tid) || {}).nome || '';
+  const porTanque = (l1, l2) => nat(nomeDe(l1.tanque_id), nomeDe(l2.tanque_id)) || String(l2.data_entrada).localeCompare(String(l1.data_entrada));
+  const linhaLote = (l) => `<li><a class="item" href="#/relatorio/${esc(l.id)}"><span class="esq"><b>${esc(nomeDe(l.tanque_id))}</b>
+      <small>${esc(ROTULO_TIPO[l.tipo] || l.tipo)} · ${esc(l.especie)} · desde ${fmtData(l.data_entrada)} · ${fmtInt(l.quantidade_inicial)} peixes</small></span><span class="seta">${icone('direita', 20)}</span></a></li>`;
+  const ativos = lotes.filter((l) => l.ativo).sort(porTanque);
+  const encerrados = lotes.filter((l) => !l.ativo).sort(porTanque);
   el.innerHTML = `<h1>Relatórios</h1>
-    <button class="btn primario grande" id="b-pdf-fazenda" type="button" style="margin-bottom:1rem">PDF geral da fazenda</button>
-    <a class="card atalho" href="#/relatorio/racao"><span class="item-ic">${icone('relatorio')}</span><span class="esq"><b>Ração por dia</b><small>Todos os tanques, dia a dia</small></span><span class="seta">${icone('direita', 20)}</span></a>
-    ${tanques.length && lotes.length ? tanques.map((t) => {
-      const ls = lotes.filter((l) => l.tanque_id === t.id);
-      if (!ls.length) return '';
-      return `<h2>${esc(t.nome)}</h2><div class="card"><ul class="lista">${ls.map((l) => `
-        <li><a class="esq" href="#/relatorio/${esc(l.id)}"><b>${esc(ROTULO_TIPO[l.tipo] || l.tipo)} · ${esc(l.especie)}</b>
-          <small>desde ${fmtData(l.data_entrada)} · ${fmtInt(l.quantidade_inicial)} peixes</small></a>
-          <span class="tag ${l.ativo ? 'ok' : ''}">${l.ativo ? 'Ativo' : 'Encerrado'}</span></li>`).join('')}</ul></div>`;
-    }).join('') : '<div class="card vazio"><p>Ainda não há lotes para mostrar.</p></div>'}`;
+    <p class="mudo" style="margin-top:-.4rem">O que você quer saber?</p>
+    <div class="hub">
+      <a class="hub-card" href="#/relatorio/racao"><span class="item-ic">${icone('lancar')}</span><span class="esq"><b>Ração fornecida</b><small>Quanto foi jogado em cada tanque, hoje ou na semana. Dá para enviar ao dono.</small></span><span class="seta">${icone('direita', 20)}</span></a>
+      <a class="hub-card" href="#/estoque"><span class="item-ic">${icone('estoque')}</span><span class="esq"><b>Estoque de ração</b><small>Quanto resta no galpão e para quantos dias dá.</small></span><span class="seta">${icone('direita', 20)}</span></a>
+      <button class="hub-card" id="b-pdf-fazenda" type="button"><span class="item-ic">${icone('relatorio')}</span><span class="esq"><b>Relatório geral da fazenda</b><small>PDF com estoque, lotes e mortalidade, para compartilhar.</small></span><span class="seta">${icone('direita', 20)}</span></button>
+    </div>
+    <h2>Relatório de um lote</h2>
+    <p class="mudo" style="margin-top:-.4rem">Peso, mortalidade e ração de cada lote de peixes.</p>
+    ${ativos.length ? `<div class="card"><ul class="lista">${ativos.map(linhaLote).join('')}</ul></div>` : '<div class="card vazio"><p>Ainda não há lotes ativos.</p></div>'}
+    ${encerrados.length ? `<details class="avancado"><summary>Lotes encerrados (${encerrados.length})</summary><div class="card"><ul class="lista">${encerrados.map(linhaLote).join('')}</ul></div></details>` : ''}`;
 
   const bf = el.querySelector('#b-pdf-fazenda');
   bf.addEventListener('click', async () => {
-    const texto = bf.textContent; bf.disabled = true; bf.textContent = 'Gerando PDF…';
+    const texto = bf.innerHTML; bf.disabled = true; bf.innerHTML = '<span class="item-ic">…</span><span class="esq"><b>Gerando o PDF…</b></span>';
     try {
       const gerir = ctx.podeGerir();
       const hoje = hojeISO();
@@ -103,9 +110,9 @@ export async function renderRelatorios(ctx, el) {
         sit: situacaoEstoque(saldo && saldo.saldo_kg, saldo && saldo.consumo_7d_kg, ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS),
         lotes: detalhes, racaoDia, racaoTanque, precoKg, ultimaContagem: contagens[0] || null,
       });
-      bf.disabled = false; bf.textContent = texto;
+      bf.disabled = false; bf.innerHTML = texto;
       await abrirVisualizador({ blob: doc.output('blob'), nome: `relatorio-geral-${hoje}.pdf`, titulo: 'Relatório geral da fazenda', toast: ctx.toast });
-    } catch (e) { ctx.toast(e.message || 'Não foi possível gerar o PDF', 'erro'); bf.disabled = false; bf.textContent = texto; }
+    } catch (e) { ctx.toast(e.message || 'Não foi possível gerar o PDF', 'erro'); bf.disabled = false; bf.innerHTML = texto; }
   });
 }
 
