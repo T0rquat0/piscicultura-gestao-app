@@ -13,3 +13,6 @@ export const ESTOQUE_CRITICO_DIAS = 7;
 
 // Tempo máximo (ms) esperando o servidor antes de considerar "sem conexão".
 export const TIMEOUT_REDE_MS = 15000;
+
+// Dias de teste grátis para fazendas novas (o valor que vale é o do banco; este é só o texto da tela).
+export const TESTE_DIAS = 30;

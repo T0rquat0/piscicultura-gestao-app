@@ -34,6 +34,14 @@ export function criarApi(client) {
     async perfil(userId) {
       return ok(await client.from('usuarios').select('id,nome,papel,fazenda_id,ativo,fazendas(nome)').eq('id', userId).maybeSingle());
     },
+    async criarFazenda(fazenda, nome) {
+      return ok(await client.rpc('criar_fazenda', { p_fazenda: fazenda, p_nome: nome }));
+    },
+    // fim do teste grátis; null se não houver (fazenda antiga) ou se o sql/06 não foi rodado
+    async testeAte() {
+      const { data, error } = await client.from('fazendas').select('teste_ate').maybeSingle();
+      return error || !data ? null : data.teste_ate || null;
+    },
     // peso do saco de ração da fazenda; null se a coluna ainda não existe (sql/03 não rodado)
     async kgSaco() {
       const { data, error } = await client.from('fazendas').select('kg_saco').maybeSingle();

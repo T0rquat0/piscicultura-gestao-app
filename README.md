@@ -3,7 +3,7 @@
 App web instalável (PWA) para controle de tanques, lotes, ração, biometria e mortalidade, com lançamento **offline** e relatórios online. Backend: Supabase. Hospedagem: Vercel (site estático, sem build).
 
 ## Ordem de configuração
-1. Supabase → SQL Editor: rodar, em ordem, `sql/01_schema.sql`, `sql/02_correcoes_e_funcoes.sql`, `sql/03_peso_do_saco.sql` e `sql/04_controle_de_estoque.sql`.
+1. Supabase → SQL Editor: rodar, em ordem, `sql/01_schema.sql`, `sql/02_correcoes_e_funcoes.sql`, `sql/03_peso_do_saco.sql` e `sql/04_controle_de_estoque.sql` e `sql/06_cadastro_da_fazenda.sql` (cadastro pelo próprio dono; o 05 é só dado de demonstração).
 2. Supabase → Project Settings → API: copiar a chave **anon public** e colocar em `js/config.js` (`SUPABASE_ANON_KEY`).
 3. Vercel: projeto ligado a este repositório (preset "Other"). Todo push na `main` publica sozinho.
 

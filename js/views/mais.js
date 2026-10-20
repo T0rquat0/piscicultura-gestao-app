@@ -1,4 +1,4 @@
-import { esc, ROTULO_PAPEL } from '../util.js';
+import { esc, ROTULO_PAPEL, fmtData, hojeISO, diasEntre } from '../util.js';
 import { icone } from '../icons.js';
 import { num, fmtNum } from '../util.js';
 import { PESO_SACO_PADRAO_KG } from '../config.js';
@@ -27,6 +27,8 @@ export function renderMais(ctx, el) {
         <button class="btn perigo" id="b-sair" type="button">Sair</button>
       </div>
     </div>
+
+    <div id="teste"></div>
 
     ${p.papel === 'dono' ? `<div class="card">
       <b>Peso do saco de ração</b>
@@ -61,4 +63,12 @@ export function renderMais(ctx, el) {
     ctx.toast('Dados atualizados', 'ok');
   });
   el.querySelector('#b-sair').addEventListener('click', () => ctx.sair());
+  if (p.papel === 'dono' && navigator.onLine) {
+    ctx.api.testeAte().then((ate) => {
+      if (!ate) return;
+      const falta = diasEntre(hojeISO(), ate);
+      el.querySelector('#teste').innerHTML = `<div class="card"><b>${falta >= 0 ? 'Período de teste grátis' : 'Período de teste terminou'}</b>
+        <small style="display:block">${falta > 0 ? `Faltam ${falta} dia(s): vai até ${fmtData(ate)}.` : falta === 0 ? 'Termina hoje.' : `Terminou em ${fmtData(ate)}.`}</small></div>`;
+    }).catch(() => {});
+  }
 }

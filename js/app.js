@@ -8,6 +8,7 @@ import { icone } from './icons.js';
 import { confirmar } from './dialogo.js';
 import { splashDoDia } from './splash.js';
 import { renderLogin } from './views/login.js';
+import { renderCadastro, renderCriarFazenda } from './views/cadastro.js';
 import { renderHome, renderTanqueDetalhe } from './views/home.js';
 import { renderLancar } from './views/lancar.js';
 import { renderTanques, renderTanque } from './views/tanques.js';
@@ -111,6 +112,10 @@ const ctx = {
   sincronizarAgora,
   entrar,
   sair,
+  cadastrar,
+  criarFazenda,
+  mostrarLogin: () => mostrarLogin(),
+  mostrarCadastro,
 };
 
 // ---------- login / sessão ----------
@@ -125,6 +130,24 @@ function mostrarMensagem(titulo, texto, comSair = true) {
     <p class="aviso">${esc(texto)}</p>${comSair ? '<button class="btn grande" id="b-sair" type="button">Sair</button>' : ''}</div></main>`;
   const b = root.querySelector('#b-sair');
   if (b) b.addEventListener('click', () => sair(true));
+}
+
+function mostrarCadastro() { renderCadastro(ctx, root); }
+
+async function cadastrar(email, senha) {
+  if (!navigator.onLine) throw new Error('Sem internet. Conecte-se para criar a conta.');
+  const { data, error } = await client.auth.signUp({ email, password: senha });
+  if (error) throw new Error(traduzErro(error));
+  // e-mail já cadastrado: o Supabase não avisa (evita descobrir quem tem conta) e devolve usuário sem identidades
+  if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) throw new Error('Este e-mail já tem conta. Toque em "Já tenho conta" e entre.');
+  if (!data.session) return 'confirmar';
+  await abrirApp(data.session.user);
+  return 'entrou';
+}
+
+async function criarFazenda(fazenda, nome, user) {
+  await api.criarFazenda(fazenda, nome);
+  await abrirApp(user);
 }
 
 async function entrar(email, senha) {
@@ -145,7 +168,7 @@ async function abrirApp(user) {
     if (cache && cache.id === user.id) perfil = cache; // sem rede: usa o perfil guardado
     else { mostrarMensagem('Não foi possível carregar seu perfil', e.message || 'Tente novamente.'); return; }
   }
-  if (!perfil) { mostrarMensagem('Acesso pendente', 'Seu login ainda não foi vinculado a uma fazenda. Fale com o dono ou com o administrador do sistema.'); return; }
+  if (!perfil) { renderCriarFazenda(ctx, root, user); return; }
   if (perfil.ativo === false) { mostrarMensagem('Acesso desativado', 'Seu acesso a esta fazenda foi desativado. Fale com o dono.'); return; }
 
   state.perfil = perfil;
