@@ -46,14 +46,15 @@ export function splashDoDia() {
 
 async function abrir3d(el, sair, registrarParada) {
   const tempo = new Promise((_, rej) => setTimeout(() => rej(new Error('lento')), 2500));
-  const mod = await Promise.race([import('./splash3d.bundle.js'), tempo]);
+  // biblioteca 3D + modelo do peixe (malha e texturas); se passar de 2,5 s, cai no peixe vetorial
+  const { mod, dados } = await Promise.race([(async () => { const m = await import('./splash3d.bundle.js'); return { mod: m, dados: await m.carregar('assets/peixe/') }; })(), tempo]);
   if (!el.isConnected) return;
   const canvas = document.createElement('canvas');
   canvas.className = 'splash-canvas';
   const largura = el.clientWidth || innerWidth, altura = el.clientHeight || innerHeight;
   canvas.width = largura; canvas.height = altura;
   el.appendChild(canvas);
-  const peixe = mod.criar(canvas, { largura, altura, dpr: window.devicePixelRatio || 1, lado: Math.random() < 0.5 ? 1 : -1 });
+  const peixe = mod.criar(canvas, { largura, altura, dpr: window.devicePixelRatio || 1, lado: Math.random() < 0.5 ? 1 : -1, dados });
   let raf = 0, antes = performance.now();
   registrarParada(() => { cancelAnimationFrame(raf); try { peixe.destruir(); } catch { /* já liberado */ } });
   const quadro = (agora) => {
