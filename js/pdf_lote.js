@@ -10,6 +10,26 @@ export const COR = {
   suave: [160, 184, 172], ambar: [168, 100, 8], branco: [255, 255, 255],
 };
 export const M = 16;
+
+// Logo no cabeçalho: a da fazenda (data URL) ou, sem ela, a marca do sistema desenhada em vetor.
+// Ocupa um quadrado de lado s (mm) em (x, y).
+export function logoPdf(doc, logo, x, y, s) {
+  if (logo) {
+    try {
+      const pr = doc.getImageProperties(logo);
+      const k = Math.min(s / pr.width, s / pr.height), w = pr.width * k, h = pr.height * k;
+      doc.addImage(logo, pr.fileType || 'PNG', x + (s - w) / 2, y + (s - h) / 2, w, h);
+      return;
+    } catch (e) { /* imagem inválida: cai para a marca do sistema */ }
+  }
+  const u = s / 24;
+  doc.setFillColor(...COR.rio); doc.roundedRect(x, y, s, s, 5.4 * u, 5.4 * u, 'F');
+  doc.setFillColor(243, 247, 244);
+  const X = (v) => x + (v - 1.4 + 0.1) * u * 0.95 + (s - 18.8 * u * 0.95) / 2, Y = (v) => y + 12 * u + (v - 12) * u * 0.95, K = u * 0.95;
+  doc.lines([[5.8 * K, 7.4 * K], [-5.8 * K, 7.4 * K], [2.2 * K, -7.4 * K]], X(1.4), Y(4.6), [1, 1], 'F', true);
+  [[8.2, 9.5, 5], [11.4, 7, 10], [14.6, 5.5, 13], [17.8, 8.5, 7]].forEach(([bx, by, bh]) => doc.roundedRect(X(bx), Y(by), 2.4 * K, bh * K, 1.2 * K, 1.2 * K, 'F'));
+  doc.setFillColor(...COR.rio); doc.circle(X(19), Y(10.9), 0.8 * K, 'F');
+}
 export const LARG = 210 - 2 * M;
 const TOPO = 26;
 const BASE = 278;
@@ -64,7 +84,8 @@ export function gerarPdfLote(jsPDF, d) {
   const cabe = (h) => { if (y + h > BASE) { doc.addPage(); y = TOPO; } };
 
   // ---------- cabeçalho da primeira página ----------
-  caps(fazenda, M, 16, { color: COR.rio, size: 7.5 });
+  logoPdf(doc, d.logo, M, 8.5, 10);
+  caps(fazenda, M + 13, 16, { color: COR.rio, size: 7.5 });
   caps('Relatório do lote', 210 - M, 16, { align: 'right' });
   const titulo = quebra(nomeTanque || 'Lote', LARG, 28, true).slice(0, 2);
   txt(titulo, M, 36, { size: 28, bold: true });
@@ -215,17 +236,17 @@ export function gerarPdfLote(jsPDF, d) {
     y += ls.length * 4 + 2.4;
   });
 
-  rodape(doc, fazenda, nomeTanque, txt, caps, linha);
+  rodape(doc, fazenda, nomeTanque, txt, caps, linha, 'Relatório do lote', d.logo);
   return doc;
 }
 
 // cabeçalho corrente (páginas 2+) e rodapé em todas as páginas
-function rodape(doc, fazenda, titulo, txt, caps, linha, rotulo = 'Relatório do lote') {
+function rodape(doc, fazenda, titulo, txt, caps, linha, rotulo = 'Relatório do lote', logo = null) {
   const total = doc.getNumberOfPages();
   for (let p = 1; p <= total; p++) {
     doc.setPage(p);
     if (p > 1) {
-      caps(fazenda, M, 14, { color: COR.rio, size: 7 }); caps(`${rotulo}  ·  ${titulo}`, 210 - M, 14, { align: 'right' });
+      logoPdf(doc, logo, M, 9.6, 6); caps(fazenda, M + 8.5, 14, { color: COR.rio, size: 7 }); caps(`${rotulo}  ·  ${titulo}`, 210 - M, 14, { align: 'right' });
     }
     txt('Gestão de Piscicultura', M, 291, { size: 7.5, color: COR.mudo });
     txt(`${p} / ${total}`, 210 - M, 291, { size: 7.5, color: COR.mudo, align: 'right' });

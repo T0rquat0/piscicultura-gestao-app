@@ -3,6 +3,7 @@ import * as db from '../db.js';
 import { situacaoEstoque } from '../calc.js';
 import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, PESO_SACO_PADRAO_KG } from '../config.js';
 import { icone } from '../icons.js';
+import { pedirTexto } from '../dialogo.js';
 
 export function cartaoEstoque(s, kgS) {
   if (!s) return '';
@@ -107,6 +108,23 @@ export async function renderTanqueDetalhe(ctx, el, id) {
     ${meus.length ? `<a class="btn grande" href="#/relatorio/${esc(meus[0].id)}">Ver relatório do lote</a>` : ''}`;
 }
 
+// Cria um tanque direto da tela inicial (dono/gerente). O limite do pacote é imposto no banco.
+async function novoTanque(ctx, el) {
+  if (!navigator.onLine) return ctx.toast('Sem internet: cadastrar tanque precisa de conexão.', 'erro');
+  const nomes = ctx.state.ref.tanques.map((t) => t.nome.toLowerCase());
+  const nome = await pedirTexto({
+    titulo: 'Novo tanque', rotulo: 'Nome do tanque', placeholder: 'Ex.: Tanque 3', ok: 'Criar tanque',
+    validar: (v) => (nomes.includes(v.toLowerCase()) ? 'Já existe um tanque com esse nome.' : ''),
+  });
+  if (!nome) return;
+  try {
+    await ctx.api.criarTanque(ctx.state.perfil.fazenda_id, nome);
+    await ctx.atualizarRef();
+    ctx.toast(`Tanque "${nome}" criado. Toque nele para cadastrar o lote.`, 'ok');
+    renderHome(ctx, el);
+  } catch (e) { ctx.toast(e.message || 'Não foi possível criar o tanque', 'erro'); }
+}
+
 export async function renderHome(ctx, el) {
   const { state } = ctx;
   const primeiro = (state.perfil.nome || '').split(' ')[0];
@@ -114,8 +132,9 @@ export async function renderHome(ctx, el) {
 
   if (!tanques.length) {
     el.innerHTML = `<h1>Olá, ${esc(primeiro)}</h1>` + (ctx.podeGerir()
-      ? `<div class="card vazio"><p>Nenhum tanque cadastrado ainda.</p><a class="btn primario" href="#/tanques">Cadastrar o primeiro tanque</a></div>`
+      ? `<div class="card vazio"><p>Nenhum tanque cadastrado ainda.</p><button class="btn primario" id="b-novo-tanque" type="button">Cadastrar o primeiro tanque</button></div>`
       : `<div class="card vazio"><p>Nenhum tanque liberado para você ainda.<br>Peça ao gerente para liberar os seus tanques.</p></div>`);
+    const b0 = el.querySelector('#b-novo-tanque'); if (b0) b0.addEventListener('click', () => novoTanque(ctx, el));
     return;
   }
 
@@ -157,7 +176,9 @@ export async function renderHome(ctx, el) {
       <button type="button" data-filtro="falta">Faltam${faltam ? ` (${faltam})` : ''}</button>
       <button type="button" data-filtro="ok">Feitos${grupos.ok.length ? ` (${grupos.ok.length})` : ''}</button>
     </div>` : ''}
-    <div id="lista-tanques"></div>`;
+    <div id="lista-tanques"></div>
+    ${ctx.podeGerir() ? `<div class="minis"><button class="mini novo" id="b-novo-tanque" type="button"><span class="novo-ic">${icone('lancar', 22)}</span><b>Novo tanque</b></button></div>` : ''}`;
+  const bn = el.querySelector('#b-novo-tanque'); if (bn) bn.addEventListener('click', () => novoTanque(ctx, el));
 
   const lista = el.querySelector('#lista-tanques');
   function pintar() {

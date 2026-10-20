@@ -35,3 +35,5 @@ Marque com [x] ao concluir. Tudo aqui foi deixado de propósito para depois do c
 - [ ] Rodar `sql/08_causa_da_mortalidade.sql` no Supabase (coluna `causa`). Sem ela o app funciona, mas a causa não é salva.
 - [ ] Abertura em 3D (peixe vindo do fundo e virando): em teste, depende de peixe feito por código com Three.js.
 - [ ] Peixe da abertura (tambaqui do Tripo, assets/peixe/; fonte original de 1 milhão de triângulos fica fora do repositório): conferir se o plano do Tripo permite uso comercial do modelo antes de vender o app.
+
+- [ ] Rodar `sql/09_logo_da_fazenda.sql` no Supabase (coluna `fazendas.logo`). Sem isso, "Logo da fazenda" em Mais avisa e não salva.

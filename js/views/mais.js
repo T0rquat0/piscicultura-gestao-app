@@ -2,6 +2,7 @@ import { esc, ROTULO_PAPEL, fmtData, hojeISO, diasEntre } from '../util.js';
 import { icone } from '../icons.js';
 import { num, fmtNum } from '../util.js';
 import { PESO_SACO_PADRAO_KG } from '../config.js';
+import { reduzirLogo } from '../util.js';
 
 export function renderMais(ctx, el) {
   const { state } = ctx;
@@ -37,6 +38,14 @@ export function renderMais(ctx, el) {
       <form id="f-saco" class="duas" style="margin-top:10px"><label>kg por saco <input id="kgsaco" type="number" inputmode="decimal" step="0.1" min="1" value="${state.ref.kgSaco || PESO_SACO_PADRAO_KG}" required></label>
       <button class="btn" type="submit">Salvar</button></form></div>` : ''}
 
+    ${p.papel === 'dono' ? `<div class="card">
+      <b>Logo da fazenda</b>
+      <small style="display:block">Aparece no topo do app e nos relatórios em PDF. Sem logo, usamos a marca do sistema.</small>
+      <div class="logo-previa"><span class="caixa">${state.ref.logo ? `<img src="${esc(state.ref.logo)}" alt="">` : icone('peixe', 40)}</span>
+        <div class="acoes" style="margin:0"><button class="btn" id="b-logo" type="button">${state.ref.logo ? 'Trocar logo' : 'Enviar logo'}</button>
+        ${state.ref.logo ? '<button class="btn perigo" id="b-logo-x" type="button">Remover</button>' : ''}</div></div>
+      <input id="in-logo" type="file" accept="image/*" hidden></div>` : ''}
+
     <details class="card">
       <summary>Como instalar no celular</summary>
       <p><b>Android (Chrome):</b> menu (três pontos) → “Instalar app” ou “Adicionar à tela inicial”.</p>
@@ -57,6 +66,24 @@ export function renderMais(ctx, el) {
       ctx.toast(`Saco = ${fmtNum(kg, 0)} kg`, 'ok');
     } catch (e) { ctx.toast('Não salvou: ' + e.message, 'erro'); }
   });
+  const salvarLogo = async (dataUrl, msg) => {
+    if (!navigator.onLine) return ctx.toast('Sem internet', 'erro');
+    try {
+      await ctx.api.salvarLogo(state.perfil.fazenda_id, dataUrl);
+      if (dataUrl && !(await ctx.api.logo())) return ctx.toast('Falta rodar o sql/09 no Supabase.', 'erro');
+      await ctx.atualizarRef(true); ctx.recarregarTopo(); ctx.toast(msg, 'ok'); renderMais(ctx, el);
+    } catch (e) { ctx.toast('Não salvou: ' + e.message, 'erro'); }
+  };
+  const inLogo = el.querySelector('#in-logo');
+  if (inLogo) {
+    el.querySelector('#b-logo').addEventListener('click', () => inLogo.click());
+    inLogo.addEventListener('change', async () => {
+      const f = inLogo.files && inLogo.files[0]; if (!f) return;
+      try { await salvarLogo(await reduzirLogo(f), 'Logo salva'); } catch (e) { ctx.toast(e.message || 'Imagem inválida', 'erro'); }
+    });
+    const x = el.querySelector('#b-logo-x');
+    if (x) x.addEventListener('click', () => salvarLogo(null, 'Logo removida'));
+  }
   el.querySelector('#b-atualizar').addEventListener('click', async () => {
     if (!navigator.onLine) return ctx.toast('Sem internet', 'erro');
     await ctx.atualizarRef(true);

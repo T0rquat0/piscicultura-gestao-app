@@ -1,6 +1,6 @@
 // Relatório de ração por tanque (um dia ou uma semana), para o responsável enviar ao dono.
 import { fmtNum, fmtInt, fmtData } from './util.js';
-import { COR, M, LARG, TOPO, BASE, ferramentas, rodape, tabela, barras } from './pdf_lote.js';
+import { COR, M, LARG, TOPO, BASE, ferramentas, rodape, logoPdf, tabela, barras } from './pdf_lote.js';
 
 const n = (v, d = 1) => fmtNum(v, d);
 const sac = (kg, kgSaco) => { const v = kg / kgSaco; return n(v, Math.abs(v - Math.round(v)) < 0.05 ? 0 : 1); };
@@ -14,7 +14,8 @@ export function gerarPdfRacao(jsPDF, d) {
   let y = 0;
   const cabe = (h) => { if (y + h > BASE) { doc.addPage(); y = TOPO; } };
 
-  caps(fazenda, M, 16, { color: COR.rio, size: 7.5 });
+  logoPdf(doc, d.logo, M, 8.5, 10);
+  caps(fazenda, M + 13, 16, { color: COR.rio, size: 7.5 });
   caps('Ração fornecida', 210 - M, 16, { align: 'right' });
   txt(rotulo, M, 36, { size: 28, bold: true });
   txt(periodo, M, 44, { size: 12.5, color: COR.mudo });
@@ -63,7 +64,7 @@ export function gerarPdfRacao(jsPDF, d) {
     txt('"-" significa que nada foi lançado naquele dia.', M, y + 2, { size: 7.5, color: COR.mudo });
   }
 
-  rodape(doc, fazenda, rotulo, txt, caps, linha, 'Ração fornecida');
+  rodape(doc, fazenda, rotulo, txt, caps, linha, 'Ração fornecida', d.logo);
   void fmtInt;
   return doc;
 }
