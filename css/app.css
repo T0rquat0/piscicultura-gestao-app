@@ -566,3 +566,11 @@ body.sem-rolagem { overflow: hidden; }
 .login-card { margin: 0 auto; }
 .login-card .btn { width: 100%; }
 .login-card .link { display: block; width: 100%; text-align: center; padding: .6rem 0; }
+
+/* ===== botões Editar/Excluir lado a lado nos registros ===== */
+.acoes-reg { display: inline-flex; gap: .4rem; flex-wrap: wrap; justify-content: flex-end; }
+.dialogo-caixa .erro { margin-top: .8rem; }
+.dialogo-caixa select, .dialogo-caixa input { width: 100%; }
+.registros li { flex-wrap: wrap; }
+.registros .acoes-reg { flex-basis: 100%; margin-top: -.3rem; }
+.registros .acoes-reg .btn { min-height: 40px; padding: 0 1rem; font-size: .9rem; }

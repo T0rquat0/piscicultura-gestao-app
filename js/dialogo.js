@@ -45,6 +45,54 @@ export function confirmar({ titulo, texto = '', ok = 'Confirmar', cancelar = 'Vo
   });
 }
 
+// Janela com campos para corrigir um registro. Devolve os valores digitados (texto, como no input) ou null se cancelar.
+// campos: [{ nome, rotulo, tipo: 'number'|'date'|'text'|'select', valor, step, min, max, inputmode, maxlength, opcoes: [[valor, rótulo]], ajuda }]
+// validar(valores) devolve a mensagem de erro (a janela continua aberta) ou nada.
+export function formulario({ titulo, texto = '', campos, ok = 'Salvar', cancelar = 'Voltar', validar }) {
+  return new Promise((resolve) => {
+    const fundo = document.createElement('div');
+    fundo.className = 'dialogo com-campo';
+    fundo.setAttribute('role', 'dialog');
+    fundo.setAttribute('aria-modal', 'true');
+    const attr = (k, v) => (v === undefined || v === null || v === '' ? '' : ` ${k}="${esc(v)}"`);
+    const campo = (c) => c.tipo === 'select'
+      ? `<label class="dialogo-campo">${esc(c.rotulo)}<select name="${esc(c.nome)}">${c.opcoes.map(([v, r]) => `<option value="${esc(v)}"${String(v) === String(c.valor ?? '') ? ' selected' : ''}>${esc(r)}</option>`).join('')}</select>${c.ajuda ? `<small class="mudo">${esc(c.ajuda)}</small>` : ''}</label>`
+      : `<label class="dialogo-campo">${esc(c.rotulo)}<input name="${esc(c.nome)}" type="${c.tipo || 'text'}"${attr('value', c.valor)}${attr('step', c.step)}${attr('min', c.min)}${attr('max', c.max)}${attr('inputmode', c.inputmode)}${attr('maxlength', c.maxlength)} autocomplete="off">${c.ajuda ? `<small class="mudo">${esc(c.ajuda)}</small>` : ''}</label>`;
+    fundo.innerHTML = `
+      <form class="dialogo-caixa" novalidate>
+        <h3>${esc(titulo)}</h3>
+        ${texto ? `<p>${esc(texto)}</p>` : ''}
+        ${campos.map(campo).join('')}
+        <p class="erro" data-erro hidden></p>
+        <div class="dialogo-acoes">
+          <button type="submit" class="btn primario">${esc(ok)}</button>
+          <button type="button" class="btn" data-cancelar>${esc(cancelar)}</button>
+        </div>
+      </form>`;
+    const form = fundo.querySelector('form'), erro = fundo.querySelector('[data-erro]');
+    const fechar = (valor) => {
+      document.removeEventListener('keydown', tecla);
+      fundo.classList.add('sai');
+      setTimeout(() => fundo.remove(), 180);
+      resolve(valor);
+    };
+    const tecla = (e) => { if (e.key === 'Escape') fechar(null); };
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const valores = Object.fromEntries(campos.map((c) => [c.nome, form.elements[c.nome].value]));
+      const msg = validar && validar(valores);
+      if (msg) { erro.textContent = msg; erro.hidden = false; return; }
+      fechar(valores);
+    });
+    fundo.querySelector('[data-cancelar]').addEventListener('click', () => fechar(null));
+    fundo.addEventListener('click', (e) => { if (e.target === fundo) fechar(null); });
+    document.addEventListener('keydown', tecla);
+    document.body.appendChild(fundo);
+    const primeiro = form.querySelector('input, select');
+    if (primeiro) primeiro.focus({ preventScroll: true });
+  });
+}
+
 // Tela de espera que bloqueia toques enquanto uma operação demorada roda. Devolve a função que a fecha.
 export function ocupado(texto = 'Aguarde…') {
   const f = document.createElement('div');

@@ -1,12 +1,12 @@
 // Relatórios por lote (precisam de internet: usam os dados já sincronizados no servidor).
-import { PESO_SACO_PADRAO_KG, ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS } from '../config.js';
+import { PESO_SACO_PADRAO_KG, ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, CAUSAS_MORTE } from '../config.js';
 import { carregarGerador, carregarFontes, abrirVisualizador } from '../pdf_ui.js';
 import { gerarPdfLote } from '../pdf_lote.js';
 import { gerarPdfFazenda } from '../pdf_fazenda.js';
 import { gerarPdfRacao } from '../pdf_racao.js';
-import { confirmar } from '../dialogo.js';
+import { confirmar, formulario } from '../dialogo.js';
 import { icone } from '../icons.js';
-import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, ROTULO_TIPO } from '../util.js';
+import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num, ROTULO_TIPO } from '../util.js';
 import { calcularLote, precoMedioKg, pontosPeso, pesoMedioKg, evolucaoPeso, racaoPorSemana, matrizRacao, situacaoEstoque } from '../calc.js';
 
 export function svgPeso(pts) {
@@ -141,7 +141,7 @@ export async function renderRelatorioLote(ctx, el, id) {
   const unid = (v, u) => `${v}<em>${u}</em>`;
   const destaque = (rotulo, valor, sub) => `<div class="destaque"><span>${rotulo}</span><b>${valor}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
   const linhaNum = (rotulo, valor, sub) => `<li><div class="esq"><b>${rotulo}</b>${sub ? `<small>${sub}</small>` : ''}</div><span class="valor">${valor}</span></li>`;
-  const excluir = (tab, rid) => (gerir ? `<button class="btn mini perigo no-print" data-del="${tab}:${esc(rid)}" type="button">Excluir</button>` : '');
+  const excluir = (tab, rid) => (gerir ? `<span class="acoes-reg no-print"><button class="btn mini no-print" data-edit="${tab}:${esc(rid)}" type="button">Editar</button><button class="btn mini perigo no-print" data-del="${tab}:${esc(rid)}" type="button">Excluir</button></span>` : '');
   const registro = (data, quemId, valor, tab, rid) => `<li><div class="esq"><b>${fmtData(data)}</b><small>${esc(quem(quemId))}</small></div><span class="valor">${valor}</span>${excluir(tab, rid)}</li>`;
   const secao = (titulo, itens, vazio) => `
     <section class="bloco"><h2>${titulo} <span class="contagem">${itens.length}</span></h2>
@@ -226,6 +226,54 @@ export async function renderRelatorioLote(ctx, el, id) {
         try { await ctx.api.excluir(tab, rid); ctx.toast('Lançamento excluído', 'ok'); renderRelatorioLote(ctx, el, id); }
         catch (e) { ctx.toast(e.message, 'erro'); }
       }));
+    painel.querySelectorAll('[data-edit]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const [tab, rid] = b.dataset.edit.split(':');
+        if (!navigator.onLine) return ctx.toast('Sem internet', 'erro');
+        const campos = camposEdicao(tab, rid);
+        if (!campos) return;
+        const v = await formulario({ titulo: 'Corrigir lançamento', texto: 'Os totais do relatório serão recalculados.', campos: campos.lista, validar: campos.validar });
+        if (!v) return;
+        try { await ctx.api.atualizar(tab, rid, campos.montar(v)); ctx.toast('Lançamento corrigido', 'ok'); renderRelatorioLote(ctx, el, id); }
+        catch (e) { ctx.toast(e.message, 'erro'); }
+      }));
+  }
+
+  // campos da janela de correção de cada tipo de lançamento
+  function camposEdicao(tab, rid) {
+    const dataCampo = (valor) => ({ nome: 'data', rotulo: 'Data', tipo: 'date', valor, min: lote.data_entrada, max: hoje });
+    const dataOk = (d) => (!d ? 'Informe a data.' : d > hoje ? 'A data não pode ser no futuro.' : d < lote.data_entrada ? `A data não pode ser antes da entrada do lote (${fmtData(lote.data_entrada)}).` : null);
+    if (tab === 'racao_consumo') {
+      const r = rac.find((x) => x.id === rid); if (!r) return null;
+      return {
+        lista: [dataCampo(r.data), { nome: 'kg', rotulo: 'Ração (kg)', tipo: 'number', valor: r.quantidade_kg, step: '0.1', min: '0.1', inputmode: 'decimal', ajuda: `1 saco = ${fmtNum(kgS, 0)} kg` }],
+        validar: (v) => dataOk(v.data) || (num(v.kg) > 0 ? null : 'Informe a quantidade de ração em kg.'),
+        montar: (v) => ({ data: v.data, quantidade_kg: num(v.kg) }),
+      };
+    }
+    if (tab === 'biometrias') {
+      const b = bios.find((x) => x.id === rid); if (!b) return null;
+      return {
+        lista: [dataCampo(b.data),
+          { nome: 'qtd', rotulo: 'Peixes pesados', tipo: 'number', valor: b.quantidade_amostrada, step: '1', min: '1', inputmode: 'numeric' },
+          { nome: 'peso', rotulo: 'Peso total da amostra (kg)', tipo: 'number', valor: b.peso_amostra_kg, step: '0.001', min: '0.001', inputmode: 'decimal' }],
+        validar: (v) => dataOk(v.data) || (Number.isInteger(num(v.qtd)) && num(v.qtd) >= 1 ? null : 'Informe quantos peixes foram pesados (número inteiro).') || (num(v.peso) > 0 ? null : 'Informe o peso da amostra em kg.'),
+        montar: (v) => ({ data: v.data, quantidade_amostrada: num(v.qtd), peso_amostra_kg: num(v.peso) }),
+      };
+    }
+    if (tab === 'mortalidade') {
+      const m = mort.find((x) => x.id === rid); if (!m) return null;
+      const opcoes = [['', 'Não informada'], ...CAUSAS_MORTE.map(([c]) => [c, c])];
+      if (m.causa && !opcoes.some(([c]) => c === m.causa)) opcoes.push([m.causa, m.causa]);
+      return {
+        lista: [dataCampo(m.data),
+          { nome: 'qtd', rotulo: 'Peixes mortos', tipo: 'number', valor: m.quantidade, step: '1', min: '1', inputmode: 'numeric' },
+          { nome: 'causa', rotulo: 'Causa provável', tipo: 'select', valor: m.causa || '', opcoes }],
+        validar: (v) => dataOk(v.data) || (Number.isInteger(num(v.qtd)) && num(v.qtd) >= 1 ? null : 'Informe quantos peixes morreram (número inteiro).'),
+        montar: (v) => ({ data: v.data, quantidade: num(v.qtd), causa: v.causa || null }),
+      };
+    }
+    return null;
   }
   el.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => { aba = b.dataset.aba; pintar(); }));
   pintar();

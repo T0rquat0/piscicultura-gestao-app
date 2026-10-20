@@ -1,5 +1,5 @@
 // Estoque de ração: saldo (todos veem, só em kg) e compras (dono/gerente veem e lançam custo).
-import { confirmar } from '../dialogo.js';
+import { confirmar, formulario } from '../dialogo.js';
 import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num } from '../util.js';
 import { PESO_SACO_PADRAO_KG } from '../config.js';
 
@@ -113,7 +113,7 @@ export async function renderEstoque(ctx, el) {
           <td>${fmtData(c.data_compra)}</td><td class="n">${sc(c.quantidade_kg)}</td>
           <td class="n">${c.custo_total != null ? fmtBRL(c.custo_total) : '—'}</td>
           <td>${esc(c.fornecedor || '—')}</td>
-          <td><button class="btn mini perigo" data-del="${esc(c.id)}" type="button">Excluir</button></td>
+          <td><span class="acoes-reg"><button class="btn mini" data-edit="${esc(c.id)}" type="button">Editar</button><button class="btn mini perigo" data-del="${esc(c.id)}" type="button">Excluir</button></span></td>
         </tr>`).join('')}</tbody></table>` : '<p class="mudo" style="margin:0">Nenhuma entrada registrada.</p>'}
     </div>` : ''}`;
 
@@ -217,5 +217,27 @@ export async function renderEstoque(ctx, el) {
       if (!(await confirmar({ titulo: 'Excluir esta entrada de ração?', texto: 'O saldo de estoque será recalculado.', ok: 'Excluir', perigo: true }))) return;
       try { await ctx.api.excluir('racao_estoque', b.dataset.del); ctx.toast('Entrada excluída', 'ok'); renderEstoque(ctx, el); }
       catch (e) { ctx.toast(e.message, 'erro'); }
+    }));
+
+  el.querySelectorAll('[data-edit]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      if (!navigator.onLine) return ctx.toast('Sem internet', 'erro');
+      const c = compras.find((x) => x.id === b.dataset.edit); if (!c) return;
+      const hoje = hojeISO();
+      const v = await formulario({
+        titulo: 'Corrigir entrada de ração', texto: 'O saldo de estoque será recalculado.',
+        campos: [
+          { nome: 'data', rotulo: 'Data da compra', tipo: 'date', valor: c.data_compra, max: hoje },
+          { nome: 'kg', rotulo: 'Quantidade (kg)', tipo: 'number', valor: c.quantidade_kg, step: '0.1', min: '0.1', inputmode: 'decimal', ajuda: `Hoje equivale a ${sc(c.quantidade_kg)} sacos de ${fmtNum(kgS, 0)} kg.` },
+          { nome: 'custo', rotulo: 'Valor pago (R$, opcional)', tipo: 'number', valor: c.custo_total ?? '', step: '0.01', min: '0', inputmode: 'decimal' },
+          { nome: 'forn', rotulo: 'Fornecedor (opcional)', tipo: 'text', valor: c.fornecedor || '', maxlength: '80' },
+        ],
+        validar: (x) => (!x.data ? 'Informe a data.' : x.data > hoje ? 'A data não pode ser no futuro.' : !(num(x.kg) > 0) ? 'Informe a quantidade em kg.' : x.custo !== '' && !(num(x.custo) >= 0) ? 'Valor pago inválido.' : null),
+      });
+      if (!v) return;
+      try {
+        await ctx.api.atualizar('racao_estoque', c.id, { data_compra: v.data, quantidade_kg: num(v.kg), custo_total: v.custo === '' ? null : num(v.custo), fornecedor: v.forn.trim() || null });
+        ctx.toast('Entrada corrigida', 'ok'); renderEstoque(ctx, el);
+      } catch (e) { ctx.toast(e.message, 'erro'); }
     }));
 }
