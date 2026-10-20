@@ -26,7 +26,9 @@ Marque com [x] ao concluir. Tudo aqui foi deixado de propósito para depois do c
 - [ ] Rateio ao subir de pacote no meio do mês (hoje: cobra o mês cheio do pacote novo).
 - [ ] O que fazer com plano vencido além de bloquear lote novo: somente leitura total? (hoje só bloqueia abrir lote; lançamentos continuam).
 - [ ] Pacote acima de 30 tanques (hoje: "fale com a gente").
-- [ ] Painel do administrador (fazendas, testes, uso de tanques, cobranças, pacotes), só para o administrador do sistema (marcar pagamento, ver cobranças pendentes). Hoje é pelo SQL Editor: `select * from cobrancas where status='pendente'` e `select confirmar_pagamento('<id>', 1);`.
+- [x] Painel do administrador (sql/15; Mais > Administração do sistema): todas as fazendas (dono, e-mail, plano, tanques em uso, último lançamento, busca e filtros), estender teste, bloquear/liberar fazenda, cobranças pendentes com "Marcar como paga", pacotes e preços, modo piloto. Toda ação fica registrada em `admin_acoes`.
+- [ ] Rodar `sql/15_painel_administrador.sql` no Supabase e cadastrar os administradores:
+  `insert into administradores (usuario_id) select id from auth.users where email = 'email@exemplo.com' on conflict do nothing;` Hoje é pelo SQL Editor: `select * from cobrancas where status='pendente'` e `select confirmar_pagamento('<id>', 1);`.
 - [x] Alertar o dono na tela inicial quando o teste/plano estiver a 7 dias ou menos de vencer, em carência ou vencido (com link para Meu plano).
 - [ ] Mesmo alerta por e-mail (depende do SMTP próprio).
 - [ ] Teste grátis: hoje 30 dias, sem limite de tanques.

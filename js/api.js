@@ -224,6 +224,21 @@ export function criarApi(client) {
     async atualizarUsuario(id, campos) {
       ok(await client.from('usuarios').update(campos).eq('id', id));
     },
+    // ----- painel do administrador do sistema (sql/15). Cada função confere no banco se quem chama é administrador.
+    async souAdmin() {
+      const { data, error } = await client.rpc('eh_admin');
+      return !error && data === true; // sem o sql/15: ninguém é administrador
+    },
+    async adminFazendas() { return ok(await client.rpc('admin_fazendas')) || []; },
+    async adminCobrancas() { return ok(await client.rpc('admin_cobrancas')) || []; },
+    async adminPacotes() { return ok(await client.rpc('admin_pacotes')) || []; },
+    async adminConfig() { const d = ok(await client.rpc('admin_config')); return (Array.isArray(d) ? d[0] : d) || {}; },
+    async adminConfirmarPagamento(cobranca, meses) { ok(await client.rpc('admin_confirmar_pagamento', { p_cobranca: cobranca, p_meses: meses })); },
+    async adminEstenderTeste(fazenda, dias) { return ok(await client.rpc('admin_estender_teste', { p_fazenda: fazenda, p_dias: dias })); },
+    async adminBloquear(fazenda, bloquear) { ok(await client.rpc('admin_bloquear', { p_fazenda: fazenda, p_bloquear: bloquear })); },
+    async adminSalvarPacote(p) { ok(await client.rpc('admin_salvar_pacote', { p_tanques_max: p.tanques_max, p_nome: p.nome, p_preco: p.preco, p_ativo: p.ativo })); },
+    async adminDefinirPiloto(ligado) { ok(await client.rpc('admin_definir_piloto', { p_ligado: ligado })); },
+
     // ----- cópia de segurança (dono): tudo o que a fazenda tem, tabela por tabela -----
     async exportarTudo() {
       const tabelas = ['fazendas', 'usuarios', 'tanques', 'usuario_tanques', 'lotes', 'biometrias', 'mortalidade', 'racao_consumo', 'racao_estoque', 'racao_contagens'];

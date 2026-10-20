@@ -14,7 +14,7 @@ await db.exec(`create role anon; create role authenticated; create schema auth;
   create table auth.users (id uuid primary key, email text);
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('teste.uid', true), '')::uuid $$;
   grant usage on schema auth to anon, authenticated;`);
-for (const f of ['01_schema', '02_correcoes_e_funcoes', '03_peso_do_saco', '04_controle_de_estoque', '06_cadastro_da_fazenda', '07_planos_e_pacotes', '08_causa_da_mortalidade', '09_logo_da_fazenda', '10_convites_e_nomes', '11_trava_do_teste_gratis', '12_historico_e_lixeira', '13_datas_no_horario_local', '14_conferencia_e_importar_copia'])
+for (const f of ['01_schema', '02_correcoes_e_funcoes', '03_peso_do_saco', '04_controle_de_estoque', '06_cadastro_da_fazenda', '07_planos_e_pacotes', '08_causa_da_mortalidade', '09_logo_da_fazenda', '10_convites_e_nomes', '11_trava_do_teste_gratis', '12_historico_e_lixeira', '13_datas_no_horario_local', '14_conferencia_e_importar_copia', '15_painel_administrador'])
   await db.exec(readFileSync(DIR + f + '.sql', 'utf8'));
 // privilégios padrão do Supabase: anon e authenticated têm acesso às tabelas; só o RLS segura
 await db.exec(`grant usage on schema public to anon, authenticated;
@@ -63,11 +63,11 @@ async function altera(uid, sql) {
 }
 
 const TABELAS = ['fazendas', 'usuarios', 'tanques', 'usuario_tanques', 'lotes', 'biometrias', 'mortalidade', 'racao_estoque', 'racao_consumo',
-  'racao_contagens', 'assinaturas', 'cobrancas', 'convites', 'config_sistema', 'historico'];
+  'racao_contagens', 'assinaturas', 'cobrancas', 'convites', 'config_sistema', 'historico', 'administradores', 'admin_acoes'];
 const ligaFaz2 = { fazendas: `id = '${FAZ2}'`, usuarios: `fazenda_id = '${FAZ2}'`, tanques: `fazenda_id = '${FAZ2}'`, usuario_tanques: `false`,
   lotes: `tanque_id = '${T9}'`, biometrias: `lote_id = '${L9}'`, mortalidade: `lote_id = '${L9}'`, racao_estoque: `fazenda_id = '${FAZ2}'`,
   racao_consumo: `tanque_id = '${T9}'`, racao_contagens: `fazenda_id = '${FAZ2}'`, assinaturas: `fazenda_id = '${FAZ2}'`,
-  cobrancas: `fazenda_id = '${FAZ2}'`, convites: `fazenda_id = '${FAZ2}'`, config_sistema: 'true', historico: `fazenda_id = '${FAZ2}'` };
+  cobrancas: `fazenda_id = '${FAZ2}'`, convites: `fazenda_id = '${FAZ2}'`, config_sistema: 'true', historico: `fazenda_id = '${FAZ2}'`, administradores: 'true', admin_acoes: 'true' };
 await db.exec(`update tanques set nome = 'T da outra (renomeado)' where id = '${T9}'; update tanques set nome = 'T1 renomeado' where id = '${T1}';`);
 
 // 1) visitante sem login: não lê nada
@@ -90,7 +90,7 @@ checa(await f(`select * from biometrias where lote_id = '${L2}'`) === 0, 'funcio
 checa(await f(`select * from mortalidade where lote_id = '${L2}'`) === 0, 'funcionário vê mortalidade de tanque não liberado');
 checa(await f(`select * from racao_estoque`) === 0, 'funcionário lê a tabela de compras (com custo)');
 checa((await como(FUNC1, `select custo_total from racao_estoque_visivel() where custo_total is not null`)).rows.length === 0, 'funcionário vê custo pela função racao_estoque_visivel');
-for (const t of ['racao_contagens', 'assinaturas', 'cobrancas', 'convites', 'historico'])
+for (const t of ['racao_contagens', 'assinaturas', 'cobrancas', 'convites', 'historico', 'administradores', 'admin_acoes'])
   checa(await f(`select * from ${t}`) === 0, `funcionário lê "${t}"`);
 checa(await f(`select * from usuarios where id <> '${FUNC1}'`) === 0, 'funcionário lê dados (papel/status) de outros usuários pela tabela');
 // 4) gerente: só tanques liberados, não lê cobrança nem convites

@@ -628,3 +628,15 @@ a.aviso-link b { white-space: nowrap; }
 small.falta-nota { display: block; color: var(--alerta, #b5402e); font-size: .8rem; font-weight: 600; }
 /* ===== revisão para o funcionário ===== */
 .mini .mini-rot { display: block; margin-top: -.15rem; font-size: .75rem; color: var(--tinta-2); }
+/* ===== painel do administrador ===== */
+.adm-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: .8rem; }
+.adm-busca { margin-bottom: .6rem; }
+.adm-filtros { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .8rem; }
+.adm-filtros .chip.on { background: var(--rio); color: #fff; border-color: var(--rio); }
+.adm-faz, .adm-cob { display: grid; gap: .3rem; margin-bottom: .7rem; }
+.adm-faz header, .adm-cob header { display: flex; justify-content: space-between; align-items: center; gap: .6rem; }
+.adm-faz header b, .adm-cob header b { font-size: 1.05rem; }
+.adm-faz small, .adm-cob small { color: var(--tinta-2); }
+.adm-faz .acoes, .adm-cob .acoes { margin-top: .4rem; }
+.adm-piloto { display: grid; gap: .3rem; border-left: 4px solid var(--rio); }
+.adm-piloto.ligado { border-left-color: var(--ambar, #c98a1b); }

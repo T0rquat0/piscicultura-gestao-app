@@ -3,7 +3,7 @@
 App web instalável (PWA) para controle de tanques, lotes, ração, biometria e mortalidade, com lançamento **offline** e relatórios online. Backend: Supabase. Hospedagem: Vercel (site estático, sem build).
 
 ## Ordem de configuração
-1. Supabase → SQL Editor: rodar, em ordem, `sql/01_schema.sql`, `sql/02_correcoes_e_funcoes.sql`, `sql/03_peso_do_saco.sql` e `sql/04_controle_de_estoque.sql` e `sql/06_cadastro_da_fazenda.sql` (cadastro pelo próprio dono) e `sql/07_planos_e_pacotes.sql` (pacotes de tanques; começa em MODO PILOTO, sem cobrança), `sql/08_causa_da_mortalidade.sql`, `sql/09_logo_da_fazenda.sql`, `sql/10_convites_e_nomes.sql` (convite da equipe por link) `sql/11_trava_do_teste_gratis.sql` (impede o dono de esticar o próprio teste) `sql/12_historico_e_lixeira.sql` (quem alterou/excluiu o quê e lixeira com restaurar) `sql/13_datas_no_horario_local.sql` (teste e plano no horário de Boa Vista) e `sql/14_conferencia_e_importar_copia.sql` (conferência de recebimento na compra e importar cópia). O 05 é só dado de demonstração. O que falta fazer está em `PENDENCIAS.md`.
+1. Supabase → SQL Editor: rodar, em ordem, `sql/01_schema.sql`, `sql/02_correcoes_e_funcoes.sql`, `sql/03_peso_do_saco.sql` e `sql/04_controle_de_estoque.sql` e `sql/06_cadastro_da_fazenda.sql` (cadastro pelo próprio dono) e `sql/07_planos_e_pacotes.sql` (pacotes de tanques; começa em MODO PILOTO, sem cobrança), `sql/08_causa_da_mortalidade.sql`, `sql/09_logo_da_fazenda.sql`, `sql/10_convites_e_nomes.sql` (convite da equipe por link) `sql/11_trava_do_teste_gratis.sql` (impede o dono de esticar o próprio teste) `sql/12_historico_e_lixeira.sql` (quem alterou/excluiu o quê e lixeira com restaurar) `sql/13_datas_no_horario_local.sql` (teste e plano no horário de Boa Vista) `sql/14_conferencia_e_importar_copia.sql` (conferência de recebimento na compra e importar cópia) e `sql/15_painel_administrador.sql` (painel do administrador do sistema). O 05 é só dado de demonstração. O que falta fazer está em `PENDENCIAS.md`.
 2. Supabase → Project Settings → API: copiar a chave **anon public** e colocar em `js/config.js` (`SUPABASE_ANON_KEY`).
 3. Vercel: projeto ligado a este repositório (preset "Other"). Todo push na `main` publica sozinho.
 
@@ -30,3 +30,10 @@ Lançamentos sem internet vão para uma fila no aparelho (IndexedDB) e sobem soz
 
 ## Testes
 `python testes/rodar_tudo.py` (ver `testes/LEIAME.md`). Rode antes de abrir um Pull Request.
+
+## Administrador do sistema
+Quem cuida do sistema (não o dono de uma fazenda) vê **Mais > Administração do sistema**: todas as fazendas, cobranças e pacotes.
+Para tornar alguém administrador (a pessoa precisa ter login no app), no SQL Editor do Supabase:
+```sql
+insert into administradores (usuario_id) select id from auth.users where email = 'email@exemplo.com' on conflict do nothing;
+```
