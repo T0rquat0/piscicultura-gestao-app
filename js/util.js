@@ -71,6 +71,7 @@ export function traduzErro(error) {
   if (c === '23505') return 'Este registro já existe';
   if (c === '23503') return 'Registro relacionado não encontrado (ou ainda em uso)';
   if (c === '23514') return 'Valor inválido';
+  if (/^LIMITE_PACOTE:/.test(m)) return m.replace(/^LIMITE_PACOTE:\s*/, '');
   if (/Invalid login credentials/i.test(m)) return 'E-mail ou senha incorretos';
   if (/Email not confirmed/i.test(m)) return 'E-mail ainda não confirmado';
   return m;

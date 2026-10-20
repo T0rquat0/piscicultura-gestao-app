@@ -34,6 +34,18 @@ export function criarApi(client) {
     async perfil(userId) {
       return ok(await client.from('usuarios').select('id,nome,papel,fazenda_id,ativo,fazendas(nome)').eq('id', userId).maybeSingle());
     },
+    // plano da fazenda; null se o sql/07 ainda não foi rodado
+    async plano() {
+      const { data, error } = await client.rpc('plano_atual');
+      return error ? null : (Array.isArray(data) ? data[0] : data) || null;
+    },
+    async pacotes() {
+      const { data, error } = await client.from('pacotes').select('tanques_max,nome,preco_mensal').order('tanques_max');
+      return error ? [] : data || [];
+    },
+    async contratarPacote(n) {
+      return ok(await client.rpc('contratar_pacote', { p_tanques_max: n }));
+    },
     async criarFazenda(fazenda, nome) {
       return ok(await client.rpc('criar_fazenda', { p_fazenda: fazenda, p_nome: nome }));
     },

@@ -493,3 +493,10 @@ body.sem-rolagem { overflow: hidden; }
 .ocupado-caixa { display: flex; align-items: center; gap: .8rem; background: var(--card); padding: 1rem 1.3rem; border-radius: 18px; }
 .ocupado-giro { width: 20px; height: 20px; border: 3px solid var(--rio-claro); border-top-color: var(--rio); border-radius: 50%; animation: giro .8s linear infinite; }
 @keyframes giro { to { transform: rotate(360deg); } }
+
+/* Meu plano */
+.plano-estado.alerta { border-left: 4px solid var(--ambar, #c98a1b); }
+.barra-uso { height: 8px; border-radius: 99px; background: #e3eae5; margin-top: .4rem; overflow: hidden; }
+.barra-uso span { display: block; height: 100%; background: var(--rio); border-radius: 99px; }
+.pacote { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.pacote.atual { border: 2px solid var(--rio); }

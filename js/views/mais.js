@@ -9,6 +9,7 @@ export function renderMais(ctx, el) {
   const gerir = ctx.podeGerir();
   const itens = [
     gerir && ['#/tanques', 'tanque', 'Tanques e lotes', 'Cadastrar tanques e lotes de peixes'],
+    p.papel === 'dono' && ['#/plano', 'check', 'Meu plano', 'Pacote de tanques e prazo'],
     ['#/estoque', 'estoque', 'Estoque de ração', gerir ? 'Saldo, compras e custos' : 'Saldo de ração'],
     p.papel === 'dono' && ['#/equipe', 'equipe', 'Equipe', 'Pessoas, papéis e tanques liberados'],
     ['#/pendencias', 'pendentes', 'Pendentes de envio', state.pendentes ? `${state.pendentes} aguardando envio` : 'Nada pendente'],
