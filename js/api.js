@@ -206,6 +206,22 @@ export function criarApi(client) {
     async atualizarUsuario(id, campos) {
       ok(await client.from('usuarios').update(campos).eq('id', id));
     },
+    // ----- histórico e lixeira (sql/12) -----
+    async historico() {
+      const { data, error } = await client.from('historico')
+        .select('id,tabela,registro_id,acao,operacao,quem,quando,antes,depois,restaurado_em')
+        .order('quando', { ascending: false }).limit(600);
+      return error ? null : data || []; // null = sql/12 ainda não rodado
+    },
+    async restaurarExclusao(operacao) {
+      return Number(ok(await client.rpc('restaurar_exclusao', { p_operacao: operacao })));
+    },
+    // a lixeira existe? (para avisar nas exclusões que dá para restaurar)
+    async temLixeira() {
+      const { error } = await client.from('historico').select('id').limit(1);
+      return !error;
+    },
+
     // ----- convites por link (sql/10) -----
     async convitesAbertos() {
       const { data, error } = await client.from('convites').select('token,papel,criado_em,expira_em')

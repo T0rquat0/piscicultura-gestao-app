@@ -612,3 +612,5 @@ body.sem-rolagem { overflow: hidden; }
 .registros li { flex-wrap: wrap; }
 .registros .acoes-reg { flex-basis: 100%; margin-top: -.3rem; }
 .registros .acoes-reg .btn { min-height: 40px; padding: 0 1rem; font-size: .9rem; }
+/* ===== histórico e lixeira ===== */
+.registros small.mud { color: var(--tinta); margin: .25rem 0; line-height: 1.45; }

@@ -15,7 +15,8 @@ Marque com [x] ao concluir. Tudo aqui foi deixado de propósito para depois do c
 - [ ] Vencimento do plano usa `current_date` (fuso UTC) no `sql/07`, enquanto o resto do app usa America/Boa_Vista: perto da meia-noite o plano vence um dia antes/depois.
 - [ ] Supabase grátis pausa o banco depois de ~7 dias sem uso: para cliente, plano pago ou um ping automático (ex.: Vercel Cron).
 - [ ] Backup e exportação dos dados de cada fazenda (hoje não existe).
-- [ ] Registro de quem excluiu/alterou o quê, e lixeira (hoje excluir lote apaga tudo em cascata, sem volta).
+- [x] Registro de quem excluiu/alterou o quê, e lixeira com restaurar (sql/12; Mais > Histórico e lixeira, só o dono). Guarda 180 dias.
+- [ ] Rodar `sql/12_historico_e_lixeira.sql` no Supabase. Sem ele, o app funciona como antes (exclusão sem volta) e a tela explica o que falta.
 - [ ] Painel do administrador (fazendas, testes, cobranças, pacotes) — ver também "Tela de administração" abaixo.
 
 ## Decisões de cobrança ainda abertas

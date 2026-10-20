@@ -13,6 +13,7 @@ export function renderMais(ctx, el) {
     p.papel === 'dono' && ['#/plano', 'check', 'Meu plano', 'Pacote de tanques e prazo'],
     ['#/estoque', 'estoque', 'Estoque de ração', gerir ? 'Saldo, compras e custos' : 'Saldo de ração'],
     p.papel === 'dono' && ['#/equipe', 'equipe', 'Equipe', 'Pessoas, papéis e tanques liberados'],
+    p.papel === 'dono' && ['#/historico', 'historico', 'Histórico e lixeira', 'Quem alterou ou excluiu, e restaurar'],
     ['#/pendencias', 'pendentes', 'Pendentes de envio', state.pendentes ? `${state.pendentes} aguardando envio` : 'Nada pendente'],
   ].filter(Boolean);
 

@@ -213,8 +213,8 @@ export async function renderTanque(ctx, el, id) {
     try {
       const lote = todos.find((l) => l.id === b.dataset.excluirLote);
       const livre0 = ocupado('Conferindo o que será apagado…');
-      let r; try { r = await resumoDe([lote.id]); } finally { livre0(); }
-      if (!(await confirmar({ titulo: 'Excluir este lote?', texto: `Será apagado de vez, com ${txtResumo(r)} Não dá para desfazer.`, ok: 'Excluir lote', perigo: true, digitar: 'excluir' }))) return;
+      let r, lixo; try { [r, lixo] = await Promise.all([resumoDe([lote.id]), ctx.api.temLixeira()]); } finally { livre0(); }
+      if (!(await confirmar({ titulo: 'Excluir este lote?', texto: `Será apagado com ${txtResumo(r)} ${lixo ? 'Fica na lixeira por 180 dias: dá para restaurar em Mais > Histórico e lixeira.' : 'Não dá para desfazer.'}`, ok: 'Excluir lote', perigo: true, digitar: 'excluir' }))) return;
       const livre = ocupado('Excluindo o lote…');
       try { await ctx.api.excluirLote(lote.id); await ctx.atualizarRef(true); } finally { livre(); }
       ctx.toast('Lote excluído', 'ok');
@@ -227,8 +227,8 @@ export async function renderTanque(ctx, el, id) {
     if (!navigator.onLine) return ctx.toast('Sem internet', 'erro');
     try {
       const livre0 = ocupado('Conferindo o que será apagado…');
-      let r; try { r = await resumoDe(todos.map((l) => l.id)); } finally { livre0(); }
-      if (!(await confirmar({ titulo: `Apagar "${tanque.nome}"?`, texto: `Serão apagados ${todos.length} lote(s), ${txtResumo(r)} Não dá para desfazer.`, ok: 'Apagar tanque', perigo: true, digitar: tanque.nome }))) return;
+      let r, lixo; try { [r, lixo] = await Promise.all([resumoDe(todos.map((l) => l.id)), ctx.api.temLixeira()]); } finally { livre0(); }
+      if (!(await confirmar({ titulo: `Apagar "${tanque.nome}"?`, texto: `Serão apagados ${todos.length} lote(s), ${txtResumo(r)} ${lixo ? 'Fica na lixeira por 180 dias: dá para restaurar em Mais > Histórico e lixeira.' : 'Não dá para desfazer.'}`, ok: 'Apagar tanque', perigo: true, digitar: tanque.nome }))) return;
       const livre = ocupado('Apagando o tanque…');
       try {
         await ctx.api.excluirTanque(id);
