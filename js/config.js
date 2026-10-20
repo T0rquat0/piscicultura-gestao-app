@@ -10,6 +10,12 @@ export const PESO_SACO_PADRAO_KG = 25;
 // Avisos de estoque: dias de ração restantes (no ritmo dos últimos 7 dias).
 export const ESTOQUE_ATENCAO_DIAS = 15;
 export const ESTOQUE_CRITICO_DIAS = 7;
+// Sugestão de compra: quanto comprar para o estoque durar este número de dias no ritmo atual.
+export const ESTOQUE_COBERTURA_DIAS = 30;
+// Lembrar de contar o estoque quando a última contagem tiver este número de dias (ou mais).
+export const CONTAGEM_LEMBRETE_DIAS = 7;
+// Avisar o dono quando faltar este número de dias (ou menos) para o teste/plano vencer.
+export const PLANO_AVISO_DIAS = 7;
 
 // Tempo máximo (ms) esperando o servidor antes de considerar "sem conexão".
 export const TIMEOUT_REDE_MS = 15000;

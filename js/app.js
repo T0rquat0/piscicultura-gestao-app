@@ -17,6 +17,7 @@ import { renderEstoque } from './views/estoque.js';
 import { renderRelatorios, renderRelatorioLote, renderRacaoDia } from './views/relatorio.js';
 import { renderEquipe } from './views/equipe.js';
 import { renderPlano } from './views/plano.js';
+import { renderHistorico } from './views/historico.js';
 import { renderPendencias } from './views/pendencias.js';
 import { renderMais } from './views/mais.js';
 
@@ -355,6 +356,7 @@ async function rotear() {
       case 'estoque': await renderEstoque(ctx, el); break;
       case 'equipe': await renderEquipe(ctx, el); break;
       case 'plano': await renderPlano(ctx, el); break;
+      case 'historico': await renderHistorico(ctx, el); break;
       case 'pendencias': await renderPendencias(ctx, el); break;
       case 'mais': renderMais(ctx, el); break;
       default: await renderHome(ctx, el);

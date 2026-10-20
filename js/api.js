@@ -206,6 +206,37 @@ export function criarApi(client) {
     async atualizarUsuario(id, campos) {
       ok(await client.from('usuarios').update(campos).eq('id', id));
     },
+    // ----- cópia de segurança (dono): tudo o que a fazenda tem, tabela por tabela -----
+    async exportarTudo() {
+      const tabelas = ['fazendas', 'usuarios', 'tanques', 'usuario_tanques', 'lotes', 'biometrias', 'mortalidade', 'racao_consumo', 'racao_estoque', 'racao_contagens'];
+      const out = { gerado_em: new Date().toISOString(), versao: 1, tabelas: {}, sem_acesso: [] };
+      for (const t of tabelas) {
+        try {
+          out.tabelas[t] = await todos(() => {
+            const q = client.from(t).select('*');
+            return t === 'usuario_tanques' ? q.order('usuario_id').order('tanque_id') : q.order('id');
+          });
+        } catch { out.sem_acesso.push(t); } // tabela que ainda não existe neste banco (sql não rodado)
+      }
+      return out;
+    },
+
+    // ----- histórico e lixeira (sql/12) -----
+    async historico() {
+      const { data, error } = await client.from('historico')
+        .select('id,tabela,registro_id,acao,operacao,quem,quando,antes,depois,restaurado_em')
+        .order('quando', { ascending: false }).limit(600);
+      return error ? null : data || []; // null = sql/12 ainda não rodado
+    },
+    async restaurarExclusao(operacao) {
+      return Number(ok(await client.rpc('restaurar_exclusao', { p_operacao: operacao })));
+    },
+    // a lixeira existe? (para avisar nas exclusões que dá para restaurar)
+    async temLixeira() {
+      const { error } = await client.from('historico').select('id').limit(1);
+      return !error;
+    },
+
     // ----- convites por link (sql/10) -----
     async convitesAbertos() {
       const { data, error } = await client.from('convites').select('token,papel,criado_em,expira_em')

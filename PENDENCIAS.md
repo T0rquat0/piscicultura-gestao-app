@@ -12,10 +12,13 @@ Marque com [x] ao concluir. Tudo aqui foi deixado de propósito para depois do c
 - [ ] **Comprar domínio** próprio e trocar Site URL / Redirect URLs no Supabase.
 
 ## Encontrado no levantamento do backoffice (20/10/26)
-- [ ] Vencimento do plano usa `current_date` (fuso UTC) no `sql/07`, enquanto o resto do app usa America/Boa_Vista: perto da meia-noite o plano vence um dia antes/depois.
-- [ ] Supabase grátis pausa o banco depois de ~7 dias sem uso: para cliente, plano pago ou um ping automático (ex.: Vercel Cron).
-- [ ] Backup e exportação dos dados de cada fazenda (hoje não existe).
-- [ ] Registro de quem excluiu/alterou o quê, e lixeira (hoje excluir lote apaga tudo em cascata, sem volta).
+- [x] Vencimento do plano no horário de Boa Vista (sql/13: `hoje_local()` no teste grátis, plano, pagamento e contratação; antes era UTC e podia vencer um dia antes/depois).
+- [ ] Rodar `sql/13_datas_no_horario_local.sql` no Supabase.
+- [x] Supabase grátis não pausa mais: `api/ping.js` + cron diário no `vercel.json` (12h17 UTC) faz uma leitura leve com a chave pública. A Vercel só roda cron no deploy de produção; conferir em Vercel > Settings > Cron Jobs depois do merge. Para cliente pagante, ainda vale o plano pago do Supabase (backup diário e sem pausa).
+- [x] Cópia dos dados da fazenda: Mais > "Baixar cópia dos dados" (dono) gera um arquivo .json com tanques, lotes, lançamentos, compras, contagens e equipe.
+- [ ] Restaurar a partir desse arquivo (importar): ainda não existe; hoje a cópia serve de guarda e para levar a outro sistema/planilha.
+- [x] Registro de quem excluiu/alterou o quê, e lixeira com restaurar (sql/12; Mais > Histórico e lixeira, só o dono). Guarda 180 dias.
+- [ ] Rodar `sql/12_historico_e_lixeira.sql` no Supabase. Sem ele, o app funciona como antes (exclusão sem volta) e a tela explica o que falta.
 - [ ] Painel do administrador (fazendas, testes, cobranças, pacotes) — ver também "Tela de administração" abaixo.
 
 ## Decisões de cobrança ainda abertas
@@ -24,7 +27,8 @@ Marque com [x] ao concluir. Tudo aqui foi deixado de propósito para depois do c
 - [ ] O que fazer com plano vencido além de bloquear lote novo: somente leitura total? (hoje só bloqueia abrir lote; lançamentos continuam).
 - [ ] Pacote acima de 30 tanques (hoje: "fale com a gente").
 - [ ] Tela de administração só para o administrador (marcar pagamento, ver cobranças pendentes). Hoje é pelo SQL Editor: `select * from cobrancas where status='pendente'` e `select confirmar_pagamento('<id>', 1);`.
-- [ ] Alertar o dono quando o teste/plano estiver perto de vencer (aviso na tela inicial e por e-mail).
+- [x] Alertar o dono na tela inicial quando o teste/plano estiver a 7 dias ou menos de vencer, em carência ou vencido (com link para Meu plano).
+- [ ] Mesmo alerta por e-mail (depende do SMTP próprio).
 - [ ] Teste grátis: hoje 30 dias, sem limite de tanques.
 
 ## Produto
@@ -33,7 +37,7 @@ Marque com [x] ao concluir. Tudo aqui foi deixado de propósito para depois do c
 - [ ] Testar o PDF e o compartilhar em celular de verdade (iPhone e Android); só foi testado no Chromium.
 - [ ] Confirmar com o cliente se "50 mil" de ração é em kg (cerca de 2.000 sacos) ou em sacos.
 - [ ] Conferência de recebimento na compra de ração (conferir quantos sacos chegaram).
-- [ ] Lembrete para contagem semanal do estoque e sugestão de compra.
+- [x] Lembrete de contagem semanal (início e Estoque, dono/gerente, quando a última contagem tem 7 dias ou mais) e sugestão de compra (sacos para a ração durar 30 dias no ritmo dos últimos 7 dias). Ajustáveis em `js/config.js`.
 - [x] Aviso de lançamento duplicado (feito: ração com a mesma quantidade no dia ou lançada nos últimos 30 min; mortalidade igual; biometria no mesmo dia).
 - [ ] Ajustar a regra de duplicidade depois de ver como o cliente realmente alimenta (várias vezes ao dia?).
 - [ ] Formulários de estoque, biometria e mortalidade no mesmo estilo da tela Lançar.

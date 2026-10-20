@@ -3,8 +3,9 @@ import { confirmar, formulario } from '../dialogo.js';
 import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num } from '../util.js';
 import { PESO_SACO_PADRAO_KG } from '../config.js';
 
-import { situacaoEstoque } from '../calc.js';
-import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS } from '../config.js';
+import { situacaoEstoque, sugestaoCompraKg } from '../calc.js';
+import { diasEntre } from '../util.js';
+import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, ESTOQUE_COBERTURA_DIAS, CONTAGEM_LEMBRETE_DIAS } from '../config.js';
 
 const MENSAGEM = {
   critico: 'Estoque acabando. Compre já e conte o que sobrou.',
@@ -31,6 +32,8 @@ export async function renderEstoque(ctx, el) {
   const hoje = hojeISO();
   const sit = situacaoEstoque(kg, saldo?.consumo_7d_kg, ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS);
   const ult = contagens[0];
+  const sugKg = sugestaoCompraKg(kg, sit.porDia, ESTOQUE_COBERTURA_DIAS);
+  const diasSemContar = ult ? diasEntre(ult.data, hoje) : null;
   const corte = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
   const extrato = [
     ...compras.filter((c) => c.data_compra >= corte).map((c) => ({ d: c.data_compra, o: 1, t: `Entrada${c.fornecedor ? ' · ' + c.fornecedor : ''}`, kg: Number(c.quantidade_kg) })),
@@ -49,6 +52,8 @@ export async function renderEstoque(ctx, el) {
       ${sit.nivel === 'ok' ? '' : `<p>${MENSAGEM[sit.nivel]}</p>`}
     </div>
     ${!navigator.onLine ? '<p class="aviso">Sem internet: os valores podem estar desatualizados.</p>' : ''}
+    ${gerir && sugKg > 0 ? `<p class="aviso" id="sugestao-compra">Sugestão de compra: <b>~${fmtInt(Math.ceil(sugKg / kgS))} sacos</b> para a ração durar ${ESTOQUE_COBERTURA_DIAS} dias no ritmo atual.</p>` : ''}
+    ${gerir && diasSemContar != null && diasSemContar >= CONTAGEM_LEMBRETE_DIAS ? `<p class="aviso" id="lembrete-contagem">A última contagem foi há ${fmtInt(diasSemContar)} dias. Contar toda semana deixa o saldo confiável.</p>` : ''}
     ${gerir ? (ult
       ? `<p class="mudo">Última contagem: ${fmtData(ult.data)} · ${Number(ult.diferenca_kg) === 0 ? 'bateu certinho' : `${Number(ult.diferenca_kg) < 0 ? 'faltaram' : 'sobraram'} ${sc(Math.abs(ult.diferenca_kg))} sacos`}</p>`
       : '<p class="aviso">Ainda não houve contagem. Não precisa contar tudo: conte por pilhas (camadas × sacos) ou espere o estoque ficar baixo, quando contar é rápido. É a contagem que deixa o saldo confiável.</p>') : ''}

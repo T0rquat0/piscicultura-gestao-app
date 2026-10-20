@@ -129,6 +129,13 @@ export function matrizRacao(linhas, tanqueIds, dias, hoje) {
 
 // Situação do estoque de ração: quantos dias dura no ritmo dos últimos 7 dias.
 // nivel: 'sem-dado' | 'ok' | 'atencao' | 'critico' | 'negativo'
+// Quanto comprar (kg) para o estoque durar `dias` no ritmo atual (0 se já dá).
+export function sugestaoCompraKg(saldoKg, porDiaKg, dias = 30) {
+  const porDia = Number(porDiaKg) || 0;
+  if (!(porDia > 0)) return 0;
+  return Math.max(0, porDia * dias - Math.max(0, Number(saldoKg) || 0));
+}
+
 export function situacaoEstoque(saldoKg, consumo7dKg, atencaoDias = 15, criticoDias = 7) {
   const saldo = Number(saldoKg) || 0;
   const porDia = (Number(consumo7dKg) || 0) / 7;
