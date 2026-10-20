@@ -556,3 +556,4 @@ body.sem-rolagem { overflow: hidden; }
 #f .tiles.causas { grid-template-columns: 1fr 1fr; gap: .55rem; }
 #f .tiles.causas .tile { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: .15rem; min-height: 78px; padding: .6rem .75rem; }
 #f .tiles.causas .tile > span { font-size: .98rem; line-height: 1.15; }
+#f .tiles.causas .tile[data-causa="outros"] { grid-column: 1 / -1; }

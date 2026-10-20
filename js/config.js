@@ -28,5 +28,4 @@ export const CAUSAS_MORTE = [
   ['Qualidade da água', 'água verde, suja ou com cheiro forte'],
   ['Predadores', 'aves, lontra, jacaré'],
   ['Manejo', 'despesca, transporte, estresse'],
-  ['Não sei', 'não deu para saber'],
 ];
