@@ -325,6 +325,23 @@ function svgSemanas(sem) {
     <p class="mudo nota" style="margin:.4rem 0 0">Cada barra é uma semana (início na segunda-feira), em kg.</p>`;
 }
 
+// Barras de ração por dia (kg), do mais antigo ao mais recente
+function svgDias(linhasDia) {
+  const dias = linhasDia.slice().reverse();
+  const W = 320, H = 130, pl = 6, pr = 6, pt = 14, pb = 20;
+  const max = Math.max(...dias.map((d) => d.kg), 1);
+  const larg = (W - pl - pr) / dias.length;
+  const passo = dias.length > 14 ? 5 : dias.length > 8 ? 2 : 1;
+  const barras = dias.map((d, i) => {
+    const h = ((H - pt - pb) * d.kg) / max;
+    const x = pl + i * larg + larg * 0.14, w = larg * 0.72, y = H - pb - h;
+    const [, m, dd] = d.data.split('-');
+    const rot = (dias.length - 1 - i) % passo === 0 ? `<text x="${(x + w / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle">${dd}/${m}</text>` : '';
+    return `<rect class="barra${i === dias.length - 1 ? ' hoje' : ''}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(h, d.kg > 0 ? 1.5 : 0.8).toFixed(1)}" rx="${Math.min(3, w / 2).toFixed(1)}"/>${rot}`;
+  }).join('');
+  return `<svg class="grafico" viewBox="0 0 ${W} ${H}" role="img" aria-label="Ração por dia">${barras}</svg>`;
+}
+
 // Ração por tanque: o relatório que o responsável manda ao dono (dia ou semana)
 export async function renderRacaoDia(ctx, el) {
   el.innerHTML = '<p class="carregando">Montando relatório…</p>';
@@ -384,38 +401,17 @@ export async function renderRacaoDia(ctx, el) {
     return { ini, fim, dias, lista, linhasDia, total, um, rotulo, periodo, colunas: lista.map((t) => t.nome) };
   }
 
-  function mensagem(r) {
-    const L = [`*Ração · ${fazenda}*`, r.um ? `${diaSemana(r.fim)}, ${fmtData(r.fim)}` : `Período: ${fmtData(r.ini)} a ${fmtData(r.fim)}`, ''];
-    r.lista.forEach((t) => L.push(t.kg > 0 ? `${t.nome}: ${sacos(t.kg)} ${sacos(t.kg) === '1' ? 'saco' : 'sacos'} (${kgTxt(t.kg)} kg)` : (t.ativo ? `${t.nome}: sem lançamento` : null)));
-    L.push('', `*Total: ${sacos(r.total)} sacos (${kgTxt(r.total)} kg)*`);
-    if (!r.um) {
-      L.push('', 'Por dia:');
-      const com = r.linhasDia.filter((d) => d.kg > 0).reverse();
-      com.forEach((d) => L.push(`${diaCurto(d.data)}: ${sacos(d.kg)} ${sacos(d.kg) === '1' ? 'saco' : 'sacos'} (${kgTxt(d.kg)} kg)`));
-      const sem = r.linhasDia.length - com.length;
-      if (sem) L.push(`(${sem} ${sem === 1 ? 'dia' : 'dias'} sem lançamento)`);
-    }
-    return L.filter((x) => x !== null).join('\n');
-  }
-
   el.innerHTML = `
     <p class="no-print"><a class="voltar" href="#/relatorio">${icone('voltar', 18)} Relatórios</a></p>
     <h1>Ração fornecida</h1>
     <div class="seg no-print" style="--n:4" role="tablist">${[['hoje', 'Hoje'], ['ontem', 'Ontem'], ['7', '7 dias'], ['30', '30 dias']].map(([k, t]) => `<button type="button" data-per="${k}">${t}</button>`).join('')}</div>
     <label class="outro-dia no-print">Ou escolha um dia<input type="date" id="outro" max="${hoje}" value="${hoje}"></label>
+    <div id="resumo"></div>
     <div id="corpo"></div>
-    <section class="msg-box no-print">
-      <div class="msg-acoes">
-        <button class="btn primario grande" id="b-msg" type="button">Enviar pelo WhatsApp</button>
-        <button class="btn" id="b-copiar" type="button">Copiar texto</button>
-      </div>
-      <details class="msg-ver"><summary>Ver a mensagem</summary><pre class="msg-previa" id="msg-previa"></pre></details>
-      <h2>Arquivos</h2>
-      <div class="msg-acoes duas-col">
-        <button class="btn" id="b-pdf-racao" type="button">Gerar PDF</button>
-        <button class="btn" id="b-csv" type="button">Planilha (CSV)</button>
-      </div>
-    </section>`;
+    <div class="msg-acoes no-print" id="acoes-racao">
+      <button class="btn primario grande" id="b-pdf-racao" type="button">Enviar relatório (PDF)</button>
+    </div>
+    <p class="no-print" style="text-align:center;margin:1.2rem 0 .4rem"><button class="link" id="b-csv" type="button">Baixar planilha (CSV)</button></p>`;
 
   let r = null;
   function pintar() {
@@ -424,39 +420,35 @@ export async function renderRacaoDia(ctx, el) {
     const ranque = r.lista.map((t) => `
       <li><span class="esq"><b>${esc(t.nome)}</b>${t.kg > 0 ? `<small>${kgTxt(t.kg)} kg</small>` : ''}</span>
       ${t.kg > 0 ? `<b class="valor">${sacos(t.kg)} <small>sacos</small></b>` : `<span class="tag ${t.ativo ? 'aviso' : ''}">${t.ativo ? 'sem lançamento' : '–'}</span>`}</li>`).join('');
-    const matriz = r.um || !r.lista.length ? '' : `
+    const grafico = r.um || !r.lista.length ? '' : svgDias(r.linhasDia);
+    const detalhe = r.um || !r.lista.length ? '' : `
       <h2>Dia a dia</h2>
-      <div class="card tabela matriz rolagem"><table>
+      <div class="card">${grafico}</div>
+      <details class="so-cel lista-recolhe"><summary><span class="vd-ic">${icone('relatorio', 20)}</span><span class="vd-t"><b>Ver dia a dia</b><small>Toque para abrir os ${r.linhasDia.length} dias</small></span><span class="vd-seta">${icone('direita', 20)}</span></summary>
+      <div class="card dias-lista">${r.linhasDia.map((d) => d.kg > 0 ? `
+        <details class="dia-det"><summary><span>${diaCurto(d.data)}</span><b>${sacos(d.kg)} <small>sacos</small></b></summary>
+          <ul>${r.lista.filter((t) => d.por[t.nome] != null).map((t) => `<li><span>${esc(t.nome)}</span><b>${kgTxt(d.por[t.nome])} kg</b></li>`).join('')}</ul></details>` : `
+        <div class="dia-det vazio"><span>${diaCurto(d.data)}</span><small>nada lançado</small></div>`).join('')}</div></details>
+      <div class="card tabela matriz rolagem so-pc"><table>
         <thead><tr><th>Dia</th>${r.lista.map((t) => `<th class="n">${esc(t.nome)}</th>`).join('')}<th class="n total">Total</th></tr></thead>
         <tbody>${r.linhasDia.map((d) => `<tr><td>${diaCurto(d.data)}</td>${r.lista.map((t) => `<td class="n">${kg(d.por[t.nome])}</td>`).join('')}<td class="n total"><b>${d.kg ? kgTxt(d.kg) : '–'}</b></td></tr>`).join('')}</tbody>
         <tfoot><tr><td>Total</td>${r.lista.map((t) => `<td class="n">${fmtNum(t.kg, 0)}</td>`).join('')}<td class="n total">${fmtNum(r.total, 0)} kg</td></tr></tfoot>
       </table></div>
-      <p class="mudo nota">Valores em kg. “–” significa que nada foi lançado naquele dia.</p>`;
-    el.querySelector('#msg-previa').textContent = r.lista.length ? mensagem(r).replace(/\*/g, '') : 'Nada para enviar neste período.';
+      <p class="mudo nota so-pc">Valores em kg. “–” significa que nada foi lançado naquele dia.</p>
+      <p class="mudo nota so-cel">Toque num dia para ver a ração de cada tanque. A tabela completa vai no PDF.</p>`;
+    el.querySelector('#resumo').innerHTML = !r.lista.length ? '' : `<div class="racao-total"><small>${esc(r.periodo)}</small><b>${sacos(r.total)} sacos</b><span>${kgTxt(r.total)} kg no total</span></div>`;
+    el.querySelector('#acoes-racao').hidden = !r.lista.length;
     el.querySelector('#corpo').innerHTML = !r.lista.length ? '<div class="card vazio">Nenhum tanque com lote ativo ou ração neste período.</div>' : `
-      <div class="racao-total"><small>${esc(r.periodo)}</small><b>${sacos(r.total)} sacos</b><span>${kgTxt(r.total)} kg no total</span></div>
-      <div class="card"><ul class="lista racao-lista">${ranque}</ul></div>${matriz}`;
+      <h2>Por tanque</h2>
+      <div class="card"><ul class="lista racao-lista">${ranque}</ul></div>${detalhe}`;
   }
   el.querySelectorAll('[data-per]').forEach((b) => b.addEventListener('click', () => { per = b.dataset.per; pintar(); }));
   el.querySelector('#outro').addEventListener('change', (e) => { if (e.target.value) { outro = e.target.value > hoje ? hoje : e.target.value; per = 'dia'; pintar(); } });
   pintar();
 
-  // abre o WhatsApp direto com o texto pronto (texto puro; o menu "Compartilhar" do celular pode virar anexo .txt)
-  el.querySelector('#b-msg').addEventListener('click', () => {
-    if (!r.lista.length) return ctx.toast('Nada para enviar neste período.', 'erro');
-    window.open(`https://wa.me/?text=${encodeURIComponent(mensagem(r))}`, '_blank', 'noopener');
-  });
-  el.querySelector('#b-copiar').addEventListener('click', async () => {
-    const texto = mensagem(r);
-    try {
-      if (navigator.clipboard) await navigator.clipboard.writeText(texto);
-      else { const t = document.createElement('textarea'); t.value = texto; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); }
-      ctx.toast('Texto copiado. Cole na conversa para enviar.', 'ok');
-    } catch { ctx.toast('Não consegui copiar. Segure o texto e copie.', 'erro'); }
-  });
   const bp = el.querySelector('#b-pdf-racao');
   bp.addEventListener('click', async () => {
-    const t0 = bp.textContent; bp.disabled = true; bp.textContent = 'Gerando PDF…';
+    const t0 = bp.textContent; bp.disabled = true; bp.textContent = 'Montando o relatório…';
     try {
       const [jsPDF, fontes] = await Promise.all([carregarGerador(), carregarFontes()]);
       const doc = gerarPdfRacao(jsPDF, { logo: ctx.state.ref.logo || null, fazenda, geradoEm: hoje, kgSaco: kgS, fontes, rotulo: r.rotulo, periodo: r.periodo, dias: r.dias.length, tanques: r.lista, linhasDia: r.linhasDia, colunas: r.colunas });

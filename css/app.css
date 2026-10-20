@@ -653,6 +653,44 @@ small.falta-nota { display: block; color: var(--alerta, #b5402e); font-size: .8r
 .msg-ver summary { cursor: pointer; font-weight: 600; color: var(--rio); padding: .4rem 0; }
 .msg-ver .msg-previa { margin-top: .4rem; }
 
+/* Ração fornecida: lista por dia no celular, tabela larga só no computador */
+.so-pc { display: none; }
+@media (min-width: 800px) { .so-pc { display: block; } .so-cel { display: none; } }
+p.so-pc { display: none; } @media (min-width: 800px) { p.so-pc { display: block; } }
+.dias-lista { padding: .3rem 1rem; }
+.dia-det { border-bottom: 1px solid var(--linha, #e1e9e4); }
+.dia-det:last-child { border-bottom: 0; }
+.dia-det summary, .dia-det.vazio { display: flex; justify-content: space-between; align-items: center; gap: .6rem; padding: .8rem 0; list-style: none; cursor: pointer; }
+.dia-det summary::-webkit-details-marker { display: none; }
+.dia-det summary b small { font-weight: 500; color: var(--tinta-2); }
+.dia-det summary::after { content: '›'; margin-left: .5rem; color: var(--tinta-2); transform: rotate(90deg); transition: transform .15s; }
+.dia-det[open] summary::after { transform: rotate(-90deg); }
+.dia-det summary span, .dia-det.vazio span { flex: 1; }
+.dia-det.vazio { cursor: default; color: var(--tinta-2); }
+.dia-det ul { list-style: none; margin: 0 0 .7rem; padding: .5rem .8rem; background: #f1f6f3; border-radius: 12px; display: grid; gap: .35rem; }
+.dia-det li { display: flex; justify-content: space-between; gap: 1rem; font-size: .93rem; }
+.grafico .barra.hoje { fill: var(--rio); }
+#acoes-racao { margin: .2rem 0 1rem; }
+
+.lista-recolhe > summary { cursor: pointer; font-weight: 600; color: var(--rio); padding: .2rem 0 .8rem; list-style: none; }
+.lista-recolhe > summary::-webkit-details-marker { display: none; }
+.lista-recolhe > summary::after { content: ' ›'; }
+.lista-recolhe[open] > summary::after { content: ' ‹'; }
+
+/* "Ver dia a dia": botão bem visível */
+.lista-recolhe { margin-bottom: 1rem; }
+.lista-recolhe > summary { display: flex; align-items: center; gap: .8rem; padding: .95rem 1rem; border-radius: 18px; background: var(--rio); color: #fff; font-weight: 700; cursor: pointer; box-shadow: 0 8px 20px -10px rgba(14, 79, 69, .55); }
+.lista-recolhe > summary::after { content: none !important; }
+.lista-recolhe .vd-ic { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: rgba(255, 255, 255, .16); flex: none; }
+.lista-recolhe .vd-t { display: grid; flex: 1; line-height: 1.25; }
+.lista-recolhe .vd-t b { font-size: 1.05rem; }
+.lista-recolhe .vd-t small { font-weight: 500; opacity: .8; font-size: .82rem; }
+.lista-recolhe .vd-seta { transition: transform .18s; display: grid; }
+.lista-recolhe[open] .vd-seta { transform: rotate(90deg); }
+.lista-recolhe[open] > summary { margin-bottom: .7rem; }
+#acoes-racao { margin: 1.2rem 0 .4rem; }
+.lista-recolhe .vd-t small { color: rgba(255, 255, 255, .92); opacity: 1; }
+
 /* ===== aceite dos termos ===== */
 .linha-check.aceite { align-items: flex-start; font-weight: 500; font-size: .92rem; text-align: left; }
 .linha-check.aceite a { color: var(--rio); }
