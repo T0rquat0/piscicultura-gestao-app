@@ -640,3 +640,11 @@ small.falta-nota { display: block; color: var(--alerta, #b5402e); font-size: .8r
 .adm-faz .acoes, .adm-cob .acoes { margin-top: .4rem; }
 .adm-piloto { display: grid; gap: .3rem; border-left: 4px solid var(--rio); }
 .adm-piloto.ligado { border-left-color: var(--ambar, #c98a1b); }
+
+/* Ração fornecida: mensagem pronta e botões alinhados */
+.msg-box { margin-top: 1.4rem; }
+.msg-box h2 { font-size: 1rem; margin: 1.1rem 0 .5rem; color: var(--tinta-2); }
+.msg-previa { margin: 0; padding: .9rem 1rem; border-radius: 16px; background: #fff; border: 1px solid var(--linha, #d6dfda); font: inherit; font-size: .95rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--tinta); user-select: text; -webkit-user-select: text; }
+.msg-acoes { display: grid; gap: .6rem; margin-top: .7rem; }
+.msg-acoes .btn { width: 100%; justify-content: center; text-align: center; }
+.msg-acoes.duas-col { grid-template-columns: 1fr 1fr; margin-top: 0; }
