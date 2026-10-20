@@ -146,7 +146,10 @@ export function criarApi(client) {
     async compras(podeGerir) {
       let lista;
       if (podeGerir) {
-        lista = await todos(() => client.from('racao_estoque').select('id,data_compra,quantidade_kg,custo_total,fornecedor').order('data_compra', { ascending: false }).order('id'));
+        // sacos_nota/sacos_recebidos vêm do sql/14 (conferência de recebimento); sem ele, lê sem as duas colunas
+        const ler = (cols) => todos(() => client.from('racao_estoque').select(cols).order('data_compra', { ascending: false }).order('id'));
+        lista = await ler('id,data_compra,quantidade_kg,custo_total,fornecedor,sacos_nota,sacos_recebidos')
+          .catch(() => ler('id,data_compra,quantidade_kg,custo_total,fornecedor'));
       } else {
         lista = ok(await client.rpc('racao_estoque_visivel'));
         lista.sort((a, b) => (a.data_compra < b.data_compra ? 1 : -1));
@@ -154,7 +157,22 @@ export function criarApi(client) {
       return lista;
     },
     async registrarCompra(c) {
-      ok(await client.from('racao_estoque').insert({ id: uuid(), ...c }));
+      const linha = { id: uuid(), ...c };
+      const r = await client.from('racao_estoque').insert(linha);
+      // banco sem o sql/14: grava sem a conferência (o kg que chegou continua certo)
+      if (r.error && /sacos_(nota|recebidos)/i.test(r.error.message || '')) {
+        const { sacos_nota, sacos_recebidos, ...sem } = linha;
+        ok(await client.from('racao_estoque').insert(sem));
+        return;
+      }
+      ok(r);
+    },
+    // importar a cópia baixada em Mais (sql/14). Devolve quantos registros voltaram por tabela.
+    async importarCopia(copia) {
+      const { data, error } = await client.rpc('importar_copia', { p_copia: copia });
+      if (error && (error.code === 'PGRST202' || /importar_copia/i.test(error.message || ''))) throw new Error('A importação ainda não foi ativada neste sistema (falta rodar o sql/14 no Supabase).');
+      if (error) throw new ErroApi(error);
+      return data || {};
     },
 
     // ----- relatório de um lote -----

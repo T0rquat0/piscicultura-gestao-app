@@ -102,7 +102,7 @@ export async function renderLancar(ctx, el, params = {}) {
       </section>` : ''}
       <p id="erro" class="erro" hidden></p>
       <button class="btn primario grande" type="submit">Salvar ${TIPOS[tipo].rotulo.toLowerCase()}</button>
-      <p class="mudo" style="margin:0;text-align:center">${navigator.onLine ? 'Será enviado ao servidor agora.' : 'Sem internet: será salvo no celular e enviado depois.'}</p>
+      <p class="mudo" style="margin:0;text-align:center">${navigator.onLine ? 'Vai para o sistema na hora.' : 'Sem internet: será salvo no celular e enviado depois.'}</p>
     </form>`;
 
   el.querySelectorAll('.seg button').forEach((b) =>

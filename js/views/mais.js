@@ -1,5 +1,6 @@
 import { esc, ROTULO_PAPEL, fmtData, hojeISO, diasEntre } from '../util.js';
 import { icone } from '../icons.js';
+import { confirmar } from '../dialogo.js';
 import { num, fmtNum } from '../util.js';
 import { PESO_SACO_PADRAO_KG } from '../config.js';
 import { reduzirLogo } from '../util.js';
@@ -50,7 +51,9 @@ export function renderMais(ctx, el) {
     ${p.papel === 'dono' ? `<div class="card">
       <b>Cópia de segurança dos dados</b>
       <small style="display:block">Baixa um arquivo com tudo da fazenda: tanques, lotes, lançamentos, compras, contagens e equipe. Guarde no Google Drive ou no e-mail.</small>
-      <div class="acoes"><button class="btn" id="b-copia" type="button">Baixar cópia dos dados</button></div></div>` : ''}
+      <div class="acoes"><button class="btn" id="b-copia" type="button">Baixar cópia dos dados</button><button class="btn" id="b-importar" type="button">Importar cópia</button></div>
+      <small class="mudo" style="display:block">Importar devolve o que estiver faltando (por exemplo, depois de apagar algo sem querer). Nada que já existe é alterado.</small>
+      <input id="in-copia" type="file" accept=".json,application/json" hidden></div>` : ''}
 
     <details class="card">
       <summary>Como instalar no celular</summary>
@@ -105,6 +108,25 @@ export function renderMais(ctx, el) {
       ctx.toast(`Cópia baixada: ${n} registro(s)`, 'ok');
     } catch (e) { ctx.toast('Não foi possível gerar a cópia: ' + e.message, 'erro'); }
     bcop.disabled = false; bcop.textContent = txt;
+  });
+  const bimp = el.querySelector('#b-importar'), incop = el.querySelector('#in-copia');
+  if (bimp) bimp.addEventListener('click', () => { if (!navigator.onLine) return ctx.toast('Sem internet', 'erro'); incop.value = ''; incop.click(); });
+  if (incop) incop.addEventListener('change', async () => {
+    const arq = incop.files && incop.files[0]; if (!arq) return;
+    let copia;
+    try { copia = JSON.parse(await arq.text()); } catch { return ctx.toast('Este arquivo não é uma cópia do app.', 'erro'); }
+    if (!copia || typeof copia.tabelas !== 'object' || Array.isArray(copia.tabelas)) return ctx.toast('Este arquivo não é uma cópia do app.', 'erro');
+    const qtd = (t) => (Array.isArray(copia.tabelas[t]) ? copia.tabelas[t].length : 0);
+    const resumo = `${qtd('tanques')} tanque(s), ${qtd('lotes')} lote(s), ${qtd('racao_consumo') + qtd('biometrias') + qtd('mortalidade')} lançamento(s) e ${qtd('racao_estoque')} compra(s)`;
+    if (!(await confirmar({ titulo: 'Importar esta cópia?', texto: `Cópia de ${copia.gerado_em ? fmtData(copia.gerado_em) : 'data desconhecida'} com ${resumo}. Só volta o que estiver faltando; nada que já existe é alterado.`, ok: 'Importar' }))) return;
+    bimp.disabled = true;
+    try {
+      const r = await ctx.api.importarCopia(copia);
+      const n = Object.values(r).reduce((s, v) => s + Number(v || 0), 0);
+      await ctx.atualizarRef(true);
+      ctx.toast(n ? `${n} registro(s) voltaram para a fazenda` : 'Nada para importar: tudo da cópia já está na fazenda.', 'ok');
+    } catch (e) { ctx.toast(e.message, 'erro'); }
+    bimp.disabled = false;
   });
   el.querySelector('#b-atualizar').addEventListener('click', async () => {
     if (!navigator.onLine) return ctx.toast('Sem internet', 'erro');

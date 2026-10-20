@@ -1,0 +1,7 @@
+{
+  "name": "testes-sql-pisciapp",
+  "private": true,
+  "type": "module",
+  "description": "Roda os sql/ do app num Postgres de verdade (PGlite, em WebAssembly) e testa regras e segurança.",
+  "dependencies": { "@electric-sql/pglite": "0.2.17" }
+}

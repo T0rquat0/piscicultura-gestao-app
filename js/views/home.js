@@ -85,7 +85,7 @@ export function htmlTileTanque(tanque, lotesDoTanque, resumo, status) {
   return `<a class="mini ${status}" href="#/t/${esc(tanque.id)}">
     <span class="mini-topo"><b>${esc(tanque.nome)}</b>${status === 'semlote' ? '' : '<i class="ponto"></i>'}</span>
     <span class="mini-esp">${esc(esp)}</span>
-    ${status === 'semlote' ? '' : `<span class="mini-num">${peso}</span><small>${sub}</small>`}
+    ${status === 'semlote' ? '' : `<span class="mini-num">${peso}</span>${r && r.ultimo_peso_medio_kg != null ? '<span class="mini-rot">peso médio</span>' : ''}<small>${sub}</small>`}
   </a>`;
 }
 

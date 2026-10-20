@@ -93,6 +93,8 @@ export async function renderEstoque(ctx, el) {
             <label>Nº de sacos <input id="sacos" class="grande" type="number" inputmode="numeric" step="1" min="1" placeholder="0" required></label>
             <label>kg por saco <input id="kgsaco" type="number" inputmode="decimal" step="0.1" min="0.1" value="${kgS}" required></label>
           </div>
+          <label class="linha-check"><input type="checkbox" id="conferir"> Chegou menos sacos do que a nota</label>
+          <label id="recebidos-wrap" hidden>Quantos sacos chegaram de fato? <input id="recebidos" class="grande" type="number" inputmode="decimal" step="0.5" min="0" placeholder="0"></label>
           <div class="calc" id="total">Total: —</div>
           <div class="data-linha"><span>Data: <b id="data-txt">hoje</b></span><button type="button" class="link" id="b-data">Mudar</button></div>
           <label id="data-wrap" hidden>Data da compra <input id="data" type="date" value="${hoje}" max="${hoje}" required></label>
@@ -118,9 +120,9 @@ export async function renderEstoque(ctx, el) {
 
     <h2>Resumo geral</h2>
     <div class="kpis">
-      <div class="kpi"><span>Comprado</span><b>${sc(comprado, 0)} sacos</b></div>
-      <div class="kpi"><span>Consumido</span><b>${sc(consumido, 0)} sacos</b></div>
-      ${ajustes ? `<div class="kpi" style="grid-column:1/-1"><span>Ajustes de contagem</span><b>${sinal(ajustes)} sacos</b></div>` : ''}
+      <div class="kpi"><span>Comprado</span><b>${sc(comprado, 0)} ${Math.round(comprado / kgS) === 1 ? 'saco' : 'sacos'}</b></div>
+      <div class="kpi"><span>Consumido</span><b>${sc(consumido, 0)} ${Math.round(consumido / kgS) === 1 ? 'saco' : 'sacos'}</b></div>
+      ${ajustes && gerir ? `<div class="kpi" style="grid-column:1/-1"><span>Ajustes de contagem</span><b>${sinal(ajustes)} sacos</b></div>` : ''}
     </div>
 
     ${gerir ? `<h2>Entradas registradas</h2>
@@ -128,7 +130,7 @@ export async function renderEstoque(ctx, el) {
       ${compras.length ? `<table>
         <thead><tr><th>Data</th><th class="n">Sacos</th><th class="n">Valor</th><th>Fornecedor</th><th></th></tr></thead>
         <tbody>${compras.map((c) => `<tr>
-          <td>${fmtData(c.data_compra)}</td><td class="n">${sc(c.quantidade_kg)}</td>
+          <td>${fmtData(c.data_compra)}</td><td class="n">${sc(c.quantidade_kg)}${c.sacos_nota != null && Number(c.sacos_recebidos) < Number(c.sacos_nota) ? `<small class="falta-nota">faltaram ${fmtNum(Number(c.sacos_nota) - Number(c.sacos_recebidos), 0)} da nota</small>` : ''}</td>
           <td class="n">${c.custo_total != null ? fmtBRL(c.custo_total) : '—'}</td>
           <td>${esc(c.fornecedor || '—')}</td>
           <td><span class="acoes-reg"><button class="btn mini" data-edit="${esc(c.id)}" type="button">Editar</button><button class="btn mini perigo" data-del="${esc(c.id)}" type="button">Excluir</button></span></td>
@@ -202,8 +204,20 @@ export async function renderEstoque(ctx, el) {
   // ---- compra ----
   const f = el.querySelector('#f-compra');
   const erro = f.querySelector('#erro');
-  const total = () => { const s = num(f.querySelector('#sacos').value), k = num(f.querySelector('#kgsaco').value); return s > 0 && k > 0 ? s * k : null; };
-  const atualiza = () => { const t = total(); f.querySelector('#total').textContent = t ? `Total: ${fmtNum(t, 1)} kg (${fmtInt(num(f.querySelector('#sacos').value))} sacos × ${fmtNum(num(f.querySelector('#kgsaco').value), 1)} kg)` : 'Total: —'; };
+  // conferência de recebimento: o estoque entra pelo que CHEGOU, não pelo que a nota diz
+  const conferir = f.querySelector('#conferir');
+  const recebidos = () => (conferir.checked ? num(f.querySelector('#recebidos').value) : num(f.querySelector('#sacos').value));
+  const total = () => { const s = recebidos(), k = num(f.querySelector('#kgsaco').value); return s >= 0 && k > 0 && num(f.querySelector('#sacos').value) > 0 ? s * k : null; };
+  const atualiza = () => {
+    const t = total(), nota = num(f.querySelector('#sacos').value), rec = recebidos(), kgs = fmtNum(num(f.querySelector('#kgsaco').value), 1);
+    f.querySelector('#total').textContent = t == null ? 'Total: —'
+      : conferir.checked && rec < nota ? `Entra no estoque: ${fmtNum(t, 1)} kg (${fmtNum(rec, rec % 1 ? 1 : 0)} sacos × ${kgs} kg)
+Faltaram ${fmtNum(nota - rec, (nota - rec) % 1 ? 1 : 0)} saco(s) da nota.`
+      : `Total: ${fmtNum(t, 1)} kg (${fmtInt(nota)} sacos × ${kgs} kg)`;
+  };
+  f.addEventListener('input', () => { erro.hidden = true; }); // corrigiu um campo: a mensagem antiga some
+  conferir.addEventListener('change', () => { f.querySelector('#recebidos-wrap').hidden = !conferir.checked; if (conferir.checked) f.querySelector('#recebidos').focus(); atualiza(); });
+  f.querySelector('#recebidos').addEventListener('input', atualiza);
   f.querySelector('#sacos').addEventListener('input', atualiza);
   const dataIn = f.querySelector('#data');
   f.querySelector('#b-data').addEventListener('click', () => {
@@ -221,6 +235,12 @@ export async function renderEstoque(ctx, el) {
     const falha = (m) => { erro.textContent = m; erro.hidden = false; };
     const s = num(f.querySelector('#sacos').value);
     if (!(s >= 1) || !Number.isInteger(s)) return falha('Informe o número de sacos (inteiro).');
+    if (conferir.checked) {
+      const rec = recebidos();
+      if (!(rec >= 0)) return falha('Informe quantos sacos chegaram de fato.');
+      if (rec === 0) return falha('Se não chegou nenhum saco, não registre a entrada: ela entra quando a ração chegar.');
+      if (rec > s) return falha('Chegaram mais sacos do que a nota? Coloque o número maior em "Nº de sacos".');
+    }
     const t = total();
     if (!t) return falha('Informe o peso de cada saco em kg.');
     if (!f.querySelector('#data').value) return falha('Informe a data.');
@@ -231,6 +251,7 @@ export async function renderEstoque(ctx, el) {
       await ctx.api.registrarCompra({
         fazenda_id: ctx.state.perfil.fazenda_id, data_compra: f.querySelector('#data').value, quantidade_kg: t,
         custo_total: custo, fornecedor: f.querySelector('#forn').value.trim() || null,
+        sacos_nota: s, sacos_recebidos: recebidos(),
       });
       ctx.toast('Entrada registrada', 'ok');
       renderEstoque(ctx, el);

@@ -339,7 +339,7 @@ async function rotear() {
   if (!view || !state.perfil) return;
   const { rota, partes, params } = parseHash(location.hash);
   rotaAtual = rota;
-  const aba = ['', 'lancar', 'relatorio'].includes(rota) ? rota : 'mais';
+  const aba = rota === 't' ? '' : ['', 'lancar', 'relatorio'].includes(rota) ? rota : 'mais'; // tela do tanque é aberta pelo Início
   document.querySelectorAll('.abas a').forEach((a) => a.classList.toggle('on', a.dataset.aba === aba));
 
   const el = document.createElement('div'); // contêiner novo por rota: renderizações atrasadas não sujam a tela atual
