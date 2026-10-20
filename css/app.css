@@ -842,3 +842,6 @@ p.so-pc { display: none; } @media (min-width: 800px) { p.so-pc { display: block;
 .ex-tag.entra { background: #dff1e6; color: var(--ok); }
 .ex-tag.sai { background: #fbe3e1; color: var(--erro); }
 
+/* Ração fornecida: tocar num tanque abre o relatório só dele */
+.racao-lista li.clicavel { cursor: pointer; border-radius: 12px; }
+@media (hover: hover) { .racao-lista li.clicavel:hover { background: var(--rio-claro); } }

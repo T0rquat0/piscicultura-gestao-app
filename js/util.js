@@ -77,6 +77,15 @@ export function traduzErro(error) {
   return m;
 }
 
+// Nome de arquivo legível, com acento: "Ração fornecida - Suvaco de cobra - 20-10-2026.pdf".
+// Tira só o que o Windows/celular não aceitam em nome de arquivo (\ / : * ? " < > |).
+export function nomeArquivo(partes, ext) {
+  const limpo = partes.filter(Boolean).map((p) => String(p).replace(/[\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean).join(' - ');
+  return `${limpo.slice(0, 150)}.${ext}`;
+}
+// "2026-10-20" -> "20-10-2026" (para nome de arquivo; barra não pode)
+export const dataArquivo = (iso) => (iso ? `${iso.slice(8, 10)}-${iso.slice(5, 7)}-${iso.slice(0, 4)}` : '');
+
 export function parseHash(h) {
   const [path, query = ''] = String(h || '').replace(/^#\/?/, '').split('?');
   const partes = path.split('/').filter(Boolean);

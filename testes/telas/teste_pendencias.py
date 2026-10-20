@@ -68,7 +68,7 @@ with sync_playwright() as pw:
     pg.goto(BASE + '#/mais'); pg.wait_for_selector('#b-copia', timeout=15000)
     with pg.expect_download() as dl: pg.click('#b-copia')
     arq = dl.value; caminho = arq.path(); dados = json.load(open(caminho, encoding='utf-8'))
-    checa(arq.suggested_filename == f'copia-fazenda-sao-joao-{hoje.isoformat()}.json', f'cópia: nome do arquivo sem acento ({arq.suggested_filename})')
+    checa(arq.suggested_filename == f'Cópia dos dados - Fazenda São João - {hoje:%d-%m-%Y}.json', f'cópia: nome do arquivo legível, com acento ({arq.suggested_filename})')
     checa(set(['tanques', 'lotes', 'racao_consumo', 'usuarios']).issubset(dados['tabelas']) and len(dados['tabelas']['lotes']) == 1, 'cópia: arquivo tem as tabelas da fazenda com os registros')
     errs += est['erros'] + est['fora']; b.close()
 

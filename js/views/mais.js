@@ -1,4 +1,4 @@
-import { esc, ROTULO_PAPEL, fmtData, hojeISO, diasEntre } from '../util.js';
+import { esc, ROTULO_PAPEL, fmtData, hojeISO, diasEntre, nomeArquivo, dataArquivo } from '../util.js';
 import { icone } from '../icons.js';
 import { confirmar } from '../dialogo.js';
 import { num, fmtNum } from '../util.js';
@@ -106,7 +106,7 @@ export function renderMais(ctx, el) {
     try {
       const dados = await ctx.api.exportarTudo();
       const n = Object.values(dados.tabelas).reduce((s, l) => s + l.length, 0);
-      const nome = `copia-${((p.fazendas && p.fazendas.nome) || 'fazenda').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\W+/g, '-').toLowerCase()}-${hojeISO()}.json`;
+      const nome = nomeArquivo(['Cópia dos dados', (p.fazendas && p.fazendas.nome) || 'Fazenda', dataArquivo(hojeISO())], 'json');
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([JSON.stringify(dados, null, 1)], { type: 'application/json' }));
       a.download = nome; document.body.appendChild(a); a.click(); a.remove();
