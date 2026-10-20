@@ -40,3 +40,4 @@ Marque com [x] ao concluir. Tudo aqui foi deixado de propósito para depois do c
 - [ ] Rodar `sql/10_convites_e_nomes.sql` no Supabase (convite por link + nomes da equipe no relatório). Sem ele, a Equipe mostra só o "vincular pelo e-mail".
 - [ ] Rodar `sql/11_trava_do_teste_gratis.sql` no Supabase. **Segurança:** sem ele, o dono consegue mudar `fazendas.teste_ate` pela API (chave pública) e usar de graça para sempre.
 - [x] Varredura de segredos no código e em todo o histórico do Git (20/10/26): nenhuma chave secreta; só a publishable, que é pública por desenho. O repositório é público, então o RLS é a única barreira: testado com 73 cenários de acesso entre fazendas/papéis num Postgres real (único furo achado: o do sql/11).
+- [ ] Login automático de teste (PRs do Hugo): preencher `DEV_LOGIN` em `js/dev-login.js` com uma conta de TESTE. Só roda em links de preview do Vercel e localhost; em produção o login segue obrigatório.
