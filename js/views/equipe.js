@@ -36,7 +36,7 @@ export async function renderEquipe(ctx, el) {
 
     <h2>Adicionar pessoa</h2>
     <form id="f-novo" class="card form" novalidate>
-      <p class="mudo" style="margin:0">O login (e-mail e senha) precisa existir antes — peça ao administrador do sistema para criar. Depois, vincule aqui:</p>
+      <p class="mudo" style="margin:0">Primeiro a pessoa cria a própria conta no app, na tela de entrada (botão <b>Criar conta da minha fazenda</b>), com o e-mail dela, e confirma pelo e-mail recebido. Ela para na tela "Cadastre sua fazenda": não precisa preencher. Depois, vincule aqui com o mesmo e-mail:</p>
       <label>E-mail do login <input name="email" type="email" inputmode="email" autocapitalize="none" required></label>
       <label>Nome <input name="nome" maxlength="80" required></label>
       <label>Papel <select name="papel"><option value="funcionario">Funcionário</option><option value="gerente">Gerente</option></select></label>
@@ -78,6 +78,9 @@ export async function renderEquipe(ctx, el) {
       await ctx.api.adicionarUsuario(email, nome, fn.querySelector('[name=papel]').value);
       ctx.toast('Pessoa vinculada. Agora libere os tanques dela.', 'ok');
       renderEquipe(ctx, el);
-    } catch (e) { erroNovo.textContent = e.message; erroNovo.hidden = false; btn.disabled = false; }
+    } catch (e) {
+      erroNovo.textContent = /Nenhum login encontrado/i.test(e.message) ? 'Nenhuma conta com este e-mail. Peça para a pessoa abrir o app, tocar em "Criar conta da minha fazenda" com este e-mail e confirmar pelo e-mail recebido. Depois tente de novo.' : e.message;
+      erroNovo.hidden = false; btn.disabled = false;
+    }
   });
 }

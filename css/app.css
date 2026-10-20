@@ -605,3 +605,10 @@ body.sem-rolagem { overflow: hidden; }
 .mini.novo b { font-size: .98rem; }
 .mini.novo .novo-ic { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--rio); color: #fff; }
 @media (hover: hover) { .mini.novo:hover { background: rgba(14, 79, 69, .05); } }
+/* ===== botões Editar/Excluir lado a lado nos registros ===== */
+.acoes-reg { display: inline-flex; gap: .4rem; flex-wrap: wrap; justify-content: flex-end; }
+.dialogo-caixa .erro { margin-top: .8rem; }
+.dialogo-caixa select, .dialogo-caixa input { width: 100%; }
+.registros li { flex-wrap: wrap; }
+.registros .acoes-reg { flex-basis: 100%; margin-top: -.3rem; }
+.registros .acoes-reg .btn { min-height: 40px; padding: 0 1rem; font-size: .9rem; }

@@ -1,5 +1,5 @@
 // Cadastro de tanques e lotes (dono e gerente). Precisa de internet.
-import { confirmar, ocupado } from '../dialogo.js';
+import { confirmar, ocupado, formulario } from '../dialogo.js';
 import { icone } from '../icons.js';
 import { ESPECIES } from '../config.js';
 import { esc, fmtData, fmtInt, fmtNum, hojeISO, num, ROTULO_TIPO } from '../util.js';
@@ -73,7 +73,8 @@ export async function renderTanque(ctx, el, id) {
           <div class="acoes" style="margin:0">
             <span class="tag ${l.ativo ? 'ok' : ''}">${l.ativo ? 'Ativo' : 'Encerrado'}</span>
             <a class="btn mini" href="#/relatorio/${esc(l.id)}">Relatório</a>
-            ${l.ativo ? `<button class="btn mini perigo" data-encerrar="${esc(l.id)}" type="button">Encerrar</button>` : ''}
+            <button class="btn mini" data-editar-lote="${esc(l.id)}" type="button">Editar</button>
+            ${l.ativo ? `<button class="btn mini perigo" data-encerrar="${esc(l.id)}" type="button">Encerrar</button>` : `<button class="btn mini" data-reabrir="${esc(l.id)}" type="button">Reabrir</button>`}
           </div>
         </li>`).join('')}</ul>` : '<p class="mudo" style="margin:0">Nenhum lote neste tanque ainda.</p>'}
     </div>
@@ -154,6 +155,44 @@ export async function renderTanque(ctx, el, id) {
         await ctx.api.encerrarLote(b.dataset.encerrar);
         await ctx.atualizarRef();
         ctx.toast('Lote encerrado', 'ok');
+        renderTanque(ctx, el, id);
+      } catch (e) { ctx.toast(e.message, 'erro'); }
+    }));
+
+  el.querySelectorAll('[data-editar-lote]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      if (!navigator.onLine) return ctx.toast('Sem internet', 'erro');
+      const l = todos.find((x) => x.id === b.dataset.editarLote); if (!l) return;
+      const v = await formulario({
+        titulo: 'Corrigir dados do lote', texto: 'Os relatórios do lote serão recalculados com os dados novos.',
+        campos: [
+          { nome: 'tipo', rotulo: 'Fase', tipo: 'select', valor: l.tipo, opcoes: [['engorda', 'Engorda'], ['alevinagem', 'Alevinagem']] },
+          { nome: 'especie', rotulo: 'Espécie', tipo: 'text', valor: l.especie, maxlength: '60' },
+          { nome: 'data', rotulo: 'Data de entrada no tanque', tipo: 'date', valor: l.data_entrada, max: hoje },
+          { nome: 'qtd', rotulo: 'Quantidade de peixes', tipo: 'number', valor: l.quantidade_inicial, step: '1', min: '1', inputmode: 'numeric' },
+          { nome: 'peso', rotulo: 'Peso total do lote (kg)', tipo: 'number', valor: l.peso_inicial_kg, step: '0.01', min: '0.01', inputmode: 'decimal' },
+        ],
+        validar: (x) => (!x.especie.trim() ? 'Informe a espécie.' : !x.data ? 'Informe a data de entrada.' : x.data > hoje ? 'A data não pode ser no futuro.'
+          : !(Number.isInteger(num(x.qtd)) && num(x.qtd) >= 1) ? 'Informe a quantidade de peixes (número inteiro).' : !(num(x.peso) > 0) ? 'Informe o peso total do lote em kg.' : null),
+      });
+      if (!v) return;
+      try {
+        await ctx.api.atualizar('lotes', l.id, { tipo: v.tipo, especie: v.especie.trim(), data_entrada: v.data, quantidade_inicial: num(v.qtd), peso_inicial_kg: num(v.peso) });
+        await ctx.atualizarRef();
+        ctx.toast('Lote corrigido', 'ok');
+        renderTanque(ctx, el, id);
+      } catch (e) { ctx.toast(e.message, 'erro'); }
+    }));
+
+  el.querySelectorAll('[data-reabrir]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      if (!navigator.onLine) return ctx.toast('Sem internet', 'erro');
+      const texto = ativos.length ? `Este tanque já tem ${ativos.length === 1 ? 'um lote ativo' : `${ativos.length} lotes ativos`}. Os dois vão aparecer nos lançamentos.` : 'Ele volta a aparecer nos lançamentos.';
+      if (!(await confirmar({ titulo: 'Reabrir este lote?', texto, ok: 'Reabrir lote' }))) return;
+      try {
+        await ctx.api.reabrirLote(b.dataset.reabrir);
+        await ctx.atualizarRef();
+        ctx.toast('Lote reaberto', 'ok');
         renderTanque(ctx, el, id);
       } catch (e) { ctx.toast(e.message, 'erro'); }
     }));
