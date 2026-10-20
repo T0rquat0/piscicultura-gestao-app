@@ -534,3 +534,13 @@ body.sem-rolagem { overflow: hidden; }
 .passo .tanque-atual { margin: 0; }
 .passo .data-linha { font-size: .92rem; }
 .passo .lote-linha { margin: -.2rem 0 0; font-size: .92rem; }
+
+/* Lançar: o padding dos passos precisa vencer as regras antigas de #f */
+#f.passos > .passo { padding: 1rem 1.15rem 1.15rem; border-bottom: 0; gap: .75rem; }
+#f.passos > .passo > * { padding: 0; border: 0; }
+#f.passos > .passo .data-linha { padding-top: .5rem; border-top: 1px solid #e3eae5; }
+#f.passos > .passo .lote-linha { padding: 0; }
+#f.passos > .passo .ajuda { margin: 0; }
+#f.passos > .btn.grande, #f.passos > p, #f.passos > #erro { padding: 0; border: 0; }
+.abas { max-width: 760px; margin: 0 auto; border-radius: 18px 18px 0 0; }
+#f.passos > .passo > .como { padding-left: 1.3rem; }
