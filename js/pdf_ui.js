@@ -63,7 +63,7 @@ export function baixarArquivo(blob, nome) {
 export async function compartilharArquivo(blob, nome, titulo) {
   const arquivo = new File([blob], nome, { type: 'application/pdf' });
   if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
-    try { await navigator.share({ files: [arquivo], title: titulo }); } catch (e) { if (!e || e.name !== 'AbortError') throw e; }
+    try { await navigator.share({ files: [arquivo], title: titulo, text: titulo }); } catch (e) { if (!e || e.name !== 'AbortError') throw e; }
     return true;
   }
   return false;
@@ -78,7 +78,7 @@ export async function abrirVisualizador({ blob, nome, titulo, toast }) {
     <header><button type="button" class="pdf-x" data-fechar aria-label="Fechar">${icone('voltar', 22)}</button><b>${esc(titulo)}</b></header>
     <div class="pdf-paginas"><p class="carregando">Abrindo o PDF…</p></div>
     <footer>
-      <button type="button" class="btn primario" data-compartilhar>Compartilhar</button>
+      <button type="button" class="btn primario" data-compartilhar>Enviar (WhatsApp, e-mail…)</button>
       <button type="button" class="btn" data-baixar>Baixar</button>
     </footer>`;
   const fechar = () => { document.removeEventListener('keydown', tecla); fundo.remove(); document.body.classList.remove('sem-rolagem'); };
