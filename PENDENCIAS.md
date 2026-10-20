@@ -31,3 +31,6 @@ Marque com [x] ao concluir. Tudo aqui foi deixado de propósito para depois do c
 - [x] Tela "esqueci minha senha" (feita; o e-mail sai em inglês até configurar o SMTP próprio).
 - [ ] Rodar `sql/03`, `sql/04`, `sql/06` e `sql/07` em cada Supabase novo (ver README).
 - [ ] `sql/05_dados_de_demonstracao.sql` é só para demonstração. Não rodar no banco do cliente.
+
+- [ ] Rodar `sql/08_causa_da_mortalidade.sql` no Supabase (coluna `causa`). Sem ela o app funciona, mas a causa não é salva.
+- [ ] Abertura em 3D (peixe vindo do fundo e virando): em teste, depende de peixe feito por código com Three.js.

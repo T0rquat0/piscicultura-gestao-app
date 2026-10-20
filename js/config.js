@@ -16,3 +16,17 @@ export const TIMEOUT_REDE_MS = 15000;
 
 // Dias de teste grátis para fazendas novas (o valor que vale é o do banco; este é só o texto da tela).
 export const TESTE_DIAS = 30;
+
+// Espécies mais criadas (a última opção "Outra" deixa a pessoa digitar).
+export const ESPECIES = ['Tambaqui', 'Tambacu', 'Tilápia', 'Matrinxã', 'Pirarucu', 'Pintado', 'Pacu', 'Curimatã', 'Carpa'];
+
+// Causa provável da morte dos peixes: [rótulo, dica curta para quem está no tanque].
+export const CAUSAS_MORTE = [
+  ['Falta de oxigênio', 'peixes boquejando na superfície'],
+  ['Temperatura', 'água muito quente ou muito fria'],
+  ['Doença ou parasitas', 'manchas, feridas, nadando estranho'],
+  ['Qualidade da água', 'água verde, suja ou com cheiro forte'],
+  ['Predadores', 'aves, lontra, jacaré'],
+  ['Manejo', 'despesca, transporte, estresse'],
+  ['Não sei', 'não deu para saber'],
+];

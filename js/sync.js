@@ -30,6 +30,11 @@ export async function sincronizar(client, userId) {
         let error = null, status = 0;
         try {
           ({ error, status } = await client.from(it.tabela).insert(it.payload));
+          // banco ainda sem a coluna "causa" (sql/08 não rodado): salva sem ela em vez de travar a fila
+          if (error && it.payload.causa !== undefined && /causa/i.test(error.message || '')) {
+            const { causa, ...semCausa } = it.payload;
+            ({ error, status } = await client.from(it.tabela).insert(semCausa));
+          }
         } catch (e) {
           error = { message: String((e && e.message) || e), code: '' };
         }

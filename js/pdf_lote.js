@@ -194,9 +194,9 @@ export function gerarPdfLote(jsPDF, d) {
   secao('Mortalidade', 44);
   if (mort.length) {
     let acc = 0;
-    const todas = mort.map((m) => { acc += Number(m.quantidade); return [fmtData(m.data), fmtInt(m.quantidade), fmtInt(acc), `${n((acc / Number(lote.quantidade_inicial)) * 100, 2)}%`]; });
+    const todas = mort.map((m) => { acc += Number(m.quantidade); return [fmtData(m.data), fmtInt(m.quantidade), fmtInt(acc), `${n((acc / Number(lote.quantidade_inicial)) * 100, 2)}%`, m.causa || '-']; });
     const lim = todas.slice(-25);
-    tabela(doc, y, [['DATA', 'MORTOS NO DIA', 'ACUMULADO', '% DO LOTE']], lim, ['left', 'right', 'right', 'right']);
+    tabela(doc, y, [['DATA', 'MORTOS NO DIA', 'ACUMULADO', '% DO LOTE', 'CAUSA PROVÁVEL']], lim, ['left', 'right', 'right', 'right', 'left']);
     y = doc.lastAutoTable.finalY + 3;
     if (todas.length > lim.length) { txt(`Mostrando os ${lim.length} registros mais recentes de ${todas.length}.`, M, y + 2, { size: 7.5, color: COR.mudo }); y += 6; }
     y += 7;

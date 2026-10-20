@@ -544,3 +544,15 @@ body.sem-rolagem { overflow: hidden; }
 #f.passos > .btn.grande, #f.passos > p, #f.passos > #erro { padding: 0; border: 0; }
 .abas { max-width: 760px; margin: 0 auto; border-radius: 18px 18px 0 0; }
 #f.passos > .passo > .como { padding-left: 1.3rem; }
+
+/* .btn.mini herdava o layout dos cartões .mini da Início (grid, alinhado ao topo): texto ficava fora do centro */
+.btn.mini { display: inline-flex; align-items: center; justify-content: center; align-content: center; gap: .4rem; border-radius: var(--r-botao); box-shadow: none; padding: .45rem 1rem; }
+.btn.mini:not(.primario):not(.perigo) { background: var(--rio-claro); }
+
+/* causa da mortalidade */
+.tiles.causas .tile { min-height: 72px; align-content: center; gap: .1rem; }
+.tiles.causas .tile small { font-size: .78rem; line-height: 1.2; font-weight: 500; }
+.valor small.causa { display: block; font-size: .78rem; color: var(--tinta-2); font-weight: 500; text-align: right; }
+#f .tiles.causas { grid-template-columns: 1fr 1fr; gap: .55rem; }
+#f .tiles.causas .tile { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: .15rem; min-height: 78px; padding: .6rem .75rem; }
+#f .tiles.causas .tile > span { font-size: .98rem; line-height: 1.15; }

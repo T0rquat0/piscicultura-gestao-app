@@ -1,9 +1,9 @@
 // Cadastro de tanques e lotes (dono e gerente). Precisa de internet.
 import { confirmar, ocupado } from '../dialogo.js';
 import { icone } from '../icons.js';
+import { ESPECIES } from '../config.js';
 import { esc, fmtData, fmtInt, fmtNum, hojeISO, num, ROTULO_TIPO } from '../util.js';
 
-const ESPECIES = ['Tilápia', 'Tambaqui', 'Tambacu', 'Pintado', 'Pirarucu', 'Matrinxã', 'Curimatã', 'Pacu', 'Carpa'];
 
 const semPermissao = (el) => { el.innerHTML = '<div class="card vazio">Você não tem permissão para esta tela.</div>'; };
 const avisoOffline = () => (navigator.onLine ? '' : '<p class="aviso">Sem internet: cadastros de tanques e lotes só funcionam com conexão.</p>');
@@ -84,9 +84,9 @@ export async function renderTanque(ctx, el, id) {
         <label>Fase
           <select id="tipo"><option value="engorda">Engorda</option><option value="alevinagem">Alevinagem</option></select></label>
         <label>Espécie
-          <input id="especie" list="especies" maxlength="60" placeholder="Ex.: Tilápia" required>
-          <datalist id="especies">${ESPECIES.map((e) => `<option value="${esc(e)}">`).join('')}</datalist></label>
+          <select id="especie">${ESPECIES.map((e) => `<option value="${esc(e)}">${esc(e)}</option>`).join('')}<option value="__outra">Outra…</option></select></label>
       </div>
+      <label id="especie-outra-wrap" hidden>Qual espécie? <input id="especie-outra" maxlength="60" placeholder="Digite o nome do peixe"></label>
       <label>Data de entrada no tanque <input id="data" type="date" value="${hoje}" max="${hoje}" required></label>
       <div class="duas">
         <label>Quantidade de peixes <input id="qtd" type="number" inputmode="numeric" step="1" min="1" required></label>
@@ -124,11 +124,13 @@ export async function renderTanque(ctx, el, id) {
   f.querySelector('#qtd').addEventListener('input', atualizaPm);
   f.querySelector('#peso').addEventListener('input', atualizaPm);
 
+  f.querySelector('#especie').addEventListener('change', (e) => { const o = e.target.value === '__outra'; f.querySelector('#especie-outra-wrap').hidden = !o; if (o) f.querySelector('#especie-outra').focus(); });
+
   const erro = f.querySelector('#erro');
   f.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     erro.hidden = true;
-    const especie = f.querySelector('#especie').value.trim();
+    const especie = f.querySelector('#especie').value === '__outra' ? f.querySelector('#especie-outra').value.trim() : f.querySelector('#especie').value;
     const qtd = num(f.querySelector('#qtd').value), peso = num(f.querySelector('#peso').value);
     const falha = (m) => { erro.textContent = m; erro.hidden = false; };
     if (!especie) return falha('Informe a espécie.');

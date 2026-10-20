@@ -5,7 +5,7 @@ import { esc, hojeISO, fmtData, fmtNum, fmtInt, num, uuid, ROTULO_TIPO } from '.
 import * as db from '../db.js';
 import { confirmar } from '../dialogo.js';
 import { ordemNatural } from './home.js';
-import { PESO_SACO_PADRAO_KG } from '../config.js';
+import { PESO_SACO_PADRAO_KG, CAUSAS_MORTE } from '../config.js';
 
 const TIPOS = {
   racao: { rotulo: 'Ração', tabela: 'racao_consumo' },
@@ -92,6 +92,14 @@ export async function renderLancar(ctx, el, params = {}) {
         <div class="data-linha"><span>Data: <b id="data-txt">hoje</b></span><button type="button" class="link" id="b-data">Mudar</button></div>
         <label id="data-wrap" hidden>Data <input id="data" type="date" value="${hoje}" max="${hoje}" required></label>
       </section>
+      ${tipo === 'mortalidade' ? `<section class="passo tipo-mortalidade">
+        <h2 class="passo-t"><i>3</i> Causa provável <small class="mudo">(opcional)</small></h2>
+        <div class="tiles compactos causas" id="causas">
+          ${CAUSAS_MORTE.map(([r, d]) => `<button type="button" class="tile" data-causa="${esc(r)}"><span>${esc(r)}</span><small>${esc(d)}</small></button>`).join('')}
+          <button type="button" class="tile" data-causa="outros"><span>Outra causa</span><small>escrever qual foi</small></button>
+        </div>
+        <label id="causa-outra-wrap" hidden>Qual foi a causa? <input id="causa-outra" maxlength="60" placeholder="Ex.: queda de energia no aerador"></label>
+      </section>` : ''}
       <p id="erro" class="erro" hidden></p>
       <button class="btn primario grande" type="submit">Salvar ${TIPOS[tipo].rotulo.toLowerCase()}</button>
       <p class="mudo" style="margin:0;text-align:center">${navigator.onLine ? 'Será enviado ao servidor agora.' : 'Sem internet: será salvo no celular e enviado depois.'}</p>
@@ -102,9 +110,9 @@ export async function renderLancar(ctx, el, params = {}) {
 
   const f = el.querySelector('#f');
   const selTanque = f.querySelector('#tanque');
-  f.querySelectorAll('.tile').forEach((b) => b.addEventListener('click', () => {
+  f.querySelectorAll('#tiles .tile').forEach((b) => b.addEventListener('click', () => {
     selTanque.value = b.dataset.tanque;
-    f.querySelectorAll('.tile').forEach((x) => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', String(on)); });
+    f.querySelectorAll('#tiles .tile').forEach((x) => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', String(on)); });
     selTanque.dispatchEvent(new Event('change'));
     f.querySelector('#tanque-nome').textContent = (tanques.find((t) => t.id === b.dataset.tanque) || {}).nome || '';
     fecharTiles();
@@ -234,6 +242,22 @@ export async function renderLancar(ctx, el, params = {}) {
     } catch { return null; }
   }
 
+  // causa provável da mortalidade: toque escolhe, toque de novo desmarca; "Outra causa" abre o campo de texto
+  let causaSel = '';
+  const causaOutra = f.querySelector('#causa-outra');
+  f.querySelectorAll('#causas .tile').forEach((b) => b.addEventListener('click', () => {
+    causaSel = b.classList.contains('on') ? '' : b.dataset.causa;
+    f.querySelectorAll('#causas .tile').forEach((x) => x.classList.toggle('on', x.dataset.causa === causaSel));
+    f.querySelector('#causa-outra-wrap').hidden = causaSel !== 'outros';
+    if (causaSel === 'outros') causaOutra.focus();
+  }));
+  function causaEscolhida() {
+    if (!causaSel) return '';
+    if (causaSel !== 'outros') return causaSel;
+    const t = causaOutra.value.trim().slice(0, 60);
+    return t ? `Outros: ${t}` : 'Outros';
+  }
+
   f.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     erro.hidden = true;
@@ -259,6 +283,8 @@ export async function renderLancar(ctx, el, params = {}) {
       const q = num(f.querySelector('#qtd').value);
       if (!(q >= 1) || !Number.isInteger(q)) return mostrarErro('Informe a quantidade de peixes mortos (número inteiro).');
       payload = { ...base, quantidade: q };
+      const causa = causaEscolhida();
+      if (causa) payload.causa = causa;
     }
 
     // possível lançamento duplicado (dois toques, ou duas pessoas lançando o mesmo)
