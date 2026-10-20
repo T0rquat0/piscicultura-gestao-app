@@ -72,7 +72,7 @@ export function renderMais(ctx, el) {
       await ctx.api.salvarLogo(state.perfil.fazenda_id, dataUrl);
       if (dataUrl && !(await ctx.api.logo())) return ctx.toast('Falta rodar o sql/09 no Supabase.', 'erro');
       await ctx.atualizarRef(true); ctx.recarregarTopo(); ctx.toast(msg, 'ok'); renderMais(ctx, el);
-    } catch (e) { ctx.toast('Não salvou: ' + e.message, 'erro'); }
+    } catch (e) { ctx.toast(/logo/.test(e.message || '') && /column|schema/.test(e.message || '') ? 'Falta rodar o sql/09 no Supabase (coluna do logo).' : 'Não salvou: ' + e.message, 'erro'); }
   };
   const inLogo = el.querySelector('#in-logo');
   if (inLogo) {
