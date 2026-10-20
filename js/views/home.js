@@ -1,7 +1,7 @@
 import { esc, fmtInt, fmtNum, fmtData, hojeISO, diasEntre, ROTULO_TIPO } from '../util.js';
 import * as db from '../db.js';
 import { situacaoEstoque } from '../calc.js';
-import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, PESO_SACO_PADRAO_KG } from '../config.js';
+import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, PESO_SACO_PADRAO_KG, CONTAGEM_LEMBRETE_DIAS, PLANO_AVISO_DIAS } from '../config.js';
 import { icone } from '../icons.js';
 import { pedirTexto } from '../dialogo.js';
 
@@ -168,6 +168,7 @@ export async function renderHome(ctx, el) {
   let filtro = 'todos';
   el.innerHTML = `
     <h1>Olá, ${esc(primeiro)}</h1>
+    <div id="avisos">${avisoContagem(ctx, saldoRacao, hoje)}</div>
     ${resumoDia(grupos.falta.length + grupos.ok.length, faltam)}
     ${cartaoEstoque(saldoRacao, state.ref.kgSaco || PESO_SACO_PADRAO_KG)}
     ${semDetalhe ? '<p class="aviso">Sem conexão: mostrando só os dados guardados no aparelho. Os totais aparecem quando houver internet.</p>' : ''}
@@ -195,4 +196,28 @@ export async function renderHome(ctx, el) {
   const atalho = el.querySelector('[data-filtrar-falta]');
   if (atalho) atalho.addEventListener('click', () => { filtro = 'falta'; pintar(); window.scrollTo({ top: 0 }); });
   pintar();
+  avisoPlano(ctx, el.querySelector('#avisos'));
+}
+
+// lembrete de contagem semanal (dono/gerente), só quando a ração está sendo usada
+function avisoContagem(ctx, saldo, hoje) {
+  if (!ctx.podeGerir() || !saldo || !(Number(saldo.consumo_7d_kg) > 0) || saldo.ultima_contagem === undefined) return '';
+  const dias = saldo.ultima_contagem ? diasEntre(saldo.ultima_contagem, hoje) : null;
+  if (dias != null && dias < CONTAGEM_LEMBRETE_DIAS) return '';
+  return `<a class="aviso aviso-link" href="#/estoque" id="aviso-contagem">${dias == null ? 'O estoque de ração ainda não foi contado.' : `Faz ${fmtInt(dias)} dias sem contar o estoque de ração.`} Toque para contar: deixa o saldo confiável.</a>`;
+}
+
+// aviso de teste/plano perto de vencer ou vencido (só o dono)
+async function avisoPlano(ctx, caixa) {
+  if (!caixa || ctx.state.perfil.papel !== 'dono' || !navigator.onLine) return;
+  const p = await ctx.api.plano().catch(() => null);
+  if (!p || !caixa.isConnected) return;
+  const dias = p.valido_ate ? diasEntre(hojeISO(), p.valido_ate) : null;
+  const quando = dias === 0 ? 'hoje' : dias === 1 ? 'amanhã' : `em ${fmtInt(dias)} dias (${fmtData(p.valido_ate)})`;
+  const txt = p.estado === 'teste' && dias != null && dias <= PLANO_AVISO_DIAS ? `Seu teste grátis termina ${quando}. Escolha um pacote para continuar abrindo lotes.`
+    : p.estado === 'ativo' && dias != null && dias <= PLANO_AVISO_DIAS ? `Seu plano vence ${quando}. Renove para continuar abrindo lotes.`
+    : p.estado === 'carencia' ? `Seu plano venceu em ${fmtData(p.valido_ate)}. Renove logo: depois da carência, não dá para abrir lotes novos.`
+    : p.estado === 'vencido' || p.estado === 'teste_acabou' ? 'Seu plano está vencido: não dá para abrir lotes novos. Os lançamentos continuam funcionando.'
+    : '';
+  if (txt) caixa.insertAdjacentHTML('afterbegin', `<a class="aviso aviso-link" href="#/plano" id="aviso-plano">${esc(txt)} <b>Ver plano</b></a>`);
 }

@@ -206,6 +206,21 @@ export function criarApi(client) {
     async atualizarUsuario(id, campos) {
       ok(await client.from('usuarios').update(campos).eq('id', id));
     },
+    // ----- cópia de segurança (dono): tudo o que a fazenda tem, tabela por tabela -----
+    async exportarTudo() {
+      const tabelas = ['fazendas', 'usuarios', 'tanques', 'usuario_tanques', 'lotes', 'biometrias', 'mortalidade', 'racao_consumo', 'racao_estoque', 'racao_contagens'];
+      const out = { gerado_em: new Date().toISOString(), versao: 1, tabelas: {}, sem_acesso: [] };
+      for (const t of tabelas) {
+        try {
+          out.tabelas[t] = await todos(() => {
+            const q = client.from(t).select('*');
+            return t === 'usuario_tanques' ? q.order('usuario_id').order('tanque_id') : q.order('id');
+          });
+        } catch { out.sem_acesso.push(t); } // tabela que ainda não existe neste banco (sql não rodado)
+      }
+      return out;
+    },
+
     // ----- histórico e lixeira (sql/12) -----
     async historico() {
       const { data, error } = await client.from('historico')

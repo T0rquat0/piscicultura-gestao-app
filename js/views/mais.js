@@ -47,6 +47,11 @@ export function renderMais(ctx, el) {
         ${state.ref.logo ? '<button class="btn perigo" id="b-logo-x" type="button">Remover</button>' : ''}</div></div>
       <input id="in-logo" type="file" accept="image/*" hidden></div>` : ''}
 
+    ${p.papel === 'dono' ? `<div class="card">
+      <b>Cópia de segurança dos dados</b>
+      <small style="display:block">Baixa um arquivo com tudo da fazenda: tanques, lotes, lançamentos, compras, contagens e equipe. Guarde no Google Drive ou no e-mail.</small>
+      <div class="acoes"><button class="btn" id="b-copia" type="button">Baixar cópia dos dados</button></div></div>` : ''}
+
     <details class="card">
       <summary>Como instalar no celular</summary>
       <p><b>Android (Chrome):</b> menu (três pontos) → “Instalar app” ou “Adicionar à tela inicial”.</p>
@@ -85,6 +90,22 @@ export function renderMais(ctx, el) {
     const x = el.querySelector('#b-logo-x');
     if (x) x.addEventListener('click', () => salvarLogo(null, 'Logo removida'));
   }
+  const bcop = el.querySelector('#b-copia');
+  if (bcop) bcop.addEventListener('click', async () => {
+    if (!navigator.onLine) return ctx.toast('Sem internet', 'erro');
+    bcop.disabled = true; const txt = bcop.textContent; bcop.textContent = 'Preparando…';
+    try {
+      const dados = await ctx.api.exportarTudo();
+      const n = Object.values(dados.tabelas).reduce((s, l) => s + l.length, 0);
+      const nome = `copia-${((p.fazendas && p.fazendas.nome) || 'fazenda').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\W+/g, '-').toLowerCase()}-${hojeISO()}.json`;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(dados, null, 1)], { type: 'application/json' }));
+      a.download = nome; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      ctx.toast(`Cópia baixada: ${n} registro(s)`, 'ok');
+    } catch (e) { ctx.toast('Não foi possível gerar a cópia: ' + e.message, 'erro'); }
+    bcop.disabled = false; bcop.textContent = txt;
+  });
   el.querySelector('#b-atualizar').addEventListener('click', async () => {
     if (!navigator.onLine) return ctx.toast('Sem internet', 'erro');
     await ctx.atualizarRef(true);

@@ -614,3 +614,6 @@ body.sem-rolagem { overflow: hidden; }
 .registros .acoes-reg .btn { min-height: 40px; padding: 0 1rem; font-size: .9rem; }
 /* ===== histórico e lixeira ===== */
 .registros small.mud { color: var(--tinta); margin: .25rem 0; line-height: 1.45; }
+/* ===== avisos da tela inicial (plano e contagem) ===== */
+a.aviso-link { display: block; text-decoration: none; }
+a.aviso-link b { white-space: nowrap; }
