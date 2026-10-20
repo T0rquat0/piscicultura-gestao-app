@@ -566,3 +566,10 @@ body.sem-rolagem { overflow: hidden; }
 .login-card { margin: 0 auto; }
 .login-card .btn { width: 100%; }
 .login-card .link { display: block; width: 100%; text-align: center; padding: .6rem 0; }
+
+/* logo própria da fazenda no topo */
+.logo-sm.propria { width: 38px; height: 38px; border-radius: 10px; background: #fff; display: grid; place-items: center; flex: none; overflow: hidden; }
+.logo-sm.propria img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.logo-previa { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
+.logo-previa .caixa { width: 64px; height: 64px; border-radius: 14px; border: 1px solid var(--linha, #d6dfda); background: #fff; display: grid; place-items: center; overflow: hidden; flex: none; color: var(--rio); }
+.logo-previa .caixa img { max-width: 100%; max-height: 100%; object-fit: contain; }

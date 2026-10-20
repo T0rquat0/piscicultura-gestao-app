@@ -1,6 +1,6 @@
 // Relatório geral da fazenda em PDF: estoque de ração, lotes ativos e ração dos últimos 30 dias.
 import { fmtNum, fmtInt, fmtData, fmtBRL, ROTULO_TIPO } from './util.js';
-import { COR, M, LARG, TOPO, BASE, ferramentas, rodape, tabela, barras } from './pdf_lote.js';
+import { COR, M, LARG, TOPO, BASE, ferramentas, rodape, logoPdf, tabela, barras } from './pdf_lote.js';
 
 const n = (v, d = 1) => fmtNum(v, d);
 const MSG = {
@@ -20,7 +20,8 @@ export function gerarPdfFazenda(jsPDF, d) {
   const cabe = (h) => { if (y + h > BASE) { doc.addPage(); y = TOPO; } };
 
   // ---------- cabeçalho ----------
-  caps(fazenda, M, 16, { color: COR.rio, size: 7.5 });
+  logoPdf(doc, d.logo, M, 8.5, 10);
+  caps(fazenda, M + 13, 16, { color: COR.rio, size: 7.5 });
   caps('Relatório geral', 210 - M, 16, { align: 'right' });
   txt('Situação da fazenda', M, 36, { size: 28, bold: true });
   txt(`em ${fmtData(geradoEm)}  ·  ração dos últimos 30 dias`, M, 44, { size: 12.5, color: COR.mudo });
@@ -109,6 +110,6 @@ export function gerarPdfFazenda(jsPDF, d) {
     y += 4;
   } else { txt('Nenhuma ração lançada nos últimos 30 dias.', M, y + 1, { size: 9, color: COR.mudo }); y += 10; }
 
-  rodape(doc, fazenda, 'Situação da fazenda', txt, caps, linha, 'Relatório geral');
+  rodape(doc, fazenda, 'Situação da fazenda', txt, caps, linha, 'Relatório geral', d.logo);
   return doc;
 }

@@ -72,9 +72,10 @@ async function carregarRefLocal() {
 async function atualizarRef() {
   if (!navigator.onLine || !state.user || !api) return false;
   try {
-    const [tanques, lotes, kgSaco] = await Promise.all([api.tanques(), api.lotes({ apenasAtivos: true }), api.kgSaco().catch(() => null)]);
-    state.ref = { tanques, lotes, kgSaco: kgSaco || (state.ref && state.ref.kgSaco) || null, userId: state.perfil.id, atualizado_em: new Date().toISOString() };
+    const [tanques, lotes, kgSaco, logo] = await Promise.all([api.tanques(), api.lotes({ apenasAtivos: true }), api.kgSaco().catch(() => null), api.logo().catch(() => undefined)]);
+    state.ref = { tanques, lotes, kgSaco: kgSaco || (state.ref && state.ref.kgSaco) || null, logo: logo === undefined ? (state.ref && state.ref.logo) || null : logo, userId: state.perfil.id, atualizado_em: new Date().toISOString() };
     await db.kvSet('ref', state.ref);
+    atualizarMarca();
     state.semRede = false;
     atualizarPill();
     return true;
@@ -83,6 +84,14 @@ async function atualizarRef() {
     atualizarPill();
     return false;
   }
+}
+
+// logo da fazenda (se houver) ou a marca do sistema, no topo
+function atualizarMarca() {
+  const el = document.querySelector('.logo-sm'); if (!el) return;
+  const logo = state.ref && state.ref.logo;
+  el.className = 'logo-sm' + (logo ? ' propria' : '');
+  el.innerHTML = logo ? `<img src="${esc(logo)}" alt="">` : icone('peixe', 26);
 }
 
 // ---------- sincronização ----------
@@ -109,6 +118,7 @@ const ctx = {
   podeGerir: () => !!state.perfil && (state.perfil.papel === 'dono' || state.perfil.papel === 'gerente'),
   toast,
   atualizarRef,
+  recarregarTopo: atualizarMarca,
   atualizarPendentes,
   sincronizarAgora,
   entrar,
@@ -258,7 +268,7 @@ function montarShell() {
   root.innerHTML = `
   <div class="app">
     <header class="topo">
-      <div class="marca"><span class="logo-sm">${icone('peixe', 26)}</span>
+      <div class="marca"><span class="logo-sm"></span>
         <div><strong>${esc((p.fazendas && p.fazendas.nome) || 'Piscicultura')}</strong><small>${esc(p.nome)} · ${esc(ROTULO_PAPEL[p.papel] || p.papel)}</small></div></div>
       <a id="pill" class="pill" href="#/pendencias"></a>
     </header>
@@ -271,6 +281,7 @@ function montarShell() {
     </nav>
   </div>`;
   atualizarPill();
+  atualizarMarca();
 }
 
 function renderErro(el, e) {

@@ -85,3 +85,21 @@ export function parseHash(h) {
 
 export const ROTULO_PAPEL = { dono: 'Dono', gerente: 'Gerente', funcionario: 'Funcionário' };
 export const ROTULO_TIPO = { alevinagem: 'Alevinagem', engorda: 'Engorda' };
+
+// Reduz a imagem escolhida (foto/arquivo) para no máximo 256 px e devolve um data URL pequeno.
+// PNG preserva fundo transparente; se ficar grande (foto), cai para JPEG com fundo branco.
+export async function reduzirLogo(file, max = 256) {
+  if (!file || !/^image\//.test(file.type)) throw new Error('Escolha um arquivo de imagem (PNG ou JPG).');
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((ok, falha) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => falha(new Error('Não consegui abrir essa imagem.')); i.src = url; });
+    const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k));
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d'); g.drawImage(img, 0, 0, w, h);
+    let out = c.toDataURL('image/png');
+    if (out.length > 150000) { g.globalCompositeOperation = 'destination-over'; g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); out = c.toDataURL('image/jpeg', 0.85); }
+    if (out.length > 240000) throw new Error('Imagem muito pesada. Use uma mais simples.');
+    return out;
+  } finally { URL.revokeObjectURL(url); }
+}

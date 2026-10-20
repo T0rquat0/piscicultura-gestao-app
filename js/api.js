@@ -63,6 +63,14 @@ export function criarApi(client) {
     async salvarKgSaco(fazendaId, kg) {
       ok(await client.from('fazendas').update({ kg_saco: kg }).eq('id', fazendaId));
     },
+    // logo da fazenda (data URL); null se não há ou se o sql/09 ainda não foi rodado
+    async logo() {
+      const { data, error } = await client.from('fazendas').select('logo').maybeSingle();
+      return error || !data || !data.logo ? null : data.logo;
+    },
+    async salvarLogo(fazendaId, dataUrl) {
+      ok(await client.from('fazendas').update({ logo: dataUrl || null }).eq('id', fazendaId));
+    },
     async tanques() {
       return ok(await client.from('tanques').select('id,nome').order('nome'));
     },

@@ -106,7 +106,7 @@ export async function renderRelatorios(ctx, el) {
       const racaoTanque = tanques.filter((t) => porTanque.has(t.id)).map((t) => ({ nome: t.nome, kg: porTanque.get(t.id) }))
         .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR', { numeric: true, sensitivity: 'base' }));
       const doc = gerarPdfFazenda(jsPDF, {
-        fazenda: (ctx.state.perfil.fazendas && ctx.state.perfil.fazendas.nome) || 'Piscicultura', geradoEm: hoje, kgSaco: kgS, gerir, fontes, saldo: saldo || {},
+        logo: ctx.state.ref.logo || null, fazenda: (ctx.state.perfil.fazendas && ctx.state.perfil.fazendas.nome) || 'Piscicultura', geradoEm: hoje, kgSaco: kgS, gerir, fontes, saldo: saldo || {},
         sit: situacaoEstoque(saldo && saldo.saldo_kg, saldo && saldo.consumo_7d_kg, ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS),
         lotes: detalhes, racaoDia, racaoTanque, precoKg, ultimaContagem: contagens[0] || null,
       });
@@ -237,7 +237,7 @@ export async function renderRelatorioLote(ctx, el, id) {
     try {
       const [jsPDF, fontes] = await Promise.all([carregarGerador(), carregarFontes()]);
       const doc = gerarPdfLote(jsPDF, {
-        fazenda: (ctx.state.perfil.fazendas && ctx.state.perfil.fazendas.nome) || 'Piscicultura', lote, nomeTanque, c, bios, mort, rac,
+        logo: ctx.state.ref.logo || null, fazenda: (ctx.state.perfil.fazendas && ctx.state.perfil.fazendas.nome) || 'Piscicultura', lote, nomeTanque, c, bios, mort, rac,
         evo: evolucaoPeso(lote, bios), semanas: racaoPorSemana(rac), kgSaco: kgS, gerir, geradoEm: hoje, fontes,
       });
       const blob = doc.output('blob');
@@ -395,7 +395,7 @@ export async function renderRacaoDia(ctx, el) {
     const t0 = bp.textContent; bp.disabled = true; bp.textContent = 'Gerando PDF…';
     try {
       const [jsPDF, fontes] = await Promise.all([carregarGerador(), carregarFontes()]);
-      const doc = gerarPdfRacao(jsPDF, { fazenda, geradoEm: hoje, kgSaco: kgS, fontes, rotulo: r.rotulo, periodo: r.periodo, dias: r.dias.length, tanques: r.lista, linhasDia: r.linhasDia, colunas: r.colunas });
+      const doc = gerarPdfRacao(jsPDF, { logo: ctx.state.ref.logo || null, fazenda, geradoEm: hoje, kgSaco: kgS, fontes, rotulo: r.rotulo, periodo: r.periodo, dias: r.dias.length, tanques: r.lista, linhasDia: r.linhasDia, colunas: r.colunas });
       bp.disabled = false; bp.textContent = t0;
       await abrirVisualizador({ blob: doc.output('blob'), nome: `racao-${r.ini}${r.um ? '' : '_a_' + r.fim}.pdf`, titulo: `Ração · ${r.periodo}`, toast: ctx.toast });
     } catch (e) { ctx.toast(e.message || 'Não foi possível gerar o PDF', 'erro'); bp.disabled = false; bp.textContent = t0; }
