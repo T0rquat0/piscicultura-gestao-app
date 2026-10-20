@@ -221,13 +221,23 @@ summary { cursor: pointer; font-weight: 700; padding: .7rem 0; font-size: 1.05re
 /* ----- abertura (1x por dia) ----- */
 .splash { position: fixed; inset: 0; z-index: 100; background: var(--rio); display: grid; place-items: center; overflow: hidden; transition: opacity .3s; }
 .splash.sai { opacity: 0; pointer-events: none; }
-.splash-peixe { color: #e8f1ed; animation: nada 1s cubic-bezier(.45, .05, .35, 1) both; }
-@keyframes nada {
-  0% { transform: translate(70vw, 18px) rotate(-4deg); }
-  35% { transform: translate(28vw, -14px) rotate(3deg); }
-  70% { transform: translate(-14vw, 10px) rotate(-2deg); }
-  100% { transform: translate(-70vw, -8px) rotate(2deg); }
-}
+.splash-peixe { display: block; animation: nada 1.7s cubic-bezier(.4, .1, .3, 1) both; }
+.splash-balanco { display: block; animation: balanco .55s ease-in-out infinite alternate; }
+.tambaqui { display: block; overflow: visible; filter: drop-shadow(0 10px 12px rgba(0, 0, 0, .25)); }
+.tb-cauda { transform-origin: 50px 50px; animation: rabo .3s ease-in-out infinite alternate; }
+.tb-corpo-todo { transform-origin: 110px 50px; animation: ondula .3s ease-in-out infinite alternate-reverse; }
+.tb-peitoral { transform-origin: 138px 64px; animation: peitoral .45s ease-in-out infinite alternate; }
+@keyframes nada { 0% { transform: translateX(-72vw); } 100% { transform: translateX(72vw); } }
+@keyframes balanco { 0% { transform: translateY(8px) rotate(-1.5deg); } 100% { transform: translateY(-10px) rotate(1.5deg); } }
+@keyframes rabo { 0% { transform: rotate(-17deg); } 100% { transform: rotate(17deg); } }
+@keyframes ondula { 0% { transform: rotate(-1.6deg); } 100% { transform: rotate(1.6deg); } }
+@keyframes peitoral { 0% { transform: rotate(-10deg); } 100% { transform: rotate(14deg); } }
+.splash-agua { position: absolute; inset: auto 0 0 0; height: 55%; background: linear-gradient(to top, rgba(255, 255, 255, .07), transparent); }
+.splash-bolha { position: absolute; width: 9px; height: 9px; border-radius: 50%; border: 2px solid rgba(232, 241, 237, .55); opacity: 0; animation: bolha 1.4s ease-out both; }
+.splash-bolha.b1 { left: 38%; top: 54%; animation-delay: .45s; }
+.splash-bolha.b2 { left: 50%; top: 50%; width: 6px; height: 6px; animation-delay: .65s; }
+.splash-bolha.b3 { left: 62%; top: 55%; width: 11px; height: 11px; animation-delay: .85s; }
+@keyframes bolha { 0% { transform: translateY(0); opacity: 0; } 20% { opacity: .9; } 100% { transform: translateY(-80px); opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
   .view { animation: none; }

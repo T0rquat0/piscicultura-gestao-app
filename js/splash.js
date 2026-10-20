@@ -1,6 +1,31 @@
-// Abertura: um peixe cruza a tela. Aparece só na primeira abertura do dia, dura menos de 1 s,
-// some ao toque e não roda se o aparelho pede menos movimento.
-import { icone } from './icons.js';
+// Abertura: um tambaqui desenhado em vetor atravessa a tela, balançando o rabo.
+// Aparece só na primeira abertura do dia, dura menos de 2 s, some ao toque e não roda
+// se o aparelho pede menos movimento. Sem imagens nem bibliotecas: é só SVG + CSS.
+
+const TAMBAQUI = `
+<svg class="tambaqui" viewBox="0 0 200 100" width="250" height="125" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="tb-corpo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2d3320"/><stop offset=".45" stop-color="#5c5a31"/>
+      <stop offset=".72" stop-color="#b0733a"/><stop offset="1" stop-color="#cf5a30"/>
+    </linearGradient>
+    <linearGradient id="tb-nadadeira" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#cf5a30"/><stop offset="1" stop-color="#8f3a1f"/>
+    </linearGradient>
+  </defs>
+  <g class="tb-corpo-todo">
+    <g class="tb-cauda"><path d="M50 49 C40 40 26 22 6 8 C8 30 20 42 32 50 C20 58 8 70 6 92 C26 78 40 60 50 51 Z" fill="#3a3a22"/></g>
+    <path d="M62 33 C66 27 74 24 82 26 C78 31 72 34 66 36 Z" fill="#3a3a22"/>
+    <path d="M80 18 C90 -2 114 -3 128 14 C112 12 97 17 88 26 Z" fill="#2a2f1c"/>
+    <path d="M44 50 C50 17 100 4 142 21 C168 31 182 44 186 53 C181 66 162 80 136 86 C98 98 54 82 44 50 Z" fill="url(#tb-corpo)"/>
+    <path d="M60 40 C90 18 130 20 156 36" fill="none" stroke="#fff" stroke-opacity=".14" stroke-width="3" stroke-linecap="round"/>
+    <path d="M139 26 C129 44 131 66 142 80" fill="none" stroke="#1d2114" stroke-opacity=".4" stroke-width="2" stroke-linecap="round"/>
+    <path d="M84 84 C92 98 108 99 118 92 C108 90 98 87 92 81 Z" fill="url(#tb-nadadeira)"/>
+    <g class="tb-peitoral"><path d="M142 66 C134 74 122 82 108 86 C124 90 142 82 150 70 Z" fill="url(#tb-nadadeira)"/></g>
+    <circle cx="161" cy="45" r="5.6" fill="#f3efe0"/><circle cx="162.4" cy="45.5" r="3" fill="#16190f"/>
+    <path d="M185 54 C181 58 176 58 171 56" fill="none" stroke="#1d2114" stroke-opacity=".55" stroke-width="1.6" stroke-linecap="round"/>
+  </g>
+</svg>`;
 
 export function splashDoDia() {
   try {
@@ -11,9 +36,9 @@ export function splashDoDia() {
   } catch { return; }
   const el = document.createElement('div');
   el.className = 'splash';
-  el.innerHTML = `<span class="splash-peixe">${icone('peixe', 88)}</span>`;
+  el.innerHTML = `<span class="splash-agua"></span><span class="splash-bolha b1"></span><span class="splash-bolha b2"></span><span class="splash-bolha b3"></span><span class="splash-peixe"><span class="splash-balanco">${TAMBAQUI}</span></span>`;
   document.body.appendChild(el);
   const fim = () => { el.classList.add('sai'); setTimeout(() => el.remove(), 320); };
   el.addEventListener('click', fim);
-  setTimeout(fim, 1000);
+  setTimeout(fim, 1800);
 }
