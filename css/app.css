@@ -648,3 +648,7 @@ small.falta-nota { display: block; color: var(--alerta, #b5402e); font-size: .8r
 .msg-acoes { display: grid; gap: .6rem; margin-top: .7rem; }
 .msg-acoes .btn { width: 100%; justify-content: center; text-align: center; }
 .msg-acoes.duas-col { grid-template-columns: 1fr 1fr; margin-top: 0; }
+
+.msg-ver { margin-top: .8rem; }
+.msg-ver summary { cursor: pointer; font-weight: 600; color: var(--rio); padding: .4rem 0; }
+.msg-ver .msg-previa { margin-top: .4rem; }

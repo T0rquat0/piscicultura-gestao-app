@@ -405,12 +405,11 @@ export async function renderRacaoDia(ctx, el) {
     <label class="outro-dia no-print">Ou escolha um dia<input type="date" id="outro" max="${hoje}" value="${hoje}"></label>
     <div id="corpo"></div>
     <section class="msg-box no-print">
-      <h2>Mensagem pronta</h2>
-      <pre class="msg-previa" id="msg-previa"></pre>
       <div class="msg-acoes">
-        <button class="btn primario grande" id="b-msg" type="button">Enviar por mensagem</button>
+        <button class="btn primario grande" id="b-msg" type="button">Enviar pelo WhatsApp</button>
         <button class="btn" id="b-copiar" type="button">Copiar texto</button>
       </div>
+      <details class="msg-ver"><summary>Ver a mensagem</summary><pre class="msg-previa" id="msg-previa"></pre></details>
       <h2>Arquivos</h2>
       <div class="msg-acoes duas-col">
         <button class="btn" id="b-pdf-racao" type="button">Gerar PDF</button>
@@ -442,12 +441,10 @@ export async function renderRacaoDia(ctx, el) {
   el.querySelector('#outro').addEventListener('change', (e) => { if (e.target.value) { outro = e.target.value > hoje ? hoje : e.target.value; per = 'dia'; pintar(); } });
   pintar();
 
-  el.querySelector('#b-msg').addEventListener('click', async () => {
-    const texto = mensagem(r);
-    try {
-      if (navigator.share) { await navigator.share({ text: texto }); return; }
-      window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
-    } catch (e) { if (e && e.name !== 'AbortError') ctx.toast('Não foi possível compartilhar: ' + e.message, 'erro'); }
+  // abre o WhatsApp direto com o texto pronto (texto puro; o menu "Compartilhar" do celular pode virar anexo .txt)
+  el.querySelector('#b-msg').addEventListener('click', () => {
+    if (!r.lista.length) return ctx.toast('Nada para enviar neste período.', 'erro');
+    window.open(`https://wa.me/?text=${encodeURIComponent(mensagem(r))}`, '_blank', 'noopener');
   });
   el.querySelector('#b-copiar').addEventListener('click', async () => {
     const texto = mensagem(r);
