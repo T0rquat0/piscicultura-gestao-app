@@ -786,3 +786,27 @@ p.so-pc { display: none; } @media (min-width: 800px) { p.so-pc { display: block;
 /* ===== aceite dos termos ===== */
 .linha-check.aceite { align-items: flex-start; font-weight: 500; font-size: .92rem; text-align: left; }
 .linha-check.aceite a { color: var(--rio); }
+
+/* Tela do tanque */
+.tanque-card.tdet { padding: 0; overflow: visible; background: none; box-shadow: none; }
+.td-topo { display: flex; align-items: flex-start; justify-content: space-between; gap: .8rem; margin: .2rem 0 1rem; }
+.td-nome { margin: 0; font-size: 1.9rem; letter-spacing: -.02em; line-height: 1.1; }
+.td-sub { margin: .25rem 0 0; color: var(--tinta-2); }
+.td-topo .tag { margin-top: .35rem; flex: none; }
+.td-lote { margin-bottom: 1rem; }
+.td-lote .lote-nome { margin: 0 0 .5rem; }
+.td-hero { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; background: var(--rio); color: #fff; border-radius: 22px; padding: 1.15rem 1.2rem; box-shadow: 0 12px 26px -14px rgba(14, 79, 69, .7); }
+.td-hero span { display: block; font-size: .85rem; color: #b5d6cb; }
+.td-hero b { display: block; white-space: nowrap; font-size: 2.1rem; font-weight: 700; letter-spacing: -.03em; line-height: 1.15; margin-top: .2rem; }
+.td-hero b em { font-style: normal; font-size: .52em; font-weight: 600; margin-left: .2em; color: #bfe3d6; letter-spacing: 0; }
+.td-hero small { display: block; margin-top: .15rem; color: #9fc7b9; font-size: .8rem; }
+.td-stats { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; margin-top: .7rem; }
+.td-stats > div { background: var(--card); border-radius: 18px; padding: .85rem 1rem; box-shadow: 0 1px 2px rgba(14, 79, 69, .06), 0 8px 20px -12px rgba(14, 79, 69, .28); }
+.td-stats span { display: block; font-size: .82rem; color: var(--tinta-2); }
+.td-stats b { display: block; font-size: 1.35rem; letter-spacing: -.02em; margin-top: .1rem; }
+.td-acoes { display: grid; gap: .6rem; margin: 1.1rem 0 1rem; }
+.td-duo { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+.td-acoes .btn { width: 100%; justify-content: center; text-align: center; }
+.td-rel { width: 100%; }
+.seg[data-de] > button.on { background: transparent; }
+.tanque-card.tdet > header { background: none; padding: 0; margin: .2rem 0 1rem; }

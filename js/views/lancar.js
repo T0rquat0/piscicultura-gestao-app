@@ -101,8 +101,9 @@ export async function renderLancar(ctx, el, params = {}) {
       ${navigator.onLine ? '' : '<p class="mudo" style="margin:0;text-align:center">Sem internet: será salvo no celular e enviado depois.</p>'}
     </form>`;
 
+  if (params.de !== undefined) { const sg = el.querySelector('.seg'); if (sg) sg.dataset.de = params.de; }
   el.querySelectorAll('.seg button').forEach((b) =>
-    b.addEventListener('click', () => renderLancar(ctx, el, { tipo: b.dataset.tipo, tanque: el.querySelector('#tanque').value })));
+    b.addEventListener('click', () => renderLancar(ctx, el, { tipo: b.dataset.tipo, tanque: el.querySelector('#tanque').value, de: Object.keys(TIPOS).indexOf(tipo) })));
 
   const f = el.querySelector('#f');
   const selTanque = f.querySelector('#tanque');

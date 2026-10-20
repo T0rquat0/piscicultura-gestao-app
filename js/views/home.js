@@ -25,6 +25,7 @@ export function statusTanque(tanque, lotes, resumo, racaoHojeLocal, hoje) {
 }
 
 export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje) {
+  const nomeLote = (l) => `${ROTULO_TIPO[l.tipo] || l.tipo} · ${l.especie}`;
   const blocos = lotes.length
     ? lotes.map((l) => {
         const r = resumo[l.id];
@@ -32,39 +33,39 @@ export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje) {
         const vivos = r ? Math.max(0, l.quantidade_inicial - Number(r.mortos)) : null;
         const pm = r && r.ultimo_peso_medio_kg != null ? fmtNum(r.ultimo_peso_medio_kg * 1000, 0) + '<em>g</em>' : '—';
         return `
-        <div class="lote">
-          <p class="lote-nome"><span class="fase ${l.tipo === 'alevinagem' ? 'alev' : 'eng'}"></span>${esc(ROTULO_TIPO[l.tipo] || l.tipo)} · ${esc(l.especie)}</p>
-          <div class="destaques">
-            <div><span class="mudo">Peso médio atual</span><b class="grande-num">${pm}</b>
-              ${r && r.ultima_biometria ? `<small>em ${fmtData(r.ultima_biometria)}</small>` : ''}</div>
-            <div><span class="mudo">Ração acumulada</span><b class="grande-num">${r ? fmtNum(r.racao_kg, 0) + '<em>kg</em>' : '—'}</b></div>
+        <section class="td-lote">
+          ${lotes.length > 1 ? `<p class="lote-nome"><span class="fase ${l.tipo === 'alevinagem' ? 'alev' : 'eng'}"></span>${esc(nomeLote(l))}</p>` : ''}
+          <div class="td-hero">
+            <div><span>Peso médio atual</span><b>${pm}</b>${r && r.ultima_biometria ? `<small>em ${fmtData(r.ultima_biometria)}</small>` : '<small>sem biometria</small>'}</div>
+            <div><span>Ração acumulada</span><b>${r ? fmtNum(r.racao_kg, 0) + '<em>kg</em>' : '—'}</b><small>desde a entrada</small></div>
           </div>
-          <div class="dados">
-            <div><span class="mudo">Dias no tanque</span><b>${fmtInt(dias)}</b></div>
-            <div><span class="mudo">Peixes vivos (estim.)</span><b>${fmtInt(vivos ?? l.quantidade_inicial)}</b></div>
+          <div class="td-stats">
+            <div><span>Dias no tanque</span><b>${fmtInt(dias)}</b></div>
+            <div><span>Peixes vivos (estim.)</span><b>${fmtInt(vivos ?? l.quantidade_inicial)}</b></div>
           </div>
-        </div>`;
+        </section>`;
       }).join('')
-    : '<p class="mudo">Sem lote ativo neste tanque.</p>';
+    : '<div class="card vazio"><p>Sem lote ativo neste tanque.</p></div>';
 
   const comLote = lotes.length > 0;
   const lancouHoje = lotes.some((l) => resumo[l.id] && resumo[l.id].ultima_racao === hoje) || racaoHojeLocal.has(tanque.id);
   const selo = !comLote ? '' : lancouHoje
     ? '<span class="tag ok"><i></i>Ração lançada hoje</span>'
     : '<span class="tag alerta"><i></i>Sem ração hoje</span>';
+  const sub = lotes.length === 1 ? nomeLote(lotes[0]) : lotes.length > 1 ? `${lotes.length} lotes ativos` : 'Sem lote ativo';
 
   return `
-  <article class="card tanque-card ${!comLote ? 'sem-lote' : lancouHoje ? 'ok' : 'falta'}">
-    <header><h3>${esc(tanque.nome)}</h3>${selo}</header>
-    <div class="corpo">
+  <section class="tanque-card tdet ${!comLote ? 'sem-lote' : lancouHoje ? 'ok' : 'falta'}">
+    <header class="td-topo"><div><h1 class="td-nome">${esc(tanque.nome)}</h1><p class="td-sub">${esc(sub)}</p></div>${selo}</header>
     ${blocos}
-    ${comLote ? `<div class="acoes">
-      <a class="btn mini primario" href="#/lancar?tipo=racao&tanque=${esc(tanque.id)}">Lançar ração</a>
-      <a class="btn mini" href="#/lancar?tipo=biometria&tanque=${esc(tanque.id)}">Biometria</a>
-      <a class="btn mini" href="#/lancar?tipo=mortalidade&tanque=${esc(tanque.id)}">Mortalidade</a>
+    ${comLote ? `<div class="td-acoes">
+      <a class="btn primario grande" href="#/lancar?tipo=racao&tanque=${esc(tanque.id)}">Lançar ração</a>
+      <div class="td-duo">
+        <a class="btn" href="#/lancar?tipo=biometria&tanque=${esc(tanque.id)}">Biometria</a>
+        <a class="btn" href="#/lancar?tipo=mortalidade&tanque=${esc(tanque.id)}">Mortalidade</a>
+      </div>
     </div>` : ''}
-    </div>
-  </article>`;
+  </section>`;
 }
 
 function resumoDia(comLote, faltam) {
@@ -105,7 +106,7 @@ export async function renderTanqueDetalhe(ctx, el, id) {
   el.innerHTML = `<p class="no-print"><a class="voltar" href="#/">${icone('voltar', 18)} Início</a></p>
     ${semDetalhe ? '<p class="aviso">Sem conexão: os totais aparecem quando houver internet.</p>' : ''}
     ${htmlCardTanque(tanque, meus, resumo, racaoHojeLocal, hoje)}
-    ${meus.length ? `<a class="btn grande" href="#/relatorio/${esc(meus[0].id)}">Ver relatório do lote</a>` : ''}`;
+    ${meus.length ? `<a class="hub-card td-rel" href="#/relatorio/${esc(meus[0].id)}"><span class="item-ic">${icone('relatorio')}</span><span class="esq"><b>Relatório do lote</b><small>Peso, ração e mortalidade do início até hoje</small></span><span class="seta">${icone('direita', 20)}</span></a>` : ''}`;
 }
 
 // Cria um tanque direto da tela inicial (dono/gerente). O limite do pacote é imposto no banco.
