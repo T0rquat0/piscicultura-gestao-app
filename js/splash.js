@@ -1,6 +1,7 @@
-// Abertura: um tambaqui desenhado em vetor atravessa a tela, balançando o rabo.
-// Aparece só na primeira abertura do dia, dura menos de 2 s, some ao toque e não roda
-// se o aparelho pede menos movimento. Sem imagens nem bibliotecas: é só SVG + CSS.
+// Abertura: um tambaqui em 3D vem do fundo da água, chega perto e vira para o lado, revelando o app.
+// Aparece só na primeira abertura do dia, dura ~3,5 s, some ao toque e não roda se o aparelho pede
+// menos movimento. O 3D (Three.js, js/splash3d.bundle.js) carrega sob demanda; se o aparelho não
+// suportar WebGL ou demorar para carregar, cai no peixe vetorial (SVG + CSS) abaixo.
 
 const TAMBAQUI = `
 <svg class="tambaqui" viewBox="0 0 200 100" width="250" height="125" aria-hidden="true" focusable="false">
@@ -35,10 +36,38 @@ export function splashDoDia() {
     localStorage.setItem('splash', hoje);
   } catch { return; }
   const el = document.createElement('div');
-  el.className = 'splash';
-  el.innerHTML = `<span class="splash-agua"></span><span class="splash-bolha b1"></span><span class="splash-bolha b2"></span><span class="splash-bolha b3"></span><span class="splash-peixe"><span class="splash-balanco">${TAMBAQUI}</span></span>`;
+  el.className = 'splash s3d';
   document.body.appendChild(el);
-  const fim = () => { el.classList.add('sai'); setTimeout(() => el.remove(), 320); };
-  el.addEventListener('click', fim);
-  setTimeout(fim, 1800);
+  let saiu = false, parar = () => {};
+  const sair = () => { if (saiu) return; saiu = true; parar(); el.classList.add('sai'); setTimeout(() => el.remove(), 320); };
+  el.addEventListener('click', sair);
+  abrir3d(el, sair, (f) => { parar = f; }).catch(() => { if (!saiu) fallbackSvg(el, sair); });
+}
+
+async function abrir3d(el, sair, registrarParada) {
+  const tempo = new Promise((_, rej) => setTimeout(() => rej(new Error('lento')), 2500));
+  const mod = await Promise.race([import('./splash3d.bundle.js'), tempo]);
+  if (!el.isConnected) return;
+  const canvas = document.createElement('canvas');
+  canvas.className = 'splash-canvas';
+  const largura = el.clientWidth || innerWidth, altura = el.clientHeight || innerHeight;
+  canvas.width = largura; canvas.height = altura;
+  el.appendChild(canvas);
+  const peixe = mod.criar(canvas, { largura, altura, dpr: window.devicePixelRatio || 1, lado: Math.random() < 0.5 ? 1 : -1 });
+  let raf = 0, antes = performance.now();
+  registrarParada(() => { cancelAnimationFrame(raf); try { peixe.destruir(); } catch { /* já liberado */ } });
+  const quadro = (agora) => {
+    const dt = Math.min(0.05, (agora - antes) / 1000); antes = agora;
+    peixe.passo(dt); peixe.desenhar();
+    el.style.opacity = String(peixe.fade());
+    if (peixe.fim()) return sair();
+    raf = requestAnimationFrame(quadro);
+  };
+  raf = requestAnimationFrame(quadro);
+}
+
+function fallbackSvg(el, sair) {
+  el.classList.remove('s3d');
+  el.innerHTML = `<span class="splash-agua"></span><span class="splash-bolha b1"></span><span class="splash-bolha b2"></span><span class="splash-bolha b3"></span><span class="splash-peixe"><span class="splash-balanco">${TAMBAQUI}</span></span>`;
+  setTimeout(sair, 1800);
 }
