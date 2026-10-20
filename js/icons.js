@@ -3,6 +3,8 @@ const P = {
   inicio: '<path d="M4 11.2 12 4.5l8 6.7V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/>',
   lancar: '<path d="M12 5v14M5 12h14"/>',
   relatorio: '<path d="M5 20V10M12 20V4M19 20v-7"/>',
+  baixar: '<path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/>',
+  subir: '<path d="M12 16V5m0 0L8 9m4-4 4 4M5 19h14"/>',
   mais: '<path d="M5 7h14M5 12h14M5 17h14"/>',
   tanque: '<ellipse cx="12" cy="6.5" rx="7" ry="2.7"/><path d="M5 6.5v11c0 1.5 3.1 2.7 7 2.7s7-1.2 7-2.7v-11"/><path d="M5 12c0 1.5 3.1 2.7 7 2.7s7-1.2 7-2.7"/>',
   estoque: '<path d="M4 8.2 12 4l8 4.2v7.6L12 20l-8-4.2z"/><path d="M4 8.2 12 12.5l8-4.3M12 12.5V20"/>',

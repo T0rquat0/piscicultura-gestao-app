@@ -691,6 +691,51 @@ p.so-pc { display: none; } @media (min-width: 800px) { p.so-pc { display: block;
 #acoes-racao { margin: 1.2rem 0 .4rem; }
 .lista-recolhe .vd-t small { color: rgba(255, 255, 255, .92); opacity: 1; }
 
+/* Mais: cartões de logo e cópia de segurança */
+.logo-linha { display: grid; grid-template-columns: 96px 1fr; gap: 14px; align-items: center; margin-top: 14px; }
+.logo-linha .caixa { width: 96px; height: 96px; border-radius: 18px; border: 1px solid var(--linha, #d6dfda); background: #fff; display: grid; place-items: center; overflow: hidden; color: var(--rio); padding: 8px; }
+.logo-linha .caixa img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.cfg-btns { display: grid; gap: .55rem; align-content: center; }
+.cfg-btns .btn { width: 100%; justify-content: center; text-align: center; }
+.cfg-btns small { text-align: center; line-height: 1.3; }
+.cfg-lista { display: grid; gap: .6rem; margin-top: 14px; }
+.cfg-lista .hub-card { width: 100%; text-align: left; }
+.cfg-lista .hub-card { background: #f1f6f3; box-shadow: none; border-radius: 18px; }
+.cfg-lista .hub-card .item-ic { background: #fff; }
+@media (hover: hover) { .cfg-lista .hub-card:hover { background: #e7f0eb; } }
+
+/* Mais: perfil e peso do saco */
+.perfil-linha { display: flex; align-items: center; gap: .9rem; }
+.perfil-linha .avatar { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: var(--rio); color: #fff; font-weight: 700; font-size: 1.25rem; flex: none; }
+.par-btns { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin-top: 1rem; }
+.par-btns .btn { width: 100%; justify-content: center; text-align: center; }
+.saco-linha { display: grid; grid-template-columns: 1fr auto; gap: .7rem; align-items: end; margin-top: 12px; }
+.saco-campo { display: grid; gap: .3rem; font-weight: 600; font-size: .92rem; }
+.com-sufixo { position: relative; display: block; }
+.com-sufixo input { width: 100%; padding-right: 2.6rem; }
+.com-sufixo em { position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); font-style: normal; color: var(--tinta-2); font-weight: 600; pointer-events: none; }
+.saco-linha .btn { min-width: 7.5rem; height: 3.1rem; align-self: end; }
+
+/* barra de baixo: o balão desliza de uma aba para a outra */
+.abas-bolha { position: absolute; left: 0; top: 0; width: 56px; height: 32px; border-radius: 999px; background: var(--rio); z-index: 0; pointer-events: none; box-shadow: 0 6px 14px -6px rgba(14, 79, 69, .6); }
+.abas-bolha.pronta { transition: transform .42s cubic-bezier(.34, 1.45, .55, 1), width .42s var(--ease), height .42s var(--ease); }
+.abas a { position: relative; z-index: 1; }
+.abas a.on span { background: transparent; }
+.abas a span { transition: color .25s var(--ease); }
+.abas a:active span { transform: scale(.92); }
+@media (prefers-reduced-motion: reduce) { .abas-bolha.pronta { transition: none; } }
+/* Mais: botões lado a lado sem quebrar linha */
+.par-btns .btn { padding-left: .4rem; padding-right: .4rem; white-space: nowrap; }
+
+/* seletores em pílula: balão que desliza */
+.seg { position: relative; }
+.seg > button { position: relative; z-index: 1; }
+.seg > button.on { background: transparent; }
+.seg-bolha { position: absolute; left: 0; top: 0; width: 0; height: 0; border-radius: 999px; background: var(--rio); z-index: 0; pointer-events: none; opacity: 0; box-shadow: 0 5px 12px -6px rgba(14, 79, 69, .55); }
+.seg-bolha.anim { transition: transform .34s cubic-bezier(.34, 1.35, .55, 1), width .3s var(--ease), height .3s var(--ease), opacity .15s; }
+@media (prefers-reduced-motion: reduce) { .seg-bolha.anim { transition: none; } }
+.seg:not([data-pronto="1"]) > button.on { background: var(--rio); }
+
 /* ===== aceite dos termos ===== */
 .linha-check.aceite { align-items: flex-start; font-weight: 500; font-size: .92rem; text-align: left; }
 .linha-check.aceite a { color: var(--rio); }
