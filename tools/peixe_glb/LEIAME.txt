@@ -1,0 +1,6 @@
+Como o peixe da abertura foi gerado a partir do .glb do Tripo (1 milhão de triângulos, vários peixes na mesma malha):
+1) extract.py  separa o peixe principal (maior peça) e escreve main.obj/main.npz
+2) dec3.py     reduz a malha para ~22 mil triângulos (pymeshlab)
+3) bake3.py    cria novo mapa de textura (xatlas) e transfere cor e normais do original
+Depois: normalizar a posição (centro na origem, comprimento 1) e gravar assets/peixe/{peixe.bin,cor.jpg,normal.jpg}.
+Os caminhos dentro dos scripts apontam para /tmp: ajuste antes de rodar. Requer: pip install pymeshlab xatlas scipy numpy pillow.

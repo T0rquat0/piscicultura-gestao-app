@@ -4,28 +4,27 @@
 import {
   WebGLRenderer, Scene, PerspectiveCamera, Group, Mesh, BufferGeometry, BufferAttribute, MeshStandardMaterial,
   CanvasTexture, Texture, DoubleSide, HemisphereLight, DirectionalLight, SphereGeometry, Fog, SRGBColorSpace,
-  NoColorSpace, Vector3, PMREMGenerator, BackSide, MeshBasicMaterial, PlaneGeometry,
+  NoColorSpace, ObjectSpaceNormalMap, Vector3, PMREMGenerator, BackSide, MeshBasicMaterial, PlaneGeometry,
 } from 'three';
 
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const easeIO = (x) => (x < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x));
 
-const ESCALA = 4.4;      // o modelo tem ~0,98 de comprimento
-const COMP = 0.98 * ESCALA;
+const ESCALA = 4.3;      // modelo normalizado: 1,0 de comprimento, centrado na origem
 
 // ---------- carga do modelo ----------
 function imagem(url) {
   return new Promise((ok, erro) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => erro(new Error('img ' + url)); i.src = url; });
 }
 export async function carregar(base) {
-  const [bin, cor, rm, normal] = await Promise.all([
+  const [bin, cor, normal] = await Promise.all([
     fetch(base + 'peixe.bin').then((r) => { if (!r.ok) throw new Error('bin'); return r.arrayBuffer(); }),
-    imagem(base + 'cor.jpg'), imagem(base + 'rm.jpg'), imagem(base + 'normal.jpg'),
+    imagem(base + 'cor.jpg'), imagem(base + 'normal.jpg'),
   ]);
-  const N = 2007, I = 7251;
-  const pos = new Float32Array(bin, 0, N * 3), nor = new Float32Array(bin, N * 12, N * 3), uv = new Float32Array(bin, N * 24, N * 2);
-  const idx = new Uint16Array(bin, N * 32, I);
-  return { pos, nor, uv, idx, cor, rm, normal };
+  const [N, I, tamIdx] = new Uint32Array(bin, 0, 3);   // cabeçalho: vértices, índices, bytes por índice
+  const pos = new Float32Array(bin, 16, N * 3), nor = new Float32Array(bin, 16 + N * 12, N * 3), uv = new Float32Array(bin, 16 + N * 24, N * 2);
+  const idx = tamIdx === 2 ? new Uint16Array(bin, 16 + N * 32, I) : new Uint32Array(bin, 16 + N * 32, I);
+  return { pos, nor, uv, idx, cor, normal };
 }
 const tex = (img, srgb) => { const t = new Texture(img); t.flipY = false; t.colorSpace = srgb ? SRGBColorSpace : NoColorSpace; t.anisotropy = 4; t.needsUpdate = true; return t; };
 
@@ -36,11 +35,10 @@ function montarPeixe(d) {
   g.setAttribute('normal', new BufferAttribute(Float32Array.from(d.nor), 3));
   g.setAttribute('uv', new BufferAttribute(d.uv, 2));
   g.setIndex(new BufferAttribute(d.idx, 1));
-  const rm = tex(d.rm, false);
-  const mat = new MeshStandardMaterial({ map: tex(d.cor, true), normalMap: tex(d.normal, false), roughnessMap: rm, metalnessMap: rm, roughness: 1, metalness: 1, envMapIntensity: 0.9, side: DoubleSide });
+  const mat = new MeshStandardMaterial({ map: tex(d.cor, true), normalMap: tex(d.normal, false), normalMapType: ObjectSpaceNormalMap, roughness: 0.5, metalness: 0.05, envMapIntensity: 0.7, side: DoubleSide });
   const malha = new Mesh(g, mat);
   // modelo: cabeça em -x, rabo em +x, base em y=0. Giramos para a cabeça ficar em +x e centramos na altura.
-  malha.position.set(0, -0.195, 0);
+  malha.position.set(0, 0, 0);
   const miolo = new Group(); miolo.add(malha); miolo.scale.set(-ESCALA, ESCALA, ESCALA); // espelho em x: cabeça passa a +x
   malha.scale.set(1, 1, 1);
   const grupo = new Group(); grupo.add(miolo);
@@ -49,7 +47,7 @@ function montarPeixe(d) {
 
 // ondulação: o corpo todo vira uma onda que vai do focinho ao rabo (x do modelo: cabeça -0.49 .. rabo +0.49)
 function dobra(xm, t) {
-  const q = clamp((xm + 0.49) / 0.98, 0, 1);            // 0 cabeça .. 1 ponta do rabo
+  const q = clamp((xm + 0.5) / 1.0, 0, 1);            // 0 cabeça .. 1 ponta do rabo
   return (0.012 + 0.115 * q * q) * Math.sin(t * 13 - 3.4 * q);
 }
 
@@ -104,6 +102,6 @@ export function criar(canvas, { largura, altura, dpr = 1, lado = 1, dados }) {
     desenhar() { renderer.render(cena, cam); },
     fade() { return 1 - easeIO((est.t - (TOTAL - 0.9)) / 0.7); },
     fim() { return est.t >= TOTAL; },
-    destruir() { renderer.dispose(); cena.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) { for (const k of ['map', 'normalMap', 'roughnessMap']) o.material[k] && o.material[k].dispose(); o.material.dispose(); } }); },
+    destruir() { renderer.dispose(); cena.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) { for (const k of ['map', 'normalMap']) o.material[k] && o.material[k].dispose(); o.material.dispose(); } }); },
   };
 }
