@@ -10,6 +10,7 @@ export class ErroApi extends Error {
 }
 
 const TABELAS_EXCLUIVEIS = new Set(['biometrias', 'mortalidade', 'racao_consumo', 'racao_estoque', 'racao_contagens']);
+const TABELAS_EDITAVEIS = new Set(['biometrias', 'mortalidade', 'racao_consumo', 'racao_estoque', 'lotes']);
 
 export function criarApi(client) {
   const ok = (res) => {
@@ -177,6 +178,16 @@ export function criarApi(client) {
     async excluir(tabela, id) {
       if (!TABELAS_EXCLUIVEIS.has(tabela)) throw new Error('Tabela não permitida');
       ok(await client.from(tabela).delete().eq('id', id));
+    },
+    // corrige um registro (dono/gerente; o RLS barra os demais sem dar erro, por isso confere se alguma linha mudou)
+    async atualizar(tabela, id, campos) {
+      if (!TABELAS_EDITAVEIS.has(tabela)) throw new Error('Tabela não permitida');
+      const d = ok(await client.from(tabela).update(campos).eq('id', id).select('id'));
+      if (!d || !d.length) throw new Error('Não foi possível salvar. Sem permissão para alterar este registro.');
+    },
+    async reabrirLote(id) {
+      const d = ok(await client.from('lotes').update({ ativo: true }).eq('id', id).select('id'));
+      if (!d || !d.length) throw new Error('Não foi possível reabrir. Sem permissão para alterar este lote.');
     },
 
     // ----- equipe (dono) -----
