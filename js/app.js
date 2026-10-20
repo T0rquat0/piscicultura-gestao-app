@@ -87,12 +87,11 @@ async function atualizarRef() {
   }
 }
 
-// logo da fazenda (se houver) ou a marca do sistema, no topo
+// topo: sempre a marca do sistema (o logo da fazenda aparece só nos relatórios em PDF)
 function atualizarMarca() {
   const el = document.querySelector('.logo-sm'); if (!el) return;
-  const logo = state.ref && state.ref.logo;
-  el.className = 'logo-sm' + (logo ? ' propria' : '');
-  el.innerHTML = logo ? `<img src="${esc(logo)}" alt="">` : icone('peixe', 26);
+  el.className = 'logo-sm';
+  el.innerHTML = icone('peixe', 26);
 }
 
 // ---------- sincronização ----------
