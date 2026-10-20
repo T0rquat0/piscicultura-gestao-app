@@ -29,9 +29,9 @@
   --ease: cubic-bezier(.2, .7, .2, 1);
 }
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; width: 100%; overflow-x: hidden; overscroll-behavior: none; }
+html { overflow-x: clip; -webkit-text-size-adjust: 100%; width: 100%; overscroll-behavior: none; }
 /* comporta-se como app: sem zoom por toque duplo, sem arrastar para o lado, sem seleção de texto na interface */
-body { overflow-x: hidden; overscroll-behavior: none; touch-action: pan-y; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+body { overflow-x: clip; overscroll-behavior: none; touch-action: pan-y; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 input, select, textarea { -webkit-user-select: text; user-select: text; touch-action: manipulation; }
 a, button, summary { touch-action: manipulation; }
 .rolagem { touch-action: pan-x pan-y; overscroll-behavior-x: contain; }
@@ -579,3 +579,23 @@ body.sem-rolagem { overflow: hidden; }
 .login-card .logo svg { width: 56px; height: 56px; }
 .login-card h1 { text-align: center; }
 .login-card > p, .login-card .aviso { text-align: center; }
+
+/* ----- computador: rolagem pela roda do mouse, largura confortável e cursor/hover ----- */
+@supports not (overflow: clip) { html { overflow-x: hidden; } }
+@media (min-width: 1000px) {
+  .view, .abas { max-width: 920px; }
+}
+@media (min-width: 800px) {
+  .topo { padding-left: max(1.1rem, calc((100vw - 760px) / 2 + 1.1rem)); padding-right: max(1.1rem, calc((100vw - 760px) / 2 + 1.1rem)); }
+}
+@media (min-width: 1000px) {
+  .topo { padding-left: max(1.1rem, calc((100vw - 920px) / 2 + 1.1rem)); padding-right: max(1.1rem, calc((100vw - 920px) / 2 + 1.1rem)); }
+}
+@media (hover: hover) {
+  button, .btn, .tile, .item, .hub-card, .abas a, summary { cursor: pointer; }
+  .btn:hover { filter: brightness(.97); }
+  .btn.primario:hover { filter: brightness(1.12); }
+  .item:hover, .hub-card:hover { background: rgba(14, 79, 69, .05); }
+  .abas a:not(.on):hover span { background: var(--rio-claro, #e8f3ee); }
+}
+:focus-visible { outline: 2px solid var(--rio-2, #1d7565); outline-offset: 2px; }
