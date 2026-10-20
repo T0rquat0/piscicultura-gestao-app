@@ -690,3 +690,16 @@ p.so-pc { display: none; } @media (min-width: 800px) { p.so-pc { display: block;
 .lista-recolhe[open] > summary { margin-bottom: .7rem; }
 #acoes-racao { margin: 1.2rem 0 .4rem; }
 .lista-recolhe .vd-t small { color: rgba(255, 255, 255, .92); opacity: 1; }
+
+/* Mais: cartões de logo e cópia de segurança */
+.logo-linha { display: grid; grid-template-columns: 96px 1fr; gap: 14px; align-items: center; margin-top: 14px; }
+.logo-linha .caixa { width: 96px; height: 96px; border-radius: 18px; border: 1px solid var(--linha, #d6dfda); background: #fff; display: grid; place-items: center; overflow: hidden; color: var(--rio); padding: 8px; }
+.logo-linha .caixa img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.cfg-btns { display: grid; gap: .55rem; align-content: center; }
+.cfg-btns .btn { width: 100%; justify-content: center; text-align: center; }
+.cfg-btns small { text-align: center; line-height: 1.3; }
+.cfg-lista { display: grid; gap: .6rem; margin-top: 14px; }
+.cfg-lista .hub-card { width: 100%; text-align: left; }
+.cfg-lista .hub-card { background: #f1f6f3; box-shadow: none; border-radius: 18px; }
+.cfg-lista .hub-card .item-ic { background: #fff; }
+@media (hover: hover) { .cfg-lista .hub-card:hover { background: #e7f0eb; } }

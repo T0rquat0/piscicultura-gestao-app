@@ -44,16 +44,18 @@ export function renderMais(ctx, el) {
     ${p.papel === 'dono' ? `<div class="card">
       <b>Logo da fazenda</b>
       <small style="display:block">Aparece no cabeçalho dos relatórios em PDF. Sem logo, usamos a marca do sistema.</small>
-      <div class="logo-previa"><span class="caixa">${state.ref.logo ? `<img src="${esc(state.ref.logo)}" alt="">` : icone('peixe', 40)}</span>
-        <div class="acoes" style="margin:0"><button class="btn" id="b-logo" type="button">${state.ref.logo ? 'Trocar logo' : 'Enviar logo'}</button>
-        ${state.ref.logo ? '<button class="btn perigo" id="b-logo-x" type="button">Remover</button>' : ''}</div></div>
+      <div class="logo-linha"><span class="caixa">${state.ref.logo ? `<img src="${esc(state.ref.logo)}" alt="">` : icone('peixe', 44)}</span>
+        <div class="cfg-btns"><button class="btn" id="b-logo" type="button">${state.ref.logo ? 'Trocar logo' : 'Enviar logo'}</button>
+        ${state.ref.logo ? '<button class="btn perigo" id="b-logo-x" type="button">Remover</button>' : '<small class="mudo">PNG ou JPG. Fundo transparente fica melhor.</small>'}</div></div>
       <input id="in-logo" type="file" accept="image/*" hidden></div>` : ''}
 
     ${p.papel === 'dono' ? `<div class="card">
       <b>Cópia de segurança dos dados</b>
-      <small style="display:block">Baixa um arquivo com tudo da fazenda: tanques, lotes, lançamentos, compras, contagens e equipe. Guarde no Google Drive ou no e-mail.</small>
-      <div class="acoes"><button class="btn" id="b-copia" type="button">Baixar cópia dos dados</button><button class="btn" id="b-importar" type="button">Importar cópia</button></div>
-      <small class="mudo" style="display:block">Importar devolve o que estiver faltando (por exemplo, depois de apagar algo sem querer). Nada que já existe é alterado.</small>
+      <small style="display:block">Um arquivo com tudo da fazenda: tanques, lotes, lançamentos, compras, contagens e equipe.</small>
+      <div class="cfg-lista">
+        <button class="hub-card" id="b-copia" type="button"><span class="item-ic">${icone('baixar')}</span><span class="esq"><b>Baixar cópia</b><small>Salva um arquivo para guardar no Drive ou e-mail</small></span><span class="seta">${icone('direita', 20)}</span></button>
+        <button class="hub-card" id="b-importar" type="button"><span class="item-ic">${icone('subir')}</span><span class="esq"><b>Importar cópia</b><small>Devolve o que faltar, sem alterar o que existe</small></span><span class="seta">${icone('direita', 20)}</span></button>
+      </div>
       <input id="in-copia" type="file" accept=".json,application/json" hidden></div>` : ''}
 
     <details class="card">
