@@ -82,7 +82,10 @@ export function criarApi(client) {
       ok(await client.from('fazendas').update({ preco_kg: preco }).eq('id', fazendaId));
     },
     async tanques() {
-      return ok(await client.from('tanques').select('id,nome').order('nome'));
+      // area_ha vem do sql/17; sem ele, lê só o nome
+      const r = await client.from('tanques').select('id,nome,area_ha').order('nome');
+      if (r.error && /area_ha/i.test(r.error.message || '')) return ok(await client.from('tanques').select('id,nome').order('nome'));
+      return ok(r);
     },
     async lotes({ apenasAtivos = false } = {}) {
       let q = client.from('lotes').select('id,tanque_id,tipo,especie,data_entrada,quantidade_inicial,peso_inicial_kg,ativo');
@@ -97,16 +100,30 @@ export function criarApi(client) {
     },
 
     // ----- tanques e lotes (dono/gerente) -----
-    async criarTanque(fazendaId, nome) {
+    async criarTanque(fazendaId, nome, area = null) {
       const id = uuid(); // gerado aqui: o gerente só enxerga o tanque depois do gatilho que o vincula
-      ok(await client.from('tanques').insert({ id, fazenda_id: fazendaId, nome }));
+      const linha = { id, fazenda_id: fazendaId, nome, ...(area ? { area_ha: area } : {}) };
+      const r = await client.from('tanques').insert(linha);
+      if (r.error && /area_ha/i.test(r.error.message || '')) throw new Error('A área do tanque ainda não foi ativada neste sistema (falta rodar o sql/17 no Supabase). Cadastre sem a área.');
+      ok(r);
       return id;
     },
-    async renomearTanque(id, nome) {
-      ok(await client.from('tanques').update({ nome }).eq('id', id));
+    async renomearTanque(id, nome, area) {
+      const campos = { nome, ...(area !== undefined ? { area_ha: area } : {}) };
+      const r = await client.from('tanques').update(campos).eq('id', id);
+      if (r.error && /area_ha/i.test(r.error.message || '')) throw new Error('A área do tanque ainda não foi ativada neste sistema (falta rodar o sql/17 no Supabase).');
+      ok(r);
     },
     async criarLote(lote) {
-      ok(await client.from('lotes').insert({ id: uuid(), ...lote }));
+      const id = uuid();
+      const r = await client.from('lotes').insert({ id, ...lote });
+      if (r.error && /lotes_tipo_check/i.test(r.error.message || '')) throw new Error('As fases Berçário e Recria ainda não foram ativadas neste sistema (falta rodar o sql/17 no Supabase). Use Alevinagem por enquanto.');
+      ok(r);
+      return id;
+    },
+    // pesagem de hoje de um lote que já estava no tanque (cadastro de lote em andamento)
+    async biometriaInicial(loteId, pesoMedioKg, userId, data) {
+      ok(await client.from('biometrias').insert({ id: uuid(), uuid_local: uuid(), lote_id: loteId, data, peso_amostra_kg: Math.round(pesoMedioKg * 1000) / 1000, quantidade_amostrada: 1, registrado_por: userId }));
     },
     // exclusões definitivas (só o dono; o RLS barra os demais). Apagam em cascata os lançamentos.
     async excluirLote(id) {
@@ -157,7 +174,9 @@ export function criarApi(client) {
       if (podeGerir) {
         // sacos_nota/sacos_recebidos vêm do sql/14 (conferência de recebimento); sem ele, lê sem as duas colunas
         const ler = (cols) => todos(() => client.from('racao_estoque').select(cols).order('data_compra', { ascending: false }).order('id'));
-        lista = await ler('id,data_compra,quantidade_kg,custo_total,fornecedor,sacos_nota,sacos_recebidos')
+        // tipo_racao vem do sql/17; sem ele, lê sem a coluna
+        lista = await ler('id,data_compra,quantidade_kg,custo_total,fornecedor,sacos_nota,sacos_recebidos,tipo_racao')
+          .catch(() => ler('id,data_compra,quantidade_kg,custo_total,fornecedor,sacos_nota,sacos_recebidos'))
           .catch(() => ler('id,data_compra,quantidade_kg,custo_total,fornecedor'));
       } else {
         lista = ok(await client.rpc('racao_estoque_visivel'));
@@ -166,8 +185,11 @@ export function criarApi(client) {
       return lista;
     },
     async registrarCompra(c) {
-      const linha = { id: uuid(), ...c };
-      const r = await client.from('racao_estoque').insert(linha);
+      let linha = { id: uuid(), ...c };
+      if (!linha.tipo_racao) delete linha.tipo_racao;
+      let r = await client.from('racao_estoque').insert(linha);
+      // banco sem o sql/17: grava sem o tipo de ração
+      if (r.error && /tipo_racao/i.test(r.error.message || '')) { const { tipo_racao, ...sem } = linha; linha = sem; r = await client.from('racao_estoque').insert(linha); }
       // banco sem o sql/14: grava sem a conferência (o kg que chegou continua certo)
       if (r.error && /sacos_(nota|recebidos)/i.test(r.error.message || '')) {
         const { sacos_nota, sacos_recebidos, ...sem } = linha;
@@ -216,7 +238,9 @@ export function criarApi(client) {
     // corrige um registro (dono/gerente; o RLS barra os demais sem dar erro, por isso confere se alguma linha mudou)
     async atualizar(tabela, id, campos) {
       if (!TABELAS_EDITAVEIS.has(tabela)) throw new Error('Tabela não permitida');
-      const d = ok(await client.from(tabela).update(campos).eq('id', id).select('id'));
+      const r = await client.from(tabela).update(campos).eq('id', id).select('id');
+      if (r.error && /lotes_tipo_check/i.test(r.error.message || '')) throw new Error('As fases Berçário e Recria ainda não foram ativadas neste sistema (falta rodar o sql/17 no Supabase).');
+      const d = ok(r);
       if (!d || !d.length) throw new Error('Não foi possível salvar. Sem permissão para alterar este registro.');
     },
     async reabrirLote(id) {

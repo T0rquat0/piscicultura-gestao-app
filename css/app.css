@@ -118,6 +118,13 @@ b, strong { font-weight: 600; }
 .fase { width: 9px; height: 9px; border-radius: 50%; background: var(--rio); flex: none; }
 .fase.alev { background: var(--alevino); }
 .fase.eng { background: var(--rio); }
+.fase.berc { background: #a9cfc5; }
+.fase.recr { background: #3f8e7b; }
+.tq-resumo .kpi small { display: block; color: var(--tinta-2); font-size: .8rem; }
+.sub-tipo { margin: 14px 0 6px; font-size: 1rem; }
+.previa-pl td, .previa-pl th { font-size: .85rem; white-space: nowrap; }
+.previa-pl .pl-erro td { color: var(--erro, #b3261e); white-space: normal; }
+#planilha { width: 100%; font: inherit; font-size: .9rem; }
 .grande-num { display: block; white-space: nowrap; font-size: 2rem; font-weight: 400; letter-spacing: -.02em; line-height: 1.1; color: var(--tinta); }
 .grande-num em { font-style: normal; font-size: .5em; font-weight: 500; letter-spacing: 0; margin-left: .2em; color: var(--tinta-2); }
 .dados { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem .8rem; }

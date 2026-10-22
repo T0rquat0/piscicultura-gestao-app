@@ -93,7 +93,13 @@ export function parseHash(h) {
 }
 
 export const ROTULO_PAPEL = { dono: 'Dono', gerente: 'Gerente', funcionario: 'Funcionário' };
-export const ROTULO_TIPO = { alevinagem: 'Alevinagem', engorda: 'Engorda' };
+export const ROTULO_TIPO = { bercario: 'Berçário', alevinagem: 'Alevinagem', recria: 'Recria', engorda: 'Engorda' };
+// fases na ordem do ciclo (Berçário e Recria precisam do sql/17 no banco)
+export const FASES = [['bercario', 'Berçário'], ['alevinagem', 'Alevinagem'], ['recria', 'Recria'], ['engorda', 'Engorda']];
+// classe de cor da bolinha de fase
+export const faseCss = (tipo) => ({ bercario: 'berc', alevinagem: 'alev', recria: 'recr', engorda: 'eng' }[tipo] || 'eng');
+// "5,5" / "0.91" -> número; vazio -> null
+export const areaHa = (v) => { const x = num(v); return v === '' || v == null || !(x > 0) ? null : Math.round(x * 100) / 100; };
 
 // Reduz a imagem escolhida (foto/arquivo) para no máximo 256 px e devolve um data URL pequeno.
 // PNG preserva fundo transparente; se ficar grande (foto), cai para JPEG com fundo branco.

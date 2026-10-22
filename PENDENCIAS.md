@@ -35,6 +35,9 @@ Marque com [x] ao concluir. Tudo aqui foi deixado de propósito para depois do c
 - [ ] Teste grátis: hoje 30 dias, sem limite de tanques.
 
 ## Produto
+- [ ] **Rodar `sql/17_fases_area_e_tipo_de_racao.sql` no Supabase** (22/10/26): fases Berçário e Recria, área do tanque (ha) e tipo de ração nas compras. Sem ele o app funciona como antes; Berçário/Recria e a área dão aviso pedindo o sql/17.
+- [x] Cadastro do lote pelo **peso médio de cada peixe** (o app calcula o peso total), lote em andamento (início do ciclo + pesagem de hoje), colar vários tanques de uma vez (planilha ou mensagem de WhatsApp), densidade por hectare na tela do tanque, "−-0" do extrato corrigido (22/10/26, teste `telas/teste_fases_area.py`).
+- [ ] Saldo de estoque **separado por tipo de ração** (hoje só as compras têm tipo; o consumo ainda não).
 - [x] Rodar `sql/16_preco_do_peixe.sql` no Supabase (rodado em 22/10/26). Falta o dono informar o preço em Mais > Preço do peixe.
 - [ ] Visual "folha emoldurada" (PR visual-premium-folha): conferir no celular de verdade (sol, toque, teclado) e no computador.
 - [x] Corrigir em vez de só excluir: editar ração, biometria, mortalidade, compras e dados do lote; reabrir lote encerrado (PR #1, no ar em 20/10/26).

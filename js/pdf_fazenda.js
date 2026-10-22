@@ -84,7 +84,7 @@ export function gerarPdfFazenda(jsPDF, d) {
   secao('Lotes ativos', 44);
   if (lotes.length) {
     const corpo = lotes.map((l) => [
-      l.nomeTanque, `${l.lote.especie} (${l.lote.tipo === 'alevinagem' ? 'alev.' : 'eng.'})`, fmtInt(l.c.diasCultivo),
+      l.nomeTanque, `${l.lote.especie} (${{ bercario: 'berç.', alevinagem: 'alev.', recria: 'recr.', engorda: 'eng.' }[l.lote.tipo] || l.lote.tipo})`, fmtInt(l.c.diasCultivo),
       l.c.pmAtualG != null ? n(l.c.pmAtualG, 0) : '-', fmtInt(l.c.vivos), fmtInt(l.c.mortos), l.c.sobrevivencia != null ? `${n(l.c.sobrevivencia, 1)}%` : '-',
       l.c.biomassaAtual != null ? n(l.c.biomassaAtual, 0) : '-', l.c.ca != null ? n(l.c.ca, 2) : '-',
     ]);

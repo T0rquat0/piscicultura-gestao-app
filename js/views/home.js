@@ -1,4 +1,4 @@
-import { esc, fmtInt, fmtNum, fmtData, hojeISO, diasEntre, ROTULO_TIPO } from '../util.js';
+import { esc, fmtInt, fmtNum, fmtData, hojeISO, diasEntre, ROTULO_TIPO, faseCss } from '../util.js';
 import * as db from '../db.js';
 import { situacaoEstoque } from '../calc.js';
 import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, PESO_SACO_PADRAO_KG, CONTAGEM_LEMBRETE_DIAS, PLANO_AVISO_DIAS } from '../config.js';
@@ -24,7 +24,7 @@ export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje) {
         const pm = r && r.ultimo_peso_medio_kg != null ? fmtNum(r.ultimo_peso_medio_kg * 1000, 0) + '<em>g</em>' : '—';
         return `
         <section class="td-lote">
-          ${lotes.length > 1 ? `<p class="lote-nome"><span class="fase ${l.tipo === 'alevinagem' ? 'alev' : 'eng'}"></span>${esc(nomeLote(l))}</p>` : ''}
+          ${lotes.length > 1 ? `<p class="lote-nome"><span class="fase ${faseCss(l.tipo)}"></span>${esc(nomeLote(l))}</p>` : ''}
           <div class="td-hero">
             <div><span>Peso médio atual</span><b>${pm}</b>${r && r.ultima_biometria ? `<small>em ${fmtData(r.ultima_biometria)}</small>` : '<small>sem biometria</small>'}</div>
             <div><span>Ração acumulada</span><b>${r ? fmtNum(r.racao_kg, 0) + '<em>kg</em>' : '—'}</b><small>desde a entrada</small></div>
