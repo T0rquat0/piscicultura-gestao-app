@@ -43,6 +43,13 @@ export function renderMais(ctx, el) {
       <button class="btn primario" type="submit">Salvar</button></form></div>` : ''}
 
     ${p.papel === 'dono' ? `<div class="card">
+      <b>Preço do peixe</b>
+      <small style="display:block">Usado só para estimar, na tela Início, quanto vale o peixe que está na água.</small>
+      <form id="f-preco" class="saco-linha"><label class="saco-campo"><span>Reais por quilo</span>
+        <span class="com-sufixo"><input id="precokg" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Ex.: 9,50" value="${state.ref.precoKg || ''}" required><em>R$/kg</em></span></label>
+      <button class="btn primario" type="submit">Salvar</button></form></div>` : ''}
+
+    ${p.papel === 'dono' ? `<div class="card">
       <b>Logo da fazenda</b>
       <small style="display:block">Aparece no cabeçalho dos relatórios em PDF. Sem logo, usamos a marca do sistema.</small>
       <div class="logo-linha"><span class="caixa">${state.ref.logo ? `<img src="${esc(state.ref.logo)}" alt="">` : icone('peixe', 44)}</span>
@@ -80,6 +87,19 @@ export function renderMais(ctx, el) {
       await ctx.atualizarRef(true);
       ctx.toast(`Saco = ${fmtNum(kg, 0)} kg`, 'ok');
     } catch (e) { ctx.toast('Não salvou: ' + e.message, 'erro'); }
+  });
+  const fp = el.querySelector('#f-preco');
+  if (fp) fp.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const preco = num(fp.querySelector('#precokg').value);
+    if (!(preco > 0 && preco <= 1000)) return ctx.toast('Informe o preço do quilo em reais (ex.: 9,50).', 'erro');
+    if (!navigator.onLine) return ctx.toast('Sem internet', 'erro');
+    try {
+      await ctx.api.salvarPrecoKg(state.perfil.fazenda_id, preco);
+      if (!(await ctx.api.precoKg())) return ctx.toast('Falta rodar o sql/16 no Supabase.', 'erro');
+      await ctx.atualizarRef(true);
+      ctx.toast(`Peixe = R$ ${fmtNum(preco, 2)} por kg`, 'ok');
+    } catch (e) { ctx.toast(/preco_kg/i.test(e.message || '') ? 'Falta rodar o sql/16 no Supabase.' : 'Não salvou: ' + e.message, 'erro'); }
   });
   const salvarLogo = async (dataUrl, msg) => {
     if (!navigator.onLine) return ctx.toast('Sem internet', 'erro');

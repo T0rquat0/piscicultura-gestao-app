@@ -35,6 +35,8 @@ Marque com [x] ao concluir. Tudo aqui foi deixado de propósito para depois do c
 - [ ] Teste grátis: hoje 30 dias, sem limite de tanques.
 
 ## Produto
+- [x] Rodar `sql/16_preco_do_peixe.sql` no Supabase (rodado em 22/10/26). Falta o dono informar o preço em Mais > Preço do peixe.
+- [ ] Visual "folha emoldurada" (PR visual-premium-folha): conferir no celular de verdade (sol, toque, teclado) e no computador.
 - [x] Corrigir em vez de só excluir: editar ração, biometria, mortalidade, compras e dados do lote; reabrir lote encerrado (PR #1, no ar em 20/10/26).
 - [x] Convite da equipe por link e nomes da equipe no relatório (sql/10).
 - [ ] Testar o PDF e o compartilhar em celular de verdade (iPhone e Android); só foi testado no Chromium. Inclui o "Enviar relatório (PDF)" da Ração fornecida, que substituiu a mensagem de texto.

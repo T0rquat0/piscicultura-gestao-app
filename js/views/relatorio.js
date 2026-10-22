@@ -337,7 +337,7 @@ function svgDias(linhasDia) {
     const x = pl + i * larg + larg * 0.14, w = larg * 0.72, y = H - pb - h;
     const [, m, dd] = d.data.split('-');
     const rot = (dias.length - 1 - i) % passo === 0 ? `<text x="${(x + w / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle">${dd}/${m}</text>` : '';
-    return `<rect class="barra${i === dias.length - 1 ? ' hoje' : ''}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(h, d.kg > 0 ? 1.5 : 0.8).toFixed(1)}" rx="${Math.min(3, w / 2).toFixed(1)}"/>${rot}`;
+    return `<rect class="barra${i === dias.length - 1 ? ' hoje' : ' cinza'}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(h, d.kg > 0 ? 1.5 : 0.8).toFixed(1)}" rx="${Math.min(3, w / 2).toFixed(1)}"/>${rot}`;
   }).join('');
   return `<svg class="grafico" viewBox="0 0 ${W} ${H}" role="img" aria-label="Ração por dia">${barras}</svg>`;
 }
