@@ -58,13 +58,14 @@ function toast(msg, tipo = '') {
 }
 
 function atualizarPill() {
-  const pill = document.getElementById('pill');
-  if (!pill) return;
   const off = !navigator.onLine || state.semRede;
   const n = state.pendentes;
-  if (off) { pill.textContent = n ? `Sem internet · ${n} pendente(s)` : 'Sem internet'; pill.className = 'pill off'; }
-  else if (n) { pill.textContent = `${n} pendente(s)`; pill.className = 'pill off'; }
-  else { pill.textContent = 'Online'; pill.className = 'pill'; }
+  for (const pill of [document.getElementById('pill'), document.getElementById('pill-lateral')]) {
+    if (!pill) continue;
+    if (off) { pill.textContent = n ? `Sem internet · ${n} pendente(s)` : 'Sem internet'; pill.className = 'pill off'; }
+    else if (n) { pill.textContent = `${n} pendente(s)`; pill.className = 'pill off'; }
+    else { pill.textContent = 'Online'; pill.className = 'pill'; }
+  }
 }
 
 async function atualizarPendentes() {
@@ -82,8 +83,8 @@ async function carregarRefLocal() {
 async function atualizarRef() {
   if (!navigator.onLine || !state.user || !api) return false;
   try {
-    const [tanques, lotes, kgSaco, logo] = await Promise.all([api.tanques(), api.lotes({ apenasAtivos: true }), api.kgSaco().catch(() => null), api.logo().catch(() => undefined)]);
-    state.ref = { tanques, lotes, kgSaco: kgSaco || (state.ref && state.ref.kgSaco) || null, logo: logo === undefined ? (state.ref && state.ref.logo) || null : logo, userId: state.perfil.id, atualizado_em: new Date().toISOString() };
+    const [tanques, lotes, kgSaco, logo, precoKg] = await Promise.all([api.tanques(), api.lotes({ apenasAtivos: true }), api.kgSaco().catch(() => null), api.logo().catch(() => undefined), api.precoKg().catch(() => null)]);
+    state.ref = { tanques, lotes, kgSaco: kgSaco || (state.ref && state.ref.kgSaco) || null, logo: logo === undefined ? (state.ref && state.ref.logo) || null : logo, precoKg, userId: state.perfil.id, atualizado_em: new Date().toISOString() };
     await db.kvSet('ref', state.ref);
     atualizarMarca();
     state.semRede = false;
@@ -98,9 +99,7 @@ async function atualizarRef() {
 
 // topo: sempre a marca do sistema (o logo da fazenda aparece só nos relatórios em PDF)
 function atualizarMarca() {
-  const el = document.querySelector('.logo-sm'); if (!el) return;
-  el.className = 'logo-sm';
-  el.innerHTML = icone('peixe', 26);
+  document.querySelectorAll('.logo-sm').forEach((el) => { el.className = 'logo-sm'; el.innerHTML = icone('peixe', 26); });
 }
 
 // ---------- sincronização ----------
@@ -335,36 +334,31 @@ async function sair(forcar = false) {
   mostrarLogin();
 }
 
-// Balão verde da barra de baixo: desliza até a aba ativa (na primeira vez só se posiciona, sem animar)
-function moverBolha() {
-  const nav = document.querySelector('.abas'); if (!nav) return;
-  const bolha = nav.querySelector('.abas-bolha'); const alvo = nav.querySelector('a.on span');
-  if (!bolha || !alvo) return;
-  const r = alvo.getBoundingClientRect(), n = nav.getBoundingClientRect();
-  if (!r.width) return;
-  bolha.style.width = `${r.width}px`; bolha.style.height = `${r.height}px`;
-  bolha.style.top = `${r.top - n.top}px`; bolha.style.transform = `translateX(${r.left - n.left}px)`;
-  if (!bolha.classList.contains('pronta')) requestAnimationFrame(() => requestAnimationFrame(() => bolha.classList.add('pronta')));
-}
-window.addEventListener('resize', () => { const b = document.querySelector('.abas-bolha'); if (b) { b.classList.remove('pronta'); moverBolha(); } });
-
 // ---------- estrutura e rotas ----------
+// No celular: barra de cima + abas embaixo. No computador: a mesma navegação numa lateral (o CSS troca uma pela outra).
 function montarShell() {
   const p = state.perfil;
+  const fazenda = esc((p.fazendas && p.fazendas.nome) || 'Piscicultura');
+  const papel = esc(ROTULO_PAPEL[p.papel] || p.papel);
+  const links = [['', '#/', 'inicio', 'Início'], ['lancar', '#/lancar', 'lancar', 'Lançar'], ['relatorio', '#/relatorio', 'relatorio', 'Relatórios'], ['mais', '#/mais', 'mais', 'Mais']];
   root.innerHTML = `
   <div class="app">
     <header class="topo">
       <div class="marca"><span class="logo-sm"></span>
-        <div><strong>${esc((p.fazendas && p.fazendas.nome) || 'Piscicultura')}</strong><small>${esc(p.nome)} · ${esc(ROTULO_PAPEL[p.papel] || p.papel)}</small></div></div>
+        <div><strong>${fazenda}</strong><small>${esc(p.nome)} · ${papel}</small></div></div>
       <a id="pill" class="pill" href="#/pendencias"></a>
     </header>
+    <aside class="lateral" aria-label="Navegação">
+      <div class="marca"><span class="logo-sm"></span><div><strong>${fazenda}</strong><small>Piscicultura</small></div></div>
+      <nav>${links.map(([aba, href, ic, txt]) => `<a data-aba="${aba}" href="${href}">${icone(ic, 19)}<span>${txt}</span></a>`).join('')}</nav>
+      <div class="lateral-pe">
+        <a id="pill-lateral" class="pill" href="#/pendencias"></a>
+        <div class="perfil-linha"><span class="avatar">${esc((p.nome || '?').trim().charAt(0).toUpperCase())}</span><div><b>${esc(p.nome)}</b><small>${papel}</small></div></div>
+      </div>
+    </aside>
     <main id="view" class="view"></main>
-    <nav class="abas">
-      <i class="abas-bolha" aria-hidden="true"></i>
-      <a data-aba="" href="#/"><span>${icone('inicio')}</span>Início</a>
-      <a data-aba="lancar" href="#/lancar"><span>${icone('lancar')}</span>Lançar</a>
-      <a data-aba="relatorio" href="#/relatorio"><span>${icone('relatorio')}</span>Relatórios</a>
-      <a data-aba="mais" href="#/mais"><span>${icone('mais')}</span>Mais</a>
+    <nav class="abas" aria-label="Navegação">
+      ${links.map(([aba, href, ic, txt]) => `<a data-aba="${aba}" href="${href}"><span>${icone(ic)}</span>${txt}</a>`).join('')}
     </nav>
   </div>`;
   atualizarPill();
@@ -378,39 +372,20 @@ function renderErro(el, e) {
   el.querySelector('#b-retry').addEventListener('click', rotear);
 }
 
-// Entrada da tela nova: quando o conteúdo fica pronto, cada bloco (título, cartões, botões) sobe e aparece
-// em sequência, levemente puxado do lado da aba para onde se foi. Só quando a rota muda (não ao atualizar dados).
-let hashAnterior = null, abaAnterior = null;
-const ORDEM_ABAS = ['', 'lancar', 'relatorio', 'mais'];
-function planejarEntrada(aba) {
-  const hash = location.hash || '#/';
-  const mudou = hash !== hashAnterior;
-  const de = abaAnterior === null ? 0 : ORDEM_ABAS.indexOf(abaAnterior), para = ORDEM_ABAS.indexOf(aba);
-  hashAnterior = hash; abaAnterior = aba;
-  const quieto = !document.body.animate || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-  return { animar: mudou && !quieto, dx: para > de ? 14 : para < de ? -14 : 0 };
-}
-function cascata(el, dx) {
-  [...el.children].slice(0, 10).forEach((c, i) => {
-    try {
-      c.animate([{ opacity: 0, transform: `translate(${dx}px, 18px)` }, { opacity: 1, transform: 'none' }],
-        { duration: 360, delay: i * 45, easing: 'cubic-bezier(.2,.85,.3,1)', fill: 'backwards' });
-    } catch { /* sem animação */ }
-  });
-}
-
 async function rotear() {
   const view = document.getElementById('view');
   if (!view || !state.perfil) return;
   const { rota, partes, params } = parseHash(location.hash);
   rotaAtual = rota;
   const aba = rota === 't' ? '' : ['', 'lancar', 'relatorio'].includes(rota) ? rota : 'mais'; // tela do tanque é aberta pelo Início
-  document.querySelectorAll('.abas a').forEach((a) => a.classList.toggle('on', a.dataset.aba === aba));
-  moverBolha();
+  document.querySelectorAll('.abas a, .lateral nav a').forEach((a) => {
+    const on = a.dataset.aba === aba;
+    a.classList.toggle('on', on);
+    if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+  });
 
   const el = document.createElement('div'); // contêiner novo por rota: renderizações atrasadas não sujam a tela atual
   view.replaceChildren(el);
-  const entrada = planejarEntrada(aba);
   const meu = ++tokenRota;
   window.scrollTo(0, 0);
   try {
@@ -429,7 +404,6 @@ async function rotear() {
       case 'mais': renderMais(ctx, el); break;
       default: await renderHome(ctx, el);
     }
-    if (entrada.animar && meu === tokenRota) cascata(el, entrada.dx);
   } catch (e) {
     if (meu === tokenRota) renderErro(el, e);
   }

@@ -72,6 +72,15 @@ export function criarApi(client) {
     async salvarLogo(fazendaId, dataUrl) {
       ok(await client.from('fazendas').update({ logo: dataUrl || null }).eq('id', fazendaId));
     },
+    // preço do kg do peixe para estimar o valor na água; null se não definido ou se o sql/16 não foi rodado
+    async precoKg() {
+      const { data, error } = await client.from('fazendas').select('preco_kg').maybeSingle();
+      if (error || !data || !(Number(data.preco_kg) > 0)) return null;
+      return Number(data.preco_kg);
+    },
+    async salvarPrecoKg(fazendaId, preco) {
+      ok(await client.from('fazendas').update({ preco_kg: preco }).eq('id', fazendaId));
+    },
     async tanques() {
       return ok(await client.from('tanques').select('id,nome').order('nome'));
     },
@@ -188,6 +197,11 @@ export function criarApi(client) {
     // ração de todos os tanques visíveis ao usuário a partir de uma data (para a tabela dia × tanque)
     async racaoPeriodo(desde) {
       return todos(() => client.from('racao_consumo').select('id,data,tanque_id,quantidade_kg').gte('data', desde).order('data').order('id'));
+    },
+    // mortes de todos os lotes visíveis a partir de uma data (resumo da semana na tela Início); sem o sql/08, vem sem a causa
+    async mortalidadePeriodo(desde) {
+      const ler = (cols) => todos(() => client.from('mortalidade').select(cols).gte('data', desde).order('id'));
+      return ler('id,data,lote_id,quantidade,causa').catch(() => ler('id,data,lote_id,quantidade'));
     },
     // nomes de toda a equipe (sql/10). Sem o sql/10, cai na tabela: o funcionário só enxerga o próprio nome.
     async nomesUsuarios() {
