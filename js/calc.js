@@ -240,3 +240,22 @@ export function calcularNaIdade(lote, bios, mort, rac, dias, precoKg = null) {
 
 // média de um campo numérico, ignorando vazios
 export const mediaDe = (lista, k) => { const v = lista.map((x) => x && x[k]).filter((x) => x != null && Number.isFinite(x)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+
+// Sugestão de ração do dia de um tanque: biomassa (vivos × peso médio) × taxa da faixa de peso.
+// lotes: os lotes ativos do tanque; resumo: {lote_id: linha}; tabela: TAXA_RACAO. Retorna null sem dados.
+export function sugestaoRacao(lotes, resumo, tabela) {
+  let kg = 0, bio = 0, provisoria = false, taxas = new Set();
+  for (const l of lotes) {
+    const r = resumo[l.id];
+    const qi = Number(l.quantidade_inicial) || 0;
+    const pm = r && r.ultimo_peso_medio_kg != null ? Number(r.ultimo_peso_medio_kg) : qi > 0 ? Number(l.peso_inicial_kg) / qi : null;
+    if (!(pm > 0)) continue;
+    const vivos = Math.max(0, qi - Number((r && r.mortos) || 0));
+    const faixa = tabela.find((f) => pm <= f.ateKg) || tabela[tabela.length - 1];
+    const b = vivos * pm;
+    bio += b; kg += (b * faixa.pct) / 100; taxas.add(faixa.pct);
+    if (faixa.provisoria) provisoria = true;
+  }
+  if (!(kg > 0)) return null;
+  return { kg, biomassaKg: bio, pct: taxas.size === 1 ? [...taxas][0] : (kg / bio) * 100, provisoria };
+}

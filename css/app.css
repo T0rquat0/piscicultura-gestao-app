@@ -1010,3 +1010,8 @@ table.cmp td b { font-weight: 600; }
   table.cmp td[data-r]::before { content: attr(data-r); display: block; font-size: .72rem; color: var(--tinta-2); }
   table.cmp .cmp-tag { display: block; width: fit-content; margin: .2rem 0 0; }
 }
+
+/* ----- Lançar: sugestão de ração do dia ----- */
+.sug-racao { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .6rem; margin-top: .5rem; }
+.sug-racao small { font-size: .78rem; color: var(--tinta-2); }
+#b-sug { border-color: var(--rio); color: var(--rio); font-weight: 600; }

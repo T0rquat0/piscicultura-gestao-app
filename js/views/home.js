@@ -1,7 +1,7 @@
 import { esc, fmtInt, fmtNum, fmtData, hojeISO, diasEntre, num, ROTULO_TIPO, progresso, fmtPct } from '../util.js';
 import * as db from '../db.js';
-import { situacaoEstoque, previsaoDespesca, alertasManejo } from '../calc.js';
-import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, ESTOQUE_COBERTURA_DIAS, PESO_SACO_PADRAO_KG, CONTAGEM_LEMBRETE_DIAS, PLANO_AVISO_DIAS, ALERTAS } from '../config.js';
+import { situacaoEstoque, previsaoDespesca, alertasManejo, sugestaoRacao } from '../calc.js';
+import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, ESTOQUE_COBERTURA_DIAS, PESO_SACO_PADRAO_KG, CONTAGEM_LEMBRETE_DIAS, PLANO_AVISO_DIAS, ALERTAS, TAXA_RACAO } from '../config.js';
 import { icone } from '../icons.js';
 import { pedirTexto } from '../dialogo.js';
 import { pizza, COR_FASE, ORDEM_FASE, COR_RACAO } from '../graficos.js';
@@ -121,11 +121,13 @@ export async function renderHome(ctx, el) {
     const meta = metaDe(l, metas);
     return `<span class="tq-dado"><span>${bioTxt}</span><strong>${pesoTxt(pm)}<span> / ${pesoTxt(meta)}</span></strong></span>${progresso((pm / meta) * 100, { fina: true, tom: pm >= meta ? 'ok' : '', rotulo: `Peso médio ${pesoTxt(pm)} de ${pesoTxt(meta)}` })}`;
   };
+  // sugestão do dia (só quando o tanque ainda não tem média de ração na semana)
+  const sugDe = (t) => (semDetalhe ? null : sugestaoRacao(lotes.filter((l) => l.tanque_id === t.id), resumo, TAXA_RACAO));
   const tile = (t) => {
     if (status[t.id] === 'falta') {
       const m = mediaKg(t.id);
       return `<a class="tq falta" href="#/lancar?tipo=racao&tanque=${esc(t.id)}"><b>${esc(t.nome)}</b><span class="tq-fase">${esc(fase(t))}</span>
-        ${linhaTq(t)}<span class="tq-acao">${m ? `<span class="tq-verbo">Lançar </span><span class="tq-mais">+</span>${esc(nSacos(sacos(m)))}` : 'Lançar ração'}</span></a>`;
+        ${linhaTq(t)}<span class="tq-acao">${m ? `<span class="tq-verbo">Lançar </span><span class="tq-mais">+</span>${esc(nSacos(sacos(m)))}` : sugDe(t) ? `<span class="tq-verbo">Lançar </span><span class="tq-mais">+</span>~${esc(nSacos(sacos(sugDe(t).kg)))}` : 'Lançar ração'}</span></a>`;
     }
     if (status[t.id] === 'ok') {
       const kg = (porTanque[t.id] || {}).hojeKg;
@@ -211,7 +213,8 @@ export async function renderHome(ctx, el) {
     const t = faltam[0], m = mediaKg(t.id);
     const ls = lotes.filter((l) => l.tanque_id === t.id);
     const peixes = ls.reduce((a, l) => a + Math.max(0, Number(l.quantidade_inicial) - Number((resumo[l.id] && resumo[l.id].mortos) || 0)), 0);
-    const det = [fase(t), peixes ? `${fmtInt(peixes)} peixes` : '', m ? `média de ${nSacos(sacos(m))}` : 'sem média ainda: conte os sacos dados'].filter(Boolean).join(' · ');
+    const sg = m ? null : sugDe(t);
+    const det = [fase(t), peixes ? `${fmtInt(peixes)} peixes` : '', m ? `média de ${nSacos(sacos(m))}` : sg ? `sugestão de ~${nSacos(sacos(sg.kg))} (${fmtNum(sg.pct, 1)}% do peso vivo${sg.provisoria ? ', provisória' : ''})` : 'sem média ainda: conte os sacos dados'].filter(Boolean).join(' · ');
     return `<section class="ag">${anel}<div class="ag-txt"><span class="ag-rot">Próxima tarefa</span><h2>Ração no ${esc(t.nome)}</h2><p>${esc(det)}${dado}</p>
       <a class="btn primario grande" href="#/lancar?tipo=racao&tanque=${esc(t.id)}">Lançar ração agora</a></div></section>`;
   }

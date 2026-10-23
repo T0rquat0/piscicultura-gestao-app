@@ -5,7 +5,8 @@ import { esc, hojeISO, fmtData, fmtNum, fmtInt, num, uuid, ROTULO_TIPO, progress
 import * as db from '../db.js';
 import { confirmar } from '../dialogo.js';
 import { ordemNatural } from './home.js';
-import { PESO_SACO_PADRAO_KG, CAUSAS_MORTE } from '../config.js';
+import { PESO_SACO_PADRAO_KG, CAUSAS_MORTE, TAXA_RACAO } from '../config.js';
+import { sugestaoRacao } from '../calc.js';
 
 const TIPOS = {
   racao: { rotulo: 'Ração', tabela: 'racao_consumo' },
@@ -26,6 +27,7 @@ function camposDoTipo(tipo, kgSaco) {
       <input id="qtd" class="grande" type="number" inputmode="decimal" step="0.5" min="0" placeholder="0" required></label>
       <div class="calc" id="conv">Cada saco = ${fmtNum(kgSaco, 0)} kg</div>
       <button type="button" class="chip repetir" id="b-ultima" hidden></button>
+      <div class="sug-racao" id="sug-racao" hidden></div>
       <details class="como-det"><summary>Como lançar</summary>
       <ol class="como">
         <li>Conte os sacos de ração que foram dados hoje neste tanque.</li>
@@ -257,6 +259,23 @@ export async function renderLancar(ctx, el, params = {}) {
     b.onclick = () => { f.querySelector('#qtd').value = String(sc); f.querySelector('#qtd').dispatchEvent(new Event('input')); f.querySelector('#qtd').focus(); };
   }
   mostrarUltima();
+
+  // sugestão do dia: % do peso vivo do tanque pela faixa de peso (tabela em config.js; faixas sem fonte são provisórias)
+  let resumoLotes = null;
+  async function mostrarSugestao() {
+    const box = f.querySelector('#sug-racao');
+    if (!box) return;
+    if (!resumoLotes && navigator.onLine) resumoLotes = Object.fromEntries(((await ctx.api.resumoLotes().catch(() => [])) || []).map((r) => [r.lote_id, r]));
+    const sug = sugestaoRacao(lotes.filter((l) => l.tanque_id === selTanque.value), resumoLotes || {}, TAXA_RACAO);
+    if (!sug) { box.hidden = true; return; }
+    const sacosSug = Math.max(0.5, Math.round((sug.kg / kgSaco) * 2) / 2);
+    const bio = sug.biomassaKg >= 1000 ? `${fmtNum(sug.biomassaKg / 1000, 1)} t` : `${fmtNum(sug.biomassaKg, 0)} kg`;
+    box.hidden = false;
+    box.innerHTML = `<button type="button" class="chip" id="b-sug">Sugestão: ${esc(sacosTxt(sacosSug))}</button>
+      <small>${fmtNum(sug.pct, 1)}% do peso vivo (${bio} de peixe)${sug.provisoria ? ' · taxa provisória, confirme com o técnico' : ''}</small>`;
+    box.querySelector('#b-sug').onclick = () => { const q = f.querySelector('#qtd'); q.value = String(sacosSug); q.dispatchEvent(new Event('input')); q.focus(); };
+  }
+  if (tipo === 'racao') { mostrarSugestao(); selTanque.addEventListener('change', mostrarSugestao); }
   if (tipo === 'racao') {
     const q = f.querySelector('#qtd'), conv = f.querySelector('#conv');
     q.addEventListener('input', () => { const n = num(q.value); conv.textContent = n > 0 ? `${sacosTxt(n)} = ${fmtNum(n * kgSaco, 1)} kg` : `Cada saco = ${fmtNum(kgSaco, 0)} kg`; });

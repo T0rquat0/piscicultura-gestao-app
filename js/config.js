@@ -76,3 +76,14 @@ export const ALERTAS = {
   racaoDesvio: 0.4,      // ração de hoje 40% abaixo ou acima da média do tanque na semana
   morteDiasSeguidos: 3,  // mortes no mesmo tanque por esse número de dias seguidos
 };
+
+// Sugestão de ração do dia: % do peso vivo (biomassa) por faixa de peso médio do peixe — tambaqui.
+// Fontes: Embrapa Amazônia Ocidental e INPA (juvenil até 250 g: 5% deu a melhor conversão; redução de 5% para 3%
+// ao longo do cultivo). Faixas acima de 800 g SEM fonte confirmada: PROVISÓRIAS, confirmar com o técnico da fazenda.
+export const TAXA_RACAO = [
+  { ateKg: 0.05, pct: 6, provisoria: true },
+  { ateKg: 0.25, pct: 5 },
+  { ateKg: 0.8, pct: 3 },
+  { ateKg: 1.5, pct: 2, provisoria: true },
+  { ateKg: Infinity, pct: 1.5, provisoria: true },
+];
