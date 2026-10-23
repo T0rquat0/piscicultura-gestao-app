@@ -38,7 +38,7 @@ export async function renderTanques(ctx, el) {
       <summary>Cadastrar vários tanques de uma vez (colar planilha)</summary>
       <div class="form">
         <p class="mudo" style="margin-top:0">Copie as linhas do Excel (ou escreva uma por linha) nesta ordem: <b>Tanque · Área (ha) · Fase · Peixes · Peso médio · Início do ciclo</b>. Pode separar por tabulação ou ponto e vírgula. Peso em kg ou com "g" (ex.: 500 g). Tanque sem peixes entra só como tanque.</p>
-        <textarea id="planilha" rows="7" placeholder="Tanque 1;5,5;Engorda;12000;2,3;10/06/2026&#10;Tanque 6;8,5;Recria;98000;500 g;15/08/2026&#10;Tanque 8;2,3"></textarea>
+        <textarea id="planilha" rows="7" aria-label="Linhas da planilha ou mensagem do WhatsApp com os tanques" placeholder="Tanque 1;5,5;Engorda;12000;2,3;10/06/2026&#10;Tanque 6;8,5;Recria;98000;500 g;15/08/2026&#10;Tanque 8;2,3"></textarea>
         <div id="previa"></div>
         <p id="erro-pl" class="erro" hidden></p>
         <button class="btn primario" id="b-importar" type="button" hidden>Cadastrar</button>
