@@ -1,7 +1,8 @@
-import { esc, fmtInt, fmtNum, fmtData, hojeISO, diasEntre, ROTULO_TIPO, faseCss, progresso } from '../util.js';
+import { esc, fmtInt, fmtNum, fmtData, hojeISO, diasEntre, num, ROTULO_TIPO, faseCss, progresso } from '../util.js';
 import * as db from '../db.js';
-import { situacaoEstoque } from '../calc.js';
-import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, ESTOQUE_COBERTURA_DIAS, PESO_SACO_PADRAO_KG, CONTAGEM_LEMBRETE_DIAS, PLANO_AVISO_DIAS } from '../config.js';
+import { situacaoEstoque, previsaoDespesca } from '../calc.js';
+import { localGuardado, pedirLocal, previsao, descricao, avisosClima } from '../clima.js';
+import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, ESTOQUE_COBERTURA_DIAS, PESO_SACO_PADRAO_KG, CONTAGEM_LEMBRETE_DIAS, PLANO_AVISO_DIAS, ALVO_PADRAO_KG } from '../config.js';
 import { icone } from '../icons.js';
 import { pedirTexto } from '../dialogo.js';
 import { pizza, COR_FASE, ORDEM_FASE, COR_RACAO } from '../graficos.js';
@@ -15,7 +16,7 @@ export function statusTanque(tanque, lotes, resumo, racaoHojeLocal, hoje) {
   return lancou ? 'ok' : 'falta';
 }
 
-export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje) {
+export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje, metas = {}) {
   const nomeLote = (l) => `${ROTULO_TIPO[l.tipo] || l.tipo} · ${l.especie}`;
   const blocos = lotes.length
     ? lotes.map((l) => {
@@ -35,6 +36,7 @@ export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje) {
             <div><span>Peixes vivos (estim.)</span><b>${fmtInt(vivos ?? l.quantidade_inicial)}</b></div>
           </div>
           ${vivos != null && l.quantidade_inicial > 0 ? `<div class="td-sobre">${progresso((vivos / l.quantidade_inicial) * 100, { tom: 'ok', rotulo: `Sobrevivência ${fmtNum((vivos / l.quantidade_inicial) * 100, 1)}%` })}<p class="h-trilho-leg"><span>Sobrevivência: ${fmtInt(vivos)} de ${fmtInt(l.quantidade_inicial)} peixes</span><b>${fmtNum((vivos / l.quantidade_inicial) * 100, 1)}%</b></p></div>` : ''}
+          ${r ? `<div class="td-prev"><div class="td-prev-cab"><span>Despesca</span><button class="link" type="button" data-meta="${esc(l.id)}">Mudar meta</button></div>${htmlPrevisao(previsaoDespesca(l, r, metaDe(l, metas), hoje))}</div>` : ''}
         </section>`;
       }).join('')
     : '<div class="card vazio"><p>Sem lote ativo neste tanque.</p></div>';
@@ -60,6 +62,20 @@ export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje) {
   </section>`;
 }
 
+// meta de despesca de um lote: a guardada no aparelho ou o padrão da fase
+const metaDe = (l, metas) => Number((metas || {})[l.id]) || ALVO_PADRAO_KG[l.tipo] || ALVO_PADRAO_KG.engorda;
+const pesoTxt = (kg) => (kg < 1 ? `${fmtNum(kg * 1000, 0)} g` : `${fmtNum(kg, kg < 10 ? 1 : 0)} kg`);
+const dataCurta = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }).replace('.', '');
+
+// linha de previsão de despesca (barra = peso atual ÷ meta)
+function htmlPrevisao(p) {
+  const leg = p.estado === 'pronto' ? '<b>Já no peso de despesca</b>'
+    : p.estado === 'previsto' ? `Previsão: <b>${esc(dataCurta(p.data))}</b> · ${p.dias === 0 ? 'hoje' : `em ${fmtInt(p.dias)} ${p.dias === 1 ? 'dia' : 'dias'}`}`
+    : 'Faça uma biometria para prever a data';
+  return `${progresso(p.pct || 0, { tom: p.estado === 'pronto' ? 'ok' : '', rotulo: `Peso ${pesoTxt(p.pmKg || 0)} de ${pesoTxt(p.alvoKg)}` })}
+    <p class="h-trilho-leg"><span>${pesoTxt(p.pmKg || 0)} de ${pesoTxt(p.alvoKg)}</span><span>${leg}</span></p>`;
+}
+
 // Tela de um tanque (todos os papéis): números do lote e atalhos para lançar
 export async function renderTanqueDetalhe(ctx, el, id) {
   const { state } = ctx;
@@ -73,10 +89,20 @@ export async function renderTanqueDetalhe(ctx, el, id) {
   const fila = await db.filaList();
   const racaoHojeLocal = new Set(fila.filter((i) => i.tabela === 'racao_consumo' && i.payload.data === hoje).map((i) => i.payload.tanque_id));
   const meus = state.ref.lotes.filter((l) => l.tanque_id === id);
+  const metas = (await db.kvGet('metasDespesca')) || {};
   el.innerHTML = `<p class="no-print"><a class="voltar" href="#/">${icone('voltar', 18)} Início</a></p>
     ${semDetalhe ? '<p class="aviso">Sem conexão: os totais aparecem quando houver internet.</p>' : ''}
-    ${htmlCardTanque(tanque, meus, resumo, racaoHojeLocal, hoje)}
+    ${htmlCardTanque(tanque, meus, resumo, racaoHojeLocal, hoje, metas)}
     ${meus.length ? `<a class="hub-card td-rel" href="#/relatorio/${esc(meus[0].id)}"><span class="item-ic">${icone('relatorio')}</span><span class="esq"><b>Relatório do lote</b><small>Peso, ração e mortalidade do início até hoje</small></span><span class="seta">${icone('direita', 20)}</span></a>` : ''}`;
+  el.querySelectorAll('[data-meta]').forEach((b) => b.addEventListener('click', async () => {
+    const l = meus.find((x) => x.id === b.dataset.meta); if (!l) return;
+    const v = await pedirTexto({ titulo: 'Meta de despesca', rotulo: 'Peso médio de cada peixe na despesca (kg)', texto: String(metaDe(l, metas)).replace('.', ','), placeholder: 'Ex.: 2,5', maxlength: 8,
+      validar: (t) => (num(t) > 0 && num(t) < 100 ? '' : 'Informe o peso em kg, ex.: 2,5') });
+    if (!v) return;
+    metas[l.id] = num(v); await db.kvSet('metasDespesca', metas);
+    ctx.toast('Meta de despesca salva neste aparelho', 'ok');
+    renderTanqueDetalhe(ctx, el, id);
+  }));
 }
 
 // Cria um tanque direto da tela inicial (dono/gerente). O limite do pacote é imposto no banco.
@@ -131,6 +157,7 @@ export async function renderHome(ctx, el) {
   const paraContar = usadas.filter((s) => Number(s.consumo_7d_kg) > 0).sort((a, b) => String(a.ultima_contagem || '').localeCompare(String(b.ultima_contagem || '')))[0] || usadas[0] || null;
 
   const fila = await db.filaList();
+  const metas = (await db.kvGet('metasDespesca')) || {};
   const pendHoje = fila.filter((i) => i.tabela === 'racao_consumo' && i.payload.data === hoje);
   const racaoHojeLocal = new Set(pendHoje.map((i) => i.payload.tanque_id));
   const kgS = state.ref.kgSaco || PESO_SACO_PADRAO_KG;
@@ -197,14 +224,52 @@ export async function renderHome(ctx, el) {
       <div class="h-col">
         ${blocoRacao()}
         ${gerir ? blocoMortes() : ''}
+        ${gerir ? blocoDespescas() : ''}
       </div>
       <div class="h-col">
+        <section class="h-bloco" aria-labelledby="h-tempo" id="b-tempo"><header><h2 id="h-tempo">Tempo na fazenda</h2></header><p class="h-calmo">Carregando a previsão…</p></section>
         ${gerir ? blocoPeixe() : ''}
         ${blocoEstoque()}
       </div>
     </div>`;
   const bn = el.querySelector('#b-novo-tanque'); if (bn) bn.addEventListener('click', () => novoTanque(ctx, el));
   avisoPlano(ctx, el.querySelector('#avisos'));
+  pintarTempo(el.querySelector('#b-tempo'));
+
+  function blocoDespescas() {
+    if (semDetalhe || !lotes.length) return '';
+    const nomeT = (id) => (tanques.find((t) => t.id === id) || {}).nome || 'Tanque';
+    const ps = lotes.map((l) => ({ l, p: previsaoDespesca(l, resumo[l.id], metaDe(l, metas), hoje) }));
+    const ordem = { pronto: 0, previsto: 1, 'sem-dado': 2 };
+    const comData = ps.filter((x) => x.p.estado !== 'sem-dado').sort((a, b) => ordem[a.p.estado] - ordem[b.p.estado] || String(a.p.data).localeCompare(String(b.p.data)));
+    const sem = ps.length - comData.length;
+    return `<section class="h-bloco" aria-labelledby="h-desp">
+      <header><h2 id="h-desp">Próximas despescas</h2><span class="h-meta">pelo ritmo de crescimento</span></header>
+      ${comData.length ? `<ul class="h-desp">${comData.slice(0, 6).map(({ l, p }) => `<li><a href="#/t/${esc(l.tanque_id)}"><b>${esc(nomeT(l.tanque_id))}</b><span>${esc(ROTULO_TIPO[l.tipo] || l.tipo)}</span></a>${htmlPrevisao(p)}</li>`).join('')}</ul>` : ''}
+      ${sem ? `<p class="h-calmo">${comData.length ? `Mais ${fmtInt(sem)}` : fmtInt(sem)} ${sem === 1 ? 'lote' : 'lotes'} sem biometria depois da entrada: lance uma pesagem para prever a despesca.</p>` : ''}
+    </section>`;
+  }
+
+  async function pintarTempo(box) {
+    if (!box) return;
+    const cab = '<header><h2 id="h-tempo">Tempo na fazenda</h2><span class="h-meta">próximos dias</span></header>';
+    const local = await localGuardado();
+    if (!local) {
+      box.innerHTML = `${cab}<p class="h-calmo">Veja a previsão do tempo e avisos de manejo (friagem, chuva forte, calor) para ajustar a ração.</p><button class="btn" id="b-tempo-ativar" type="button">Ativar previsão do tempo</button>`;
+      box.querySelector('#b-tempo-ativar').addEventListener('click', async () => {
+        try { await pedirLocal(); pintarTempo(box); } catch (e) { ctx.toast(e.message, 'erro'); }
+      });
+      return;
+    }
+    const pv = await previsao(local);
+    if (!pv) { box.innerHTML = `${cab}<p class="h-calmo">Previsão indisponível agora. Tente de novo com internet.</p>`; return; }
+    const dias = pv.dias.filter((d) => d.data >= hoje).slice(0, 4);
+    const av = avisosClima(dias);
+    const nomeDia = (d, i) => (i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : new Date(`${d}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', ''));
+    box.innerHTML = `${cab}
+      <ul class="h-tempo">${dias.map((d, i) => `<li${i === 0 ? ' class="hoje"' : ''}><span>${esc(nomeDia(d.data, i))}</span><b>${Math.round(d.max)}°</b><small>mín. ${Math.round(d.min)}°</small><em>${esc(descricao(d.codigo))}${d.chuva >= 1 ? ` · ${fmtNum(d.chuva, 0)} mm` : ''}</em></li>`).join('')}</ul>
+      ${av.length ? av.map((a) => `<p class="${a.nivel === 'alerta' ? 'h-alerta' : 'aviso'}">${esc(a.txt)}</p>`).join('') : '<p class="h-calmo">Sem aviso de manejo para hoje e amanhã.</p>'}`;
+  }
 
   function blocoRacao() {
     const previsto = dadoKg + previstoFaltaKg;

@@ -55,6 +55,8 @@ export function calcularLote(lote, bios, mort, rac, hoje, precoKg = null) {
     ca,
     gpd,
     custoRacao: precoKg != null ? racaoTotal * precoKg : null,
+    // custo da ração por kg de peixe produzido (ração até a última biometria ÷ ganho de biomassa)
+    custoKgProduzido: precoKg != null && ganhoBiomassa > 0 && racaoAteBio > 0 ? (racaoAteBio * precoKg) / ganhoBiomassa : null,
   };
 }
 
@@ -146,4 +148,27 @@ export function situacaoEstoque(saldoKg, consumo7dKg, atencaoDias = 15, criticoD
   const d = Math.floor(dias);
   const nivel = d <= criticoDias ? 'critico' : d <= atencaoDias ? 'atencao' : 'ok';
   return { nivel, dias, porDia };
+}
+
+/**
+ * Previsão de despesca de um lote pelo ritmo médio de crescimento desde a entrada.
+ * lote: {data_entrada, quantidade_inicial, peso_inicial_kg}; r: linha do resumo_lotes
+ * (ultimo_peso_medio_kg, ultima_biometria, mortos); alvoKg: peso médio de despesca.
+ * Retorna { estado: 'sem-dado' | 'pronto' | 'previsto', pmKg, alvoKg, pct, gpdG, data, dias, biomassaKg }
+ */
+export function previsaoDespesca(lote, r, alvoKg, hoje) {
+  const qi = Number(lote.quantidade_inicial) || 0;
+  const pmIni = qi > 0 ? Number(lote.peso_inicial_kg) / qi : null;
+  const pm = r && r.ultimo_peso_medio_kg != null ? Number(r.ultimo_peso_medio_kg) : pmIni;
+  const vivos = Math.max(0, qi - Number((r && r.mortos) || 0));
+  const base = { pmKg: pm, alvoKg, pct: pm != null && alvoKg > 0 ? Math.min(100, (pm / alvoKg) * 100) : null, biomassaKg: alvoKg * vivos };
+  if (pm != null && pm >= alvoKg) return { ...base, estado: 'pronto' };
+  const dataBio = r && r.ultima_biometria;
+  const dias = dataBio ? diasEntre(lote.data_entrada, dataBio) : 0;
+  if (pm == null || pmIni == null || !dataBio || dias <= 0 || pm <= pmIni) return { ...base, estado: 'sem-dado' };
+  const gpd = (pm - pmIni) / dias; // kg/dia
+  const falta = Math.ceil((alvoKg - pm) / gpd);
+  const d = new Date(`${dataBio}T12:00:00`); d.setDate(d.getDate() + falta);
+  const data = d.toISOString().slice(0, 10);
+  return { ...base, estado: 'previsto', gpdG: gpd * 1000, data, dias: Math.max(0, diasEntre(hoje, data)) };
 }

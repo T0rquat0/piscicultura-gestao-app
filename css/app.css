@@ -867,3 +867,22 @@ h2, h3, .h-bloco h2 { font-weight: 700; letter-spacing: -.015em; }
   .lc-painel .pequeno { font-size: .8rem; }
   .lc-dias b { text-align: right; font-weight: 500; color: var(--tinta); font-variant-numeric: tabular-nums; }
 }
+
+/* ----- previsão de despesca e tempo na fazenda ----- */
+.h-desp { list-style: none; margin: .8rem 0 0; padding: 0; display: grid; gap: .9rem; }
+.h-desp li > a { display: flex; align-items: baseline; gap: .5rem; color: inherit; text-decoration: none; }
+.h-desp li > a b { font: 700 .98rem var(--fonte-titulo); }
+.h-desp li > a span { font-size: .8rem; color: var(--tinta-2); }
+.h-desp .prog { margin: .35rem 0 .15rem; }
+.h-desp .h-trilho-leg b, .td-prev .h-trilho-leg b { color: var(--tinta); font-weight: 600; }
+.td-prev { margin: .3rem 0 .7rem; }
+.td-prev-cab { display: flex; justify-content: space-between; align-items: baseline; font-size: .85rem; color: var(--tinta-2); }
+.td-prev-cab .link { font-size: .85rem; }
+.h-tempo { list-style: none; margin: .7rem 0 .2rem; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .4rem; }
+.h-tempo li { display: grid; gap: .1rem; padding: .55rem .5rem; border-radius: var(--r-campo); background: var(--campo-bg); text-align: center; }
+.h-tempo li.hoje { background: var(--rio-claro); }
+.h-tempo span { font-size: .78rem; color: var(--tinta-2); text-transform: capitalize; }
+.h-tempo b { font: 700 1.05rem var(--fonte-titulo); font-variant-numeric: tabular-nums; }
+.h-tempo small { font-size: .74rem; color: var(--tinta-2); font-variant-numeric: tabular-nums; }
+.h-tempo em { font-style: normal; font-size: .72rem; color: var(--tinta-2); line-height: 1.25; }
+#b-tempo .btn { margin-top: .6rem; }

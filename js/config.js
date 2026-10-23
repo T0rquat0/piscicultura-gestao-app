@@ -56,3 +56,16 @@ export const CAUSAS_MORTE = [
 // da versão (ex.: '2026-11-01'). Quem já tem conta verá o pedido de aceite no próximo acesso;
 // quem criar conta marca o aceite no cadastro. Mudou o texto? Troque a data: todos aceitam de novo.
 export const TERMOS_VERSAO = null;
+
+// Peso médio de despesca (kg por peixe) usado na previsão quando o lote não tem meta própria.
+// É só um ponto de partida: cada lote pode ter a sua meta (tela do tanque > "Mudar meta").
+export const ALVO_PADRAO_KG = { bercario: 0.005, alevinagem: 0.05, recria: 0.8, engorda: 2.5 };
+
+// Avisos do tempo (sugestões de manejo; ajuste à realidade da fazenda)
+export const CLIMA = {
+  friagemMinC: 20,      // mínima abaixo disso: peixe tropical come menos
+  quedaC: 4,            // mínima de amanhã cai isso ou mais em relação a hoje
+  calorMaxC: 35,        // máxima acima disso: água quente, menos oxigênio
+  chuvaForteMm: 30,     // chuva do dia acima disso
+  validadeMin: 180,     // quanto tempo a previsão guardada vale antes de buscar de novo
+};
