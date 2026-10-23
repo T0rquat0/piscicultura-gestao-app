@@ -7,6 +7,7 @@ import { gerarPdfRacao } from '../pdf_racao.js';
 import { confirmar, formulario } from '../dialogo.js';
 import { icone } from '../icons.js';
 import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num, ROTULO_TIPO, faseCss, nomeArquivo, dataArquivo, progresso } from '../util.js';
+import { pizza, COR_FASE, ORDEM_FASE } from '../graficos.js';
 import { calcularLote, precoMedioKg, pontosPeso, pesoMedioKg, evolucaoPeso, racaoPorSemana, matrizRacao, situacaoEstoque } from '../calc.js';
 
 export function svgPeso(pts) {
@@ -367,7 +368,7 @@ export async function renderRacaoDia(ctx, el) {
   // lote e peso estimado dos peixes de cada tanque (para "% do peso vivo")
   const infoTanque = (tid) => {
     const ls = lotesAtivos.filter((l) => l.tanque_id === tid);
-    if (!ls.length) return { lote: '', vivos: null, biomassaKg: null };
+    if (!ls.length) return { lote: '', vivos: null, biomassaKg: null, fase: null };
     const lote = ls.length > 1 ? `${ls.length} lotes` : `${ls[0].especie} · ${(ROTULO_TIPO[ls[0].tipo] || ls[0].tipo || '').toLowerCase()}`;
     let vivos = 0, bio = 0, temPeso = true;
     for (const l of ls) {
@@ -376,7 +377,7 @@ export async function renderRacaoDia(ctx, el) {
       vivos += v;
       if (r0 && r0.ultimo_peso_medio_kg != null) bio += v * Number(r0.ultimo_peso_medio_kg); else temPeso = false;
     }
-    return { lote, vivos, biomassaKg: temPeso && bio > 0 ? bio : null };
+    return { lote, vivos, biomassaKg: temPeso && bio > 0 ? bio : null, fase: ls.every((l) => l.tipo === ls[0].tipo) ? ls[0].tipo : null };
   };
   const nat = (a, b) => String(a).localeCompare(String(b), 'pt-BR', { numeric: true, sensitivity: 'base' });
   const diaSemana = (iso) => new Intl.DateTimeFormat('pt-BR', { weekday: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`)).replace(/^./, (c) => c.toUpperCase());
@@ -450,6 +451,14 @@ export async function renderRacaoDia(ctx, el) {
     <p class="no-print" style="text-align:center;margin:1.2rem 0 .4rem"><button class="link" id="b-csv" type="button">Baixar planilha (CSV)</button></p>`;
 
   let r = null;
+  // ração do período dividida por fase do lote (só quando há mais de uma fase)
+  function pizzaFase(lista) {
+    const porFase = {};
+    for (const t of lista) if (t.kg > 0 && t.fase) porFase[t.fase] = (porFase[t.fase] || 0) + t.kg;
+    const fases = ORDEM_FASE.filter((f) => porFase[f] > 0);
+    if (fases.length < 2) return '';
+    return `<div class="pz-faixa">${pizza(fases.map((f) => ({ nome: ROTULO_TIPO[f] || f, valor: porFase[f], cor: COR_FASE[f], txt: `${sacos(porFase[f])} sacos` })), { centro: sacos(Object.values(porFase).reduce((a, b) => a + b, 0)), sub: 'sacos', rotulo: 'Ração por fase' })}</div>`;
+  }
   function pintar() {
     el.querySelectorAll('[data-per]').forEach((b) => b.classList.toggle('on', b.dataset.per === per));
     r = calcular();
@@ -475,7 +484,7 @@ export async function renderRacaoDia(ctx, el) {
       <p class="mudo nota so-pc">Valores em kg. “–” significa que nada foi lançado naquele dia.</p>
       <p class="mudo nota so-cel">Toque num dia para ver a ração de cada tanque. A tabela completa vai no PDF.</p>`;
     const quem = r.individual ? r.lista[0].nome : r.parcial ? `${r.lista.length} de ${r.todos.length} tanques` : r.todos.length > 1 ? 'todos os tanques' : '';
-    el.querySelector('#resumo').innerHTML = !r.todos.length ? '' : `<div class="racao-total"><small>${esc(r.periodo)}${quem ? ` · ${esc(quem)}` : ''}</small><b>${sacos(r.total)} sacos</b><span>${kgTxt(r.total)} kg no total</span>${(() => { const at = r.todos.filter((t) => t.ativo), com = at.filter((t) => t.kg > 0).length; return at.length > 1 ? `<div class="hero-prog">${progresso((com / at.length) * 100, { tom: com === at.length ? 'ok' : '', rotulo: `${com} de ${at.length} tanques com ração lançada` })}<p class="h-trilho-leg"><span>${fmtInt(com)} de ${fmtInt(at.length)} tanques com ração lançada</span></p></div>` : ''; })()}</div>`;
+    el.querySelector('#resumo').innerHTML = !r.todos.length ? '' : `<div class="racao-total"><small>${esc(r.periodo)}${quem ? ` · ${esc(quem)}` : ''}</small><b>${sacos(r.total)} sacos</b><span>${kgTxt(r.total)} kg no total</span>${pizzaFase(r.lista)}${(() => { const at = r.todos.filter((t) => t.ativo), com = at.filter((t) => t.kg > 0).length; return at.length > 1 ? `<div class="hero-prog">${progresso((com / at.length) * 100, { tom: com === at.length ? 'ok' : '', rotulo: `${com} de ${at.length} tanques com ração lançada` })}<p class="h-trilho-leg"><span>${fmtInt(com)} de ${fmtInt(at.length)} tanques com ração lançada</span></p></div>` : ''; })()}</div>`;
     el.querySelector('#acoes-racao').hidden = !r.todos.length;
     const bpdf = el.querySelector('#b-pdf-racao'); bpdf.disabled = !r.lista.length;
     el.querySelector('#b-csv').disabled = !r.lista.length;

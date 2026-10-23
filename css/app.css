@@ -822,4 +822,48 @@ h2, h3, .h-bloco h2 { font-weight: 700; letter-spacing: -.015em; }
 /* quadro estreito (celular): "+ 10 sacos" no lugar de "Lançar 10 sacos", para caber numa linha */
 .tq-mais { display: none; }
 @media (max-width: 599px) { .tq-verbo { display: none; } .tq-mais { display: inline; font-weight: 700; } .tq-acao { white-space: nowrap; } }
-@media (min-width: 900px) { .acoes-reg { flex-wrap: nowrap; } }
+
+/* ----- gráfico de pizza (rosca): total no meio, legenda com valor e % ----- */
+.pizza { display: flex; align-items: center; gap: 1.2rem; margin: 1rem 0 .4rem; max-width: 480px; }
+.h-bloco .pizza { gap: .9rem; }
+.h-bloco .pizza svg { width: 104px; height: 104px; }
+.pizza svg { width: 124px; height: 124px; flex: none; }
+.pizza svg path, .pizza svg circle { stroke: var(--card); stroke-width: 2px; transition: opacity .15s; }
+.pizza svg circle { stroke-width: 18px; }
+.pizza svg:hover path { opacity: .45; }
+.pizza svg path:hover { opacity: 1; }
+.pz-c { font: 700 17px var(--fonte-titulo); fill: var(--tinta); letter-spacing: -.02em; }
+.pz-s { font: 400 9px var(--fonte); fill: var(--tinta-2); }
+.pz-leg { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; flex: 1; min-width: 0; }
+.pz-leg li { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; align-items: center; gap: .5rem; font-size: .88rem; }
+.pz-leg i { width: 12px; height: 12px; border-radius: 3px; }
+.pizza .pz-leg span { font-size: .88rem; color: var(--tinta); line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pizza .pz-leg b { font-size: .88rem; letter-spacing: 0; line-height: 1.3; font-family: var(--fonte); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.pizza .pz-leg small { font-family: var(--fonte); color: var(--tinta-2); font-size: .78rem; font-weight: 400; margin-left: .2rem; }
+.estoque-hero .pizza svg path, .racao-total .pizza svg path { stroke: var(--campo-bg); }
+.pz-faixa { margin: .4rem 0 .2rem; }
+.card > .pizza { margin: 0; }
+@media (max-width: 380px) { .pizza svg { width: 112px; height: 112px; } .pizza { gap: .9rem; } }
+
+/* ----- Lançar: painel do tanque ao lado do formulário (só no computador) ----- */
+.lc-painel { display: none; }
+@media (min-width: 1100px) {
+  .view > div:has(.lc-duas) { max-width: 1120px; }
+  .lc-duas { grid-template-columns: minmax(0, 1.35fr) minmax(280px, 1fr) !important; }
+  .lc-painel { display: block; position: sticky; top: 1.4rem; border: 1px solid var(--linha); border-radius: var(--r-card); padding: 1.1rem 1.2rem 1.2rem; background: var(--card); }
+  .lc-painel h2 { margin: .1rem 0 0; font-size: 1.35rem; }
+  .lc-cab { margin: 0; font-size: .78rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--tinta-2); }
+  .lc-num { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin: 1rem 0 .2rem; }
+  .lc-num dt { font-size: .8rem; color: var(--tinta-2); }
+  .lc-num dd { margin: .1rem 0 0; font: 600 1.3rem/1.2 var(--fonte-titulo); letter-spacing: -.02em; }
+  .lc-sub { margin: 1.2rem 0 .1rem; font-size: .95rem; padding-top: .9rem; border-top: 1px solid var(--linha-2); }
+  .lc-painel .h-trilho-leg b { color: var(--tinta); font-weight: 600; }
+  .lc-dias { list-style: none; margin: .6rem 0 0; padding: 0; display: grid; gap: .35rem; }
+  .lc-dias li { display: grid; grid-template-columns: 3.2rem minmax(0, 1fr) 2.6rem; align-items: center; gap: .6rem; font-size: .85rem; color: var(--tinta-2); }
+  .lc-dias li i { height: 8px; border-radius: 99px; background: var(--campo-bg); overflow: hidden; }
+  .lc-dias li em { display: block; height: 100%; border-radius: inherit; background: #b8c6bf; }
+  .lc-dias li.hoje em { background: var(--rio); }
+  .lc-dias li.hoje span, .lc-dias li.hoje b { color: var(--tinta); font-weight: 600; }
+  .lc-painel .pequeno { font-size: .8rem; }
+  .lc-dias b { text-align: right; font-weight: 500; color: var(--tinta); font-variant-numeric: tabular-nums; }
+}

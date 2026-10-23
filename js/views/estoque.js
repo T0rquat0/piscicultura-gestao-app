@@ -1,6 +1,7 @@
 // Estoque de ração: saldo (todos veem, só em kg) e compras (dono/gerente veem e lançam custo).
 import { confirmar, formulario } from '../dialogo.js';
 import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num, progresso } from '../util.js';
+import { pizza, COR_RACAO } from '../graficos.js';
 import { PESO_SACO_PADRAO_KG } from '../config.js';
 
 import { situacaoEstoque, sugestaoCompraKg } from '../calc.js';
@@ -67,6 +68,7 @@ export async function renderEstoque(ctx, el) {
       ${sit.dias != null || sit.nivel === 'negativo' ? `<div class="hero-prog">${progresso(((sit.dias || 0) / ESTOQUE_COBERTURA_DIAS) * 100, { tom: { atencao: 'alerta', critico: 'erro', negativo: 'erro' }[sit.nivel] || '', rotulo: `Ração para ${fmtInt(Math.floor(sit.dias || 0))} de ${ESTOQUE_COBERTURA_DIAS} dias` })}<p class="h-trilho-leg"><span>${fmtInt(Math.floor(sit.dias || 0))} de ${ESTOQUE_COBERTURA_DIAS} dias de ração</span><span>meta: ${ESTOQUE_COBERTURA_DIAS} dias</span></p></div>` : ''}
       ${sit.nivel === 'ok' ? '' : `<p>${MENSAGEM[sit.nivel]}</p>`}
     </div>
+    ${porTipo && saldos.linhas.length > 1 ? `<div class="card">${pizza(saldos.linhas.map((x) => { const v = Math.max(0, Number(x.saldo_kg || 0)) / kgS; return { nome: x.tipo_racao === 'alevino' ? 'Ração de alevino' : 'Ração de engorda', valor: v, cor: COR_RACAO[x.tipo_racao === 'alevino' ? 'alevino' : 'engorda'], txt: `${fmtNum(v, 0)} sacos` }; }), { centro: fmtNum(saldos.linhas.reduce((a, x) => a + Math.max(0, Number(x.saldo_kg || 0)), 0) / kgS, 0), sub: 'sacos', rotulo: 'Estoque por tipo de ração' })}</div>` : ''}
     ${!navigator.onLine ? '<p class="aviso">Sem internet: os valores podem estar desatualizados.</p>' : ''}
     ${gerir && sugKg > 0 ? `<p class="aviso" id="sugestao-compra">Sugestão de compra: <b>~${fmtInt(Math.ceil(sugKg / kgS))} sacos</b> para a ração durar ${ESTOQUE_COBERTURA_DIAS} dias no ritmo atual.</p>` : ''}
     ${gerir && diasSemContar != null && diasSemContar >= CONTAGEM_LEMBRETE_DIAS ? `<p class="aviso" id="lembrete-contagem">A última contagem foi há ${fmtInt(diasSemContar)} dias. Contar toda semana deixa o saldo confiável.</p>` : ''}

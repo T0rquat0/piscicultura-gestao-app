@@ -4,6 +4,7 @@ import { situacaoEstoque } from '../calc.js';
 import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, ESTOQUE_COBERTURA_DIAS, PESO_SACO_PADRAO_KG, CONTAGEM_LEMBRETE_DIAS, PLANO_AVISO_DIAS } from '../config.js';
 import { icone } from '../icons.js';
 import { pedirTexto } from '../dialogo.js';
+import { pizza, COR_FASE, ORDEM_FASE, COR_RACAO } from '../graficos.js';
 
 export const ordemNatural = (a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR', { numeric: true, sensitivity: 'base' });
 
@@ -222,13 +223,14 @@ export async function renderHome(ctx, el) {
   }
 
   function blocoPeixe() {
-    let peixes = 0, kg = 0; const porT = {};
+    let peixes = 0, kg = 0; const porT = {}, porFase = {};
     for (const l of lotes) {
       const r = resumo[l.id];
       const vivos = Math.max(0, Number(l.quantidade_inicial) - Number((r && r.mortos) || 0));
       const pm = r && r.ultimo_peso_medio_kg != null ? Number(r.ultimo_peso_medio_kg) : Number(l.peso_inicial_kg) / Math.max(1, Number(l.quantidade_inicial));
       const b = vivos * (pm || 0);
       peixes += vivos; kg += b; porT[l.tanque_id] = (porT[l.tanque_id] || 0) + b;
+      porFase[l.tipo] = (porFase[l.tipo] || 0) + b;
     }
     if (!lotes.length || semDetalhe) return '';
     const preco = state.ref.precoKg;
@@ -243,6 +245,7 @@ export async function renderHome(ctx, el) {
           ? `<div><dt>Valor estimado</dt><dd>${esc(valorCurto(kg * preco))}</dd></div><div><dt>Preço usado</dt><dd>R$ ${fmtNum(preco, 2)}/kg</dd></div>`
           : '<div><dt>Valor estimado</dt><dd><a href="#/mais">Informar preço do kg</a></dd></div>') : ''}
       </dl>
+      ${Object.keys(porFase).filter((f) => porFase[f] > 0).length > 1 ? pizza(ORDEM_FASE.filter((f) => porFase[f] > 0).map((f) => ({ nome: ROTULO_TIPO[f] || f, valor: porFase[f], cor: COR_FASE[f], txt: t ? fmtNum(porFase[f] / 1000, 1) + ' t' : fmtNum(porFase[f], 0) + ' kg' })), { centro: t ? fmtNum(kg / 1000, 0) + ' t' : fmtNum(kg, 0) + ' kg', sub: 'por fase', rotulo: 'Peixe na água por fase' }) : ''}
       ${top.length > 1 ? `<ul class="h-barras">${top.map((x) => `<li><span>${esc(x.nome)}</span><b>${t ? fmtNum(porT[x.id] / 1000, 1) + ' t' : fmtNum(porT[x.id], 0) + ' kg'}</b><i style="width:${((porT[x.id] / porT[top[0].id]) * 100).toFixed(1)}%"></i></li>`).join('')}</ul>` : ''}
     </section>`;
   }
@@ -273,6 +276,7 @@ export async function renderHome(ctx, el) {
     const temDias = racao && dias14.some((d) => porDia[d] > 0);
     return `<section class="h-bloco" aria-labelledby="h-est">
       <header><h2 id="h-est"><a href="#/estoque" style="color:inherit;text-decoration:none">Estoque de ração</a></h2><span class="h-meta">no galpão</span></header>
+      ${duas ? pizza(usadas.map((s) => ({ nome: s.tipo_racao === 'alevino' ? 'Alevino' : 'Engorda', valor: Math.max(0, sacos(Number(s.saldo_kg) || 0)), cor: COR_RACAO[s.tipo_racao === 'alevino' ? 'alevino' : 'engorda'], txt: nSacos(Math.max(0, sacos(Number(s.saldo_kg) || 0))) })), { centro: fmtNum(usadas.reduce((a, s) => a + Math.max(0, sacos(Number(s.saldo_kg) || 0)), 0), 0), sub: 'sacos', rotulo: 'Estoque de ração por tipo' }) : ''}
       ${usadas.map((s) => linhaEstoque(s, duas ? (s.tipo_racao === 'alevino' ? 'Ração de alevino' : 'Ração de engorda') : '')).join('')}
       ${temDias ? `<div class="h-graf">${barras14()}</div><p class="h-graf-leg">Sacos dados por dia nos últimos 14 dias${duas ? ', somando as duas rações' : ''}. Hoje, em verde, ainda em andamento.</p>` : ''}
     </section>`;
