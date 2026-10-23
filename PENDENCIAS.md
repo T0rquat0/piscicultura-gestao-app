@@ -35,6 +35,7 @@ Marque com [x] ao concluir. Tudo aqui foi deixado de propósito para depois do c
 - [ ] Teste grátis: hoje 30 dias, sem limite de tanques.
 
 ## Segurança (verificação de 22/10/26)
+- [ ] **Rodar `sql/19_piloto_sem_acumular.sql`** (23/10/26): no modo piloto, apertar "contratar" de novo somava 12 meses grátis a cada vez (5 vezes = 5 anos) e desligar o piloto não desfazia. Depois de rodar, conferir com a consulta comentada no fim do arquivo se alguém já acumulou.
 - [x] Banco no ar testado com login de dono: vê só a própria fazenda e a própria equipe; não estende o teste, não vira administrador, não cria assinatura paga, não abre o painel de admin; sem login não lê nada.
 - [x] Cabeçalhos de segurança no `vercel.json`: CSP (só arquivos do próprio site + Supabase), X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy. Conferido na cópia: 13 telas e os PDFs sem nenhum bloqueio.
 - [ ] **Cópia de desenvolvimento expõe a conta de teste**: o `js/dev-login.js` publicado em pisciapp-copia-hugo.vercel.app tem a senha e entra sozinho como DONO. Desde 22/10/26 essa conta tem os dados reais da fazenda do Guilherme. Decidir: tirar o login automático / trocar a senha / mover os dados reais para a conta dele.
