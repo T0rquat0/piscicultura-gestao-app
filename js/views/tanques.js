@@ -2,7 +2,7 @@
 import { confirmar, ocupado, formulario } from '../dialogo.js';
 import { icone } from '../icons.js';
 import { ESPECIES } from '../config.js';
-import { esc, fmtData, fmtInt, fmtNum, hojeISO, num, ROTULO_TIPO, FASES, areaHa, progresso } from '../util.js';
+import { esc, fmtData, fmtInt, fmtNum, hojeISO, num, ROTULO_TIPO, FASES, areaHa, progresso, fmtPct } from '../util.js';
 import { lerPlanilha } from '../planilha.js';
 
 
@@ -143,7 +143,7 @@ export async function renderTanque(ctx, el, id) {
     <h1>${esc(tanque.nome)}</h1>
     ${avisoOffline()}
     ${ativos.length || area ? `<div class="kpis tq-resumo">
-      <div class="kpi"><span>Peixes vivos</span><b>${fmtInt(vivos)}</b>${iniciais > 0 ? `${progresso((vivos / iniciais) * 100, { tom: 'ok', fina: true, rotulo: `Sobrevivência ${fmtNum((vivos / iniciais) * 100, 1)}%` })}<small>${fmtNum((vivos / iniciais) * 100, 1)}% dos ${fmtInt(iniciais)} que entraram</small>` : ''}</div>
+      <div class="kpi"><span>Peixes vivos</span><b>${fmtInt(vivos)}</b>${iniciais > 0 ? `${progresso((vivos / iniciais) * 100, { tom: 'ok', fina: true, rotulo: `Sobrevivência ${fmtPct((vivos / iniciais) * 100)}%` })}<small>${fmtPct((vivos / iniciais) * 100)}% dos ${fmtInt(iniciais)} que entraram</small>` : ''}</div>
       <div class="kpi"><span>Peixe na água</span><b>${biomassa >= 1000 ? fmtNum(biomassa / 1000, 1) + ' t' : fmtNum(biomassa, 0) + ' kg'}</b></div>
       ${area ? `<div class="kpi"><span>Área</span><b>${haTxt(area)}</b></div>
       <div class="kpi"><span>Densidade</span><b>${fmtInt(vivos / area)} peixes/ha</b><small>${fmtNum(biomassa / 1000 / area, 1)} t/ha</small></div>` : ''}

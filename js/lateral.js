@@ -8,17 +8,46 @@ import { situacaoEstoque, previsaoDespesca } from './calc.js';
 import { descricao } from './clima.js';
 import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, ESTOQUE_COBERTURA_DIAS, PESO_SACO_PADRAO_KG, ALVO_PADRAO_KG } from './config.js';
 
-export function htmlAtalhos(state, gerir) {
-  const p = state.perfil;
-  const itens = [
-    gerir && ['tanques', '#/tanques', 'tanque', 'Tanques e lotes'],
-    ['estoque', '#/estoque', 'estoque', 'Estoque de ração'],
-    p.papel === 'dono' && ['equipe', '#/equipe', 'equipe', 'Equipe'],
-    p.papel === 'dono' && ['plano', '#/plano', 'check', 'Meu plano'],
-    p.papel === 'dono' && ['historico', '#/historico', 'historico', 'Histórico e lixeira'],
+// Todos os atalhos possíveis, já filtrados pelo papel de quem está usando: [id, rota marcada, link, ícone, texto]
+export function catalogoAtalhos(state, gerir) {
+  const dono = state.perfil.papel === 'dono';
+  return [
+    gerir && ['tanques', 'tanques', '#/tanques', 'tanque', 'Tanques e lotes'],
+    ['estoque', 'estoque', '#/estoque', 'estoque', 'Estoque de ração'],
+    dono && ['equipe', 'equipe', '#/equipe', 'equipe', 'Equipe'],
+    dono && ['plano', 'plano', '#/plano', 'check', 'Meu plano'],
+    dono && ['historico', 'historico', '#/historico', 'historico', 'Histórico e lixeira'],
+    ['racao', 'relatorio-racao', '#/relatorio/racao', 'relatorio', 'Ração fornecida'],
+    ['biometria', '', '#/lancar?tipo=biometria', 'lancar', 'Lançar biometria'],
+    ['mortalidade', '', '#/lancar?tipo=mortalidade', 'lancar', 'Lançar mortalidade'],
+    ['pendencias', 'pendencias', '#/pendencias', 'pendentes', 'Pendentes de envio'],
+    state.admin && ['admin', 'admin', '#/admin', 'admin', 'Administração do sistema'],
   ].filter(Boolean);
-  return `<nav class="lat-atalhos" aria-label="Atalhos"><p class="lat-rot">Atalhos</p>${itens.map(([rota, href, ic, txt]) => `<a data-rota="${rota}" href="${href}">${icone(ic, 17)}<span>${txt}</span></a>`).join('')}</nav>
+}
+// os 5 primeiros que a pessoa pode ver (o mesmo que aparecia antes da personalização)
+const PADRAO = ['tanques', 'estoque', 'equipe', 'plano', 'historico'];
+
+// ids escolhidos (na ordem); sem escolha guardada, o padrão do papel
+export async function atalhosEscolhidos(state, gerir) {
+  const pode = new Set(catalogoAtalhos(state, gerir).map((x) => x[0]));
+  const salvo = await db.kvGet('atalhosLateral');
+  return (Array.isArray(salvo) ? salvo : PADRAO).filter((id) => pode.has(id));
+}
+export const salvarAtalhos = (ids) => db.kvSet('atalhosLateral', ids);
+
+export function htmlAtalhos() {
+  return `<nav class="lat-atalhos" id="lat-atalhos" aria-label="Atalhos"></nav>
     <section class="lat-hoje" id="lat-hoje" aria-label="Resumo de hoje"></section>`;
+}
+
+// desenha os atalhos escolhidos na lateral (chamada ao montar a tela e depois de mudar a escolha em Mais)
+export async function pintarAtalhos(ctx, rota = null) {
+  const nav = document.getElementById('lat-atalhos');
+  if (!nav) return;
+  const cat = Object.fromEntries(catalogoAtalhos(ctx.state, ctx.podeGerir()).map((x) => [x[0], x]));
+  const ids = await atalhosEscolhidos(ctx.state, ctx.podeGerir());
+  nav.innerHTML = ids.length ? `<p class="lat-rot">Atalhos</p>${ids.map((id) => { const [, r, href, ic, txt] = cat[id]; return `<a data-rota="${r}" href="${href}">${icone(ic, 17)}<span>${esc(txt)}</span></a>`; }).join('')}` : '';
+  if (rota != null) marcarAtalho(rota);
 }
 
 let cache = { em: 0, resumo: null, saldos: null };
@@ -72,6 +101,6 @@ export async function atualizarLateral(ctx) {
 // marca o atalho da tela aberta (e tira o destaque de "Mais" quando o atalho já indica onde está)
 export function marcarAtalho(rota) {
   let achou = false;
-  document.querySelectorAll('.lat-atalhos a').forEach((a) => { const on = a.dataset.rota === rota; a.classList.toggle('on', on); if (on) achou = true; });
-  if (achou) document.querySelectorAll('.lateral nav:not(.lat-atalhos) a[data-aba="mais"]').forEach((a) => a.classList.remove('on'));
+  document.querySelectorAll('.lat-atalhos a').forEach((a) => { const on = !!rota && a.dataset.rota === rota; a.classList.toggle('on', on); if (on) achou = true; });
+  if (achou) document.querySelectorAll('.lateral a[data-aba="mais"]').forEach((a) => { a.classList.remove('on'); a.removeAttribute('aria-current'); });
 }

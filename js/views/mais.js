@@ -4,6 +4,7 @@ import { confirmar } from '../dialogo.js';
 import { num, fmtNum } from '../util.js';
 import { PESO_SACO_PADRAO_KG, TERMOS_VERSAO, AMBIENTE_NOME } from '../config.js';
 import { reduzirLogo } from '../util.js';
+import { catalogoAtalhos, atalhosEscolhidos, salvarAtalhos, pintarAtalhos } from '../lateral.js';
 
 export function renderMais(ctx, el) {
   const { state } = ctx;
@@ -36,6 +37,11 @@ export function renderMais(ctx, el) {
 
     <div id="teste"></div>
     </div><div>
+    <section class="card lat-cfg" id="cfg-atalhos" aria-labelledby="t-atalhos">
+      <b id="t-atalhos">Atalhos da barra lateral</b>
+      <small style="display:block">Escolha o que aparece no menu do lado esquerdo e em que ordem. Vale para este computador.</small>
+      <ul class="atalhos-cfg" id="lista-atalhos"></ul>
+    </section>
 
     ${p.papel === 'dono' ? `<div class="card">
       <b>Peso do saco de ração</b>
@@ -77,6 +83,29 @@ export function renderMais(ctx, el) {
       <p><b>iPhone (Safari):</b> botão Compartilhar → “Adicionar à Tela de Início”.</p>
       <p class="mudo">Instalar é importante: no iPhone, lançamentos guardados sem internet podem ser apagados pelo sistema se o app não estiver instalado.</p>
     </details>`;
+
+  pintarCfgAtalhos();
+  async function pintarCfgAtalhos() {
+    const ul = el.querySelector('#lista-atalhos');
+    if (!ul) return;
+    const cat = catalogoAtalhos(state, gerir);
+    const escolhidos = await atalhosEscolhidos(state, gerir);
+    const resto = cat.map((x) => x[0]).filter((id) => !escolhidos.includes(id));
+    const porId = Object.fromEntries(cat.map((x) => [x[0], x]));
+    ul.innerHTML = [...escolhidos, ...resto].map((id, i) => {
+      const on = escolhidos.includes(id), [, , , ic, txt] = porId[id];
+      return `<li class="${on ? 'on' : ''}"><label><input type="checkbox" data-at="${esc(id)}"${on ? ' checked' : ''}>${icone(ic, 17)}<span>${esc(txt)}</span></label>
+        ${on ? `<span class="at-ordem"><button type="button" class="btn mini" data-sobe="${esc(id)}" aria-label="Subir ${esc(txt)}"${i === 0 ? ' disabled' : ''}>↑</button><button type="button" class="btn mini" data-desce="${esc(id)}" aria-label="Descer ${esc(txt)}"${i === escolhidos.length - 1 ? ' disabled' : ''}>↓</button></span>` : ''}</li>`;
+    }).join('');
+    const salvar = async (ids) => { await salvarAtalhos(ids); await pintarAtalhos(ctx, null); pintarCfgAtalhos(); };
+    ul.querySelectorAll('[data-at]').forEach((c) => c.addEventListener('change', () => {
+      const id = c.dataset.at;
+      salvar(c.checked ? [...escolhidos, id] : escolhidos.filter((x) => x !== id));
+    }));
+    const mover = (id, d) => { const a = [...escolhidos], i = a.indexOf(id), j = i + d; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; salvar(a); };
+    ul.querySelectorAll('[data-sobe]').forEach((b) => b.addEventListener('click', () => mover(b.dataset.sobe, -1)));
+    ul.querySelectorAll('[data-desce]').forEach((b) => b.addEventListener('click', () => mover(b.dataset.desce, 1)));
+  }
 
   const fs = el.querySelector('#f-saco');
   if (fs) fs.addEventListener('submit', async (ev) => {

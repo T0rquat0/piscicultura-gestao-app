@@ -21,6 +21,8 @@ export function fmtNum(n, dec = 1) {
   return (_fmts[dec] ||= _num(dec)).format(Number(n));
 }
 export const fmtInt = (n) => fmtNum(n, 0);
+// porcentagem sem enganar nos extremos: 99,96 não vira "100,0" (houve perda) e 0,04 não vira "0,0"
+export const fmtPct = (v) => { const x = Number(v) || 0; return fmtNum(x, (x > 99.9 && x < 100) || (x > 0 && x < 0.1) ? 2 : 1); };
 // barra de progresso: pct de 0 a 100; tom = '' (verde da marca), 'ok', 'alerta', 'erro' ou 'claro'; rotulo vai para leitor de tela
 export function progresso(pct, { tom = '', rotulo = '', fina = false } = {}) {
   const v = Math.max(0, Math.min(100, Number(pct) || 0));

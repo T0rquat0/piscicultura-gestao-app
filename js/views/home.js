@@ -1,4 +1,4 @@
-import { esc, fmtInt, fmtNum, fmtData, hojeISO, diasEntre, num, ROTULO_TIPO, faseCss, progresso } from '../util.js';
+import { esc, fmtInt, fmtNum, fmtData, hojeISO, diasEntre, num, ROTULO_TIPO, faseCss, progresso, fmtPct } from '../util.js';
 import * as db from '../db.js';
 import { situacaoEstoque, previsaoDespesca } from '../calc.js';
 import { localGuardado, pedirLocal, previsao, descricao, avisosClima } from '../clima.js';
@@ -35,7 +35,7 @@ export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje, meta
             <div><span>Dias no tanque</span><b>${fmtInt(dias)}</b></div>
             <div><span>Peixes vivos (estim.)</span><b>${fmtInt(vivos ?? l.quantidade_inicial)}</b></div>
           </div>
-          ${vivos != null && l.quantidade_inicial > 0 ? `<div class="td-sobre">${progresso((vivos / l.quantidade_inicial) * 100, { tom: 'ok', rotulo: `Sobrevivência ${fmtNum((vivos / l.quantidade_inicial) * 100, 1)}%` })}<p class="h-trilho-leg"><span>Sobrevivência: ${fmtInt(vivos)} de ${fmtInt(l.quantidade_inicial)} peixes</span><b>${fmtNum((vivos / l.quantidade_inicial) * 100, 1)}%</b></p></div>` : ''}
+          ${vivos != null && l.quantidade_inicial > 0 ? `<div class="td-sobre">${progresso((vivos / l.quantidade_inicial) * 100, { tom: 'ok', rotulo: `Sobrevivência ${fmtPct((vivos / l.quantidade_inicial) * 100)}%` })}<p class="h-trilho-leg"><span>Sobrevivência: ${fmtInt(vivos)} de ${fmtInt(l.quantidade_inicial)} peixes</span><b>${fmtPct((vivos / l.quantidade_inicial) * 100)}%</b></p></div>` : ''}
           ${r ? `<div class="td-prev"><div class="td-prev-cab"><span>Despesca</span><button class="link" type="button" data-meta="${esc(l.id)}">Mudar meta</button></div>${htmlPrevisao(previsaoDespesca(l, r, metaDe(l, metas), hoje))}</div>` : ''}
         </section>`;
       }).join('')
@@ -282,7 +282,7 @@ export async function renderHome(ctx, el) {
       }
       const sob = ini > 0 ? (peixes / ini) * 100 : 100;
       ks.push(`<div class="kp"><span>Peixe na água</span><b>${kg >= 1000 ? fmtNum(kg / 1000, 1) : fmtNum(kg, 0)}<em>${kg >= 1000 ? 't' : 'kg'}</em></b><small>${fmtInt(peixes)} peixes vivos</small></div>`);
-      ks.push(`<div class="kp"><span>Sobrevivência</span><b>${fmtNum(sob, 1)}<em>%</em></b>${progresso(sob, { fina: true, tom: sob >= 90 ? 'ok' : sob >= 75 ? 'alerta' : 'erro', rotulo: `Sobrevivência ${fmtNum(sob, 1)}%` })}<small>desde a entrada dos lotes</small></div>`);
+      ks.push(`<div class="kp"><span>Sobrevivência</span><b>${fmtPct(sob)}<em>%</em></b>${progresso(sob, { fina: true, tom: sob >= 90 ? 'ok' : sob >= 75 ? 'alerta' : 'erro', rotulo: `Sobrevivência ${fmtPct(sob)}%` })}<small>desde a entrada dos lotes</small></div>`);
     } else {
       ks.push(`<div class="kp"><span>Ração dada hoje</span><b>${fmtNum(sacos(dadoKg), 0)}<em>${Math.round(sacos(dadoKg)) === 1 ? 'saco' : 'sacos'}</em></b><small>${fmtNum(dadoKg, 0)} kg</small></div>`);
     }

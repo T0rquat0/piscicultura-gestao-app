@@ -22,7 +22,7 @@ import { renderHistorico } from './views/historico.js';
 import { renderAdmin } from './views/admin.js';
 import { renderPendencias } from './views/pendencias.js';
 import { renderMais } from './views/mais.js';
-import { htmlAtalhos, atualizarLateral, marcarAtalho } from './lateral.js';
+import { htmlAtalhos, atualizarLateral, marcarAtalho, pintarAtalhos } from './lateral.js';
 
 const root = document.getElementById('root');
 splashDoDia();
@@ -351,9 +351,10 @@ function montarShell() {
     </header>
     <aside class="lateral" aria-label="Navegação">
       <div class="marca"><span class="logo-sm"></span><div><strong>${fazenda}</strong><small>Piscicultura</small></div></div>
-      <nav>${links.map(([aba, href, ic, txt]) => `<a data-aba="${aba}" href="${href}">${icone(ic, 19)}<span>${txt}</span></a>`).join('')}</nav>
-      ${htmlAtalhos(state, ctx.podeGerir())}
+      <nav>${links.filter(([aba]) => aba !== 'mais').map(([aba, href, ic, txt]) => `<a data-aba="${aba}" href="${href}">${icone(ic, 19)}<span>${txt}</span></a>`).join('')}</nav>
+      ${htmlAtalhos()}
       <div class="lateral-pe">
+        <a class="lat-mais" data-aba="mais" href="#/mais">${icone('mais', 19)}<span>Mais</span></a>
         <a id="pill-lateral" class="pill" href="#/pendencias"></a>
         <div class="perfil-linha"><span class="avatar">${esc((p.nome || '?').trim().charAt(0).toUpperCase())}</span><div><b>${esc(p.nome)}</b><small>${papel}</small></div></div>
       </div>
@@ -365,6 +366,7 @@ function montarShell() {
   </div>`;
   atualizarPill();
   atualizarMarca();
+  pintarAtalhos(ctx, parseHash(location.hash).rota);
 }
 
 function renderErro(el, e) {
@@ -380,13 +382,13 @@ async function rotear() {
   const { rota, partes, params } = parseHash(location.hash);
   rotaAtual = rota;
   const aba = rota === 't' ? '' : ['', 'lancar', 'relatorio'].includes(rota) ? rota : 'mais'; // tela do tanque é aberta pelo Início
-  document.querySelectorAll('.abas a, .lateral nav a').forEach((a) => {
+  document.querySelectorAll('.abas a, .lateral a[data-aba]').forEach((a) => {
     const on = a.dataset.aba === aba;
     a.classList.toggle('on', on);
     if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   });
 
-  marcarAtalho(rota);
+  marcarAtalho(rota === 'relatorio' && partes[0] === 'racao' ? 'relatorio-racao' : rota);
   const el = document.createElement('div'); // contêiner novo por rota: renderizações atrasadas não sujam a tela atual
   view.replaceChildren(el);
   const meu = ++tokenRota;

@@ -951,3 +951,30 @@ h2, h3, .h-bloco h2 { font-weight: 700; letter-spacing: -.015em; }
 }
 @media (min-width: 900px) and (hover: hover) { .lat-item:hover { background: #fff; } .lat-atalhos a:not(.on):hover { color: var(--tinta); background: rgba(255, 255, 255, .5); } }
 @media (min-width: 900px) and (max-height: 960px) { .lateral { gap: 1rem; } .lat-hoje { gap: .3rem; } .lat-item { padding: .45rem .7rem; } .lat-hoje .lat-item > small { display: none; } .lat-atalhos a { min-height: 30px; } }
+
+/* ----- lateral: "Mais" no rodapé e escolha de atalhos (tela Mais) ----- */
+.lat-mais { display: none; }
+.lat-cfg { display: none; }
+@media (min-width: 900px) {
+  .lat-mais { display: flex; align-items: center; gap: .65rem; min-height: 38px; margin: 0 -.55rem .2rem; padding: 0 .65rem; border-radius: var(--r-botao); color: var(--tinta-2); text-decoration: none; font-size: .95rem; }
+  .lat-mais .ic { width: 19px; height: 19px; }
+  .lat-mais.on { background: var(--ativo); color: var(--tinta); font-weight: 500; }
+  .lat-cfg { display: block; }
+  .atalhos-cfg { list-style: none; margin: .8rem 0 0; padding: 0; display: grid; gap: 2px; }
+  .atalhos-cfg li { display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .35rem .5rem; border-radius: var(--r-campo); }
+  .atalhos-cfg li.on { background: var(--campo-bg); }
+  .atalhos-cfg label { display: flex; align-items: center; gap: .6rem; margin: 0; font-weight: 400; cursor: pointer; flex: 1; min-height: 36px; }
+  .atalhos-cfg label .ic { width: 17px; height: 17px; color: var(--tinta-2); }
+  .atalhos-cfg input { width: 18px; height: 18px; margin: 0; accent-color: var(--rio); }
+  .at-ordem { display: flex; gap: .3rem; }
+  .at-ordem .btn { min-height: 32px; min-width: 34px; padding: 0; }
+}
+@media (min-width: 900px) and (hover: hover) { .lat-mais:not(.on):hover { color: var(--tinta); background: rgba(255, 255, 255, .5); } }
+
+/* ----- relatório do lote no computador: destaques lado a lado e folha mais larga ----- */
+@media (min-width: 900px) {
+  .view > div:has(.destaques3) { max-width: 1120px; }
+  .destaques3 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); padding: 0; }
+  .destaque { padding: 1.1rem 1.2rem; }
+  .destaque + .destaque { border-top: 0; border-left: 1px solid var(--linha-2); }
+}

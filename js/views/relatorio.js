@@ -6,7 +6,7 @@ import { gerarPdfFazenda } from '../pdf_fazenda.js';
 import { gerarPdfRacao } from '../pdf_racao.js';
 import { confirmar, formulario } from '../dialogo.js';
 import { icone } from '../icons.js';
-import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num, ROTULO_TIPO, faseCss, nomeArquivo, dataArquivo, progresso } from '../util.js';
+import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num, ROTULO_TIPO, faseCss, nomeArquivo, dataArquivo, progresso, fmtPct } from '../util.js';
 import { pizza, COR_FASE, ORDEM_FASE } from '../graficos.js';
 import { calcularLote, precoMedioKg, pontosPeso, pesoMedioKg, evolucaoPeso, racaoPorSemana, matrizRacao, situacaoEstoque } from '../calc.js';
 
@@ -68,7 +68,7 @@ export async function renderRelatorios(ctx, el) {
     const x = resumo[l.id], ini = Number(l.quantidade_inicial) || 0;
     if (!x || !ini || !l.ativo) return '';
     const pct = (Math.max(0, ini - Number(x.mortos || 0)) / ini) * 100;
-    return `${progresso(pct, { fina: true, tom: pct >= 90 ? 'ok' : pct >= 75 ? 'alerta' : 'erro', rotulo: `Sobrevivência ${fmtNum(pct, 1)}%` })}<small class="prog-leg">Sobrevivência ${fmtNum(pct, 1)}%</small>`;
+    return `${progresso(pct, { fina: true, tom: pct >= 90 ? 'ok' : pct >= 75 ? 'alerta' : 'erro', rotulo: `Sobrevivência ${fmtPct(pct)}%` })}<small class="prog-leg">Sobrevivência ${fmtPct(pct)}%</small>`;
   }
   const ativos = lotes.filter((l) => l.ativo).sort(porTanque);
   const encerrados = lotes.filter((l) => !l.ativo).sort(porTanque);
@@ -167,7 +167,7 @@ export async function renderRelatorioLote(ctx, el, id) {
     <section class="bloco"><h2>Situação do lote</h2>
       <div class="card"><ul class="lista numeros">
         ${linhaNum('Dias de cultivo', fmtInt(c.diasCultivo))}
-        ${linhaNum('Peixes vivos (estim.)', fmtInt(c.vivos), `${fmtNum(c.sobrevivencia, 1)}% de sobrevivência · ${fmtInt(c.mortos)} mortos`)}
+        ${linhaNum('Peixes vivos (estim.)', fmtInt(c.vivos), `${fmtPct(c.sobrevivencia)}% de sobrevivência · ${fmtInt(c.mortos)} mortos`)}
         ${linhaNum('Biomassa estimada', c.biomassaAtual != null ? fmtNum(c.biomassaAtual, 0) + ' kg' : '—', `na entrada: ${fmtNum(c.biomassaInicial, 0)} kg`)}
         ${gerir ? linhaNum('Custo de ração', c.custoRacao != null ? fmtBRL(c.custoRacao) : '—', c.custoRacao != null ? 'pelo preço médio pago por kg' : 'registre o valor nas compras') : ''}
         ${gerir ? linhaNum('Custo de ração por kg produzido', c.custoKgProduzido != null ? fmtBRL(c.custoKgProduzido) : '—', c.custoKgProduzido != null ? 'ração até a última biometria ÷ peixe que ganhou peso' : 'precisa de preço nas compras e biometria com ganho') : ''}
