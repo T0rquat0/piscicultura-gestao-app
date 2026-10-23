@@ -6,7 +6,8 @@ import * as db from './db.js';
 import { icone } from './icons.js';
 import { situacaoEstoque, previsaoDespesca } from './calc.js';
 import { descricao } from './clima.js';
-import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, ESTOQUE_COBERTURA_DIAS, PESO_SACO_PADRAO_KG, ALVO_PADRAO_KG } from './config.js';
+import { metaDe } from './views/despesca.js';
+import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, ESTOQUE_COBERTURA_DIAS, PESO_SACO_PADRAO_KG } from './config.js';
 
 // Todos os atalhos possíveis, já filtrados pelo papel de quem está usando: [id, rota marcada, link, ícone, texto]
 export function catalogoAtalhos(state, gerir) {
@@ -83,7 +84,7 @@ export async function atualizarLateral(ctx) {
   }
   if (ctx.podeGerir() && cache.resumo) {
     const metas = (await db.kvGet('metasDespesca')) || {};
-    const prox = lotes.map((l) => ({ l, p: previsaoDespesca(l, resumo[l.id], Number(metas[l.id]) || ALVO_PADRAO_KG[l.tipo] || ALVO_PADRAO_KG.engorda, hoje) }))
+    const prox = lotes.map((l) => ({ l, p: previsaoDespesca(l, resumo[l.id], metaDe(l, metas), hoje) }))
       .filter((x) => x.p.estado !== 'sem-dado').sort((a, b) => (a.p.estado === 'pronto' ? -1 : 0) - (b.p.estado === 'pronto' ? -1 : 0) || String(a.p.data).localeCompare(String(b.p.data)))[0];
     if (prox) {
       const nome = (tanques.find((t) => t.id === prox.l.tanque_id) || {}).nome || 'Tanque';
