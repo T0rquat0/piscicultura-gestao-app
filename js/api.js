@@ -143,13 +143,31 @@ export function criarApi(client) {
       }
       return s;
     },
-    async consumoDiario(dias = 30) {
+    // saldo de cada ração (engorda e alevino, sql/17). Sem o sql/17: uma linha só, o total, contada como engorda.
+    async saldosRacao() {
+      const { data, error } = await client.rpc('saldo_racao_por_tipo');
+      if (!error && Array.isArray(data) && data.length) return { porTipo: true, linhas: data };
+      const s = await this.saldoRacao();
+      return { porTipo: false, linhas: s ? [{ ...s, tipo_racao: 'engorda' }] : [] };
+    },
+    async consumoDiario(dias = 30, tipo = null) {
+      if (tipo) {
+        const { data, error } = await client.rpc('consumo_diario_tipo', { p_dias: dias, p_tipo: tipo });
+        if (!error) return data || [];
+      }
       return ok(await client.rpc('consumo_diario', { p_dias: dias })) || [];
     },
     async contagens() {
-      return ok(await client.from('racao_contagens').select('id,data,contado_kg,saldo_sistema_kg,diferenca_kg,obs,criado_em').order('criado_em', { ascending: false }).limit(30)) || [];
+      const ler = (cols) => client.from('racao_contagens').select(cols).order('criado_em', { ascending: false }).limit(60);
+      const r = await ler('id,data,contado_kg,saldo_sistema_kg,diferenca_kg,obs,criado_em,tipo_racao');
+      return (r.error ? ok(await ler('id,data,contado_kg,saldo_sistema_kg,diferenca_kg,obs,criado_em')) : r.data) || [];
     },
-    async registrarContagem(kg, obs) {
+    async registrarContagem(kg, obs, tipo = null) {
+      if (tipo) {
+        const r = await client.rpc('registrar_contagem', { p_contado_kg: kg, p_obs: obs || null, p_tipo: tipo });
+        if (!r.error) return Number(r.data);
+        if (!(r.error.code === 'PGRST202' || /registrar_contagem/i.test(r.error.message || ''))) throw new ErroApi(r.error);
+      }
       return Number(ok(await client.rpc('registrar_contagem', { p_contado_kg: kg, p_obs: obs || null })));
     },
     async compras(podeGerir) {
@@ -157,7 +175,8 @@ export function criarApi(client) {
       if (podeGerir) {
         // sacos_nota/sacos_recebidos vêm do sql/14 (conferência de recebimento); sem ele, lê sem as duas colunas
         const ler = (cols) => todos(() => client.from('racao_estoque').select(cols).order('data_compra', { ascending: false }).order('id'));
-        lista = await ler('id,data_compra,quantidade_kg,custo_total,fornecedor,sacos_nota,sacos_recebidos')
+        lista = await ler('id,data_compra,quantidade_kg,custo_total,fornecedor,sacos_nota,sacos_recebidos,tipo_racao') // tipo_racao: sql/17
+          .catch(() => ler('id,data_compra,quantidade_kg,custo_total,fornecedor,sacos_nota,sacos_recebidos'))
           .catch(() => ler('id,data_compra,quantidade_kg,custo_total,fornecedor'));
       } else {
         lista = ok(await client.rpc('racao_estoque_visivel'));
@@ -166,8 +185,13 @@ export function criarApi(client) {
       return lista;
     },
     async registrarCompra(c) {
-      const linha = { id: uuid(), ...c };
-      const r = await client.from('racao_estoque').insert(linha);
+      let linha = { id: uuid(), ...c };
+      let r = await client.from('racao_estoque').insert(linha);
+      // banco sem o sql/17: grava sem o tipo (conta como engorda)
+      if (r.error && /tipo_racao/i.test(r.error.message || '')) {
+        const { tipo_racao, ...semTipo } = linha; linha = semTipo;
+        r = await client.from('racao_estoque').insert(linha);
+      }
       // banco sem o sql/14: grava sem a conferência (o kg que chegou continua certo)
       if (r.error && /sacos_(nota|recebidos)/i.test(r.error.message || '')) {
         const { sacos_nota, sacos_recebidos, ...sem } = linha;

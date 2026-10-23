@@ -112,17 +112,21 @@ export async function renderHome(ctx, el) {
   const desde = (n) => { const d = new Date(`${hoje}T00:00:00Z`); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10); };
   const gerir = ctx.podeGerir();
   const resumo = {};
-  let semDetalhe = false, saldoRacao = null, racao = null, mortes = null;
+  let semDetalhe = false, saldos = null, racao = null, mortes = null;
   if (navigator.onLine) {
     const [rs, sd, rc, mt] = await Promise.all([
       ctx.api.resumoLotes().catch(() => null),
-      ctx.api.saldoRacao().catch(() => null),
+      ctx.api.saldosRacao().catch(() => null),
       ctx.api.racaoPeriodo(desde(13)).catch(() => null), // 14 dias: hoje e os 13 anteriores
       gerir ? ctx.api.mortalidadePeriodo(desde(6)).catch(() => null) : null, // 7 dias com hoje
     ]);
     if (rs) for (const r of rs) resumo[r.lote_id] = r; else semDetalhe = true;
-    saldoRacao = sd; racao = rc; mortes = mt;
+    saldos = sd; racao = rc; mortes = mt;
   } else { semDetalhe = true; }
+  // a ração de alevino só aparece na Início quando a fazenda usa (tem saldo, compra ou consumo)
+  const usadas = saldos ? saldos.linhas.filter((s, i) => i === 0 || ['total_comprado_kg', 'total_consumido_kg', 'saldo_kg'].some((k) => Number(s[k]))) : [];
+  // lembrete de contagem: a ração em uso há mais tempo sem contar
+  const paraContar = usadas.filter((s) => Number(s.consumo_7d_kg) > 0).sort((a, b) => String(a.ultima_contagem || '').localeCompare(String(b.ultima_contagem || '')))[0] || usadas[0] || null;
 
   const fila = await db.filaList();
   const pendHoje = fila.filter((i) => i.tabela === 'racao_consumo' && i.payload.data === hoje);
@@ -183,7 +187,7 @@ export async function renderHome(ctx, el) {
         <p class="h-achado">${esc(dataLonga.charAt(0).toUpperCase() + dataLonga.slice(1))} · ${achado}</p></div>
       ${faltam.length ? `<a class="btn primario" href="#/lancar?tipo=racao&tanque=${esc(faltam[0].id)}">${icone('lancar', 20)}Lançar ração</a>` : ''}
     </div>
-    <div id="avisos">${avisoContagem(ctx, saldoRacao, hoje)}</div>
+    <div id="avisos">${avisoContagem(ctx, paraContar, hoje)}</div>
     ${semDetalhe ? '<p class="aviso">Sem conexão: mostrando só o que está guardado no aparelho. Os totais aparecem quando houver internet.</p>' : ''}
     <div class="h-grade">
       <div class="h-col">
@@ -240,10 +244,9 @@ export async function renderHome(ctx, el) {
     </section>`;
   }
 
-  function blocoEstoque() {
-    if (!saldoRacao) return '';
-    const saldo = Number(saldoRacao.saldo_kg) || 0;
-    const sit = situacaoEstoque(saldo, saldoRacao.consumo_7d_kg, ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS);
+  function linhaEstoque(s, titulo) {
+    const saldo = Number(s.saldo_kg) || 0;
+    const sit = situacaoEstoque(saldo, s.consumo_7d_kg, ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS);
     let nota = '';
     if (sit.nivel === 'negativo') nota = '<p class="h-alerta">O saldo ficou negativo: confira o estoque no galpão.</p>';
     else if (sit.dias != null) {
@@ -253,12 +256,19 @@ export async function renderHome(ctx, el) {
       nota = sit.nivel === 'ok' ? `<p class="h-nota">${txt}</p>` : `<p class="${sit.nivel === 'critico' ? 'h-alerta' : 'aviso'}">${txt} Hora de comprar.</p>`;
     } else nota = '<p class="h-nota">Sem consumo na última semana para estimar a duração.</p>';
     const dur = sit.dias != null ? ` · dura ${fmtInt(Math.floor(sit.dias))} ${Math.floor(sit.dias) === 1 ? 'dia' : 'dias'}` : '';
+    return `<div class="h-estoque">${titulo ? `<p class="h-sub">${esc(titulo)}</p>` : ''}
+      <p class="h-lead"><span class="h-num">${saldo < 0 ? '−' : ''}${fmtNum(Math.abs(sacos(saldo)), 0)}</span><span class="h-de">sacos${dur}</span></p>
+      ${nota}</div>`;
+  }
+
+  function blocoEstoque() {
+    if (!usadas.length) return '';
+    const duas = saldos.porTipo && usadas.length > 1;
     const temDias = racao && dias14.some((d) => porDia[d] > 0);
     return `<section class="h-bloco" aria-labelledby="h-est">
       <header><h2 id="h-est"><a href="#/estoque" style="color:inherit;text-decoration:none">Estoque de ração</a></h2><span class="h-meta">no galpão</span></header>
-      <p class="h-lead"><span class="h-num">${saldo < 0 ? '−' : ''}${fmtNum(Math.abs(sacos(saldo)), 0)}</span><span class="h-de">sacos${dur}</span></p>
-      ${nota}
-      ${temDias ? `<div class="h-graf">${barras14()}</div><p class="h-graf-leg">Sacos dados por dia nos últimos 14 dias. Hoje, em verde, ainda em andamento.</p>` : ''}
+      ${usadas.map((s) => linhaEstoque(s, duas ? (s.tipo_racao === 'alevino' ? 'Ração de alevino' : 'Ração de engorda') : '')).join('')}
+      ${temDias ? `<div class="h-graf">${barras14()}</div><p class="h-graf-leg">Sacos dados por dia nos últimos 14 dias${duas ? ', somando as duas rações' : ''}. Hoje, em verde, ainda em andamento.</p>` : ''}
     </section>`;
   }
 
