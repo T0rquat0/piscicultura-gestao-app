@@ -21,6 +21,11 @@ export function fmtNum(n, dec = 1) {
   return (_fmts[dec] ||= _num(dec)).format(Number(n));
 }
 export const fmtInt = (n) => fmtNum(n, 0);
+// barra de progresso: pct de 0 a 100; tom = '' (verde da marca), 'ok', 'alerta', 'erro' ou 'claro'; rotulo vai para leitor de tela
+export function progresso(pct, { tom = '', rotulo = '', fina = false } = {}) {
+  const v = Math.max(0, Math.min(100, Number(pct) || 0));
+  return `<div class="prog${tom ? ' ' + tom : ''}${fina ? ' fina' : ''}" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(v)}"${rotulo ? ` aria-label="${esc(rotulo)}"` : ''}><i style="width:${v.toFixed(1)}%"></i></div>`;
+}
 export function fmtBRL(n) {
   if (n === null || n === undefined || Number.isNaN(Number(n))) return '—';
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n));

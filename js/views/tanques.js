@@ -2,7 +2,7 @@
 import { confirmar, ocupado, formulario } from '../dialogo.js';
 import { icone } from '../icons.js';
 import { ESPECIES } from '../config.js';
-import { esc, fmtData, fmtInt, fmtNum, hojeISO, num, ROTULO_TIPO, FASES, areaHa } from '../util.js';
+import { esc, fmtData, fmtInt, fmtNum, hojeISO, num, ROTULO_TIPO, FASES, areaHa, progresso } from '../util.js';
 import { lerPlanilha } from '../planilha.js';
 
 
@@ -20,11 +20,14 @@ export async function renderTanques(ctx, el) {
     <h1>Tanques</h1>
     ${avisoOffline()}
     <div class="card">
-      ${tanques.length ? `<ul class="lista">${tanques.map((t) => {
-        const n = lotes.filter((l) => l.tanque_id === t.id).length;
-        return `<li><a class="esq" href="#/tanque/${esc(t.id)}"><b>${esc(t.nome)}</b><small>${n ? n + ' lote(s) ativo(s)' : 'sem lote ativo'}${t.area_ha ? ` · ${haTxt(t.area_ha)}` : ''}</small></a><span class="seta">${icone('direita', 20)}</span></li>`;
+      ${tanques.length ? `<ul class="lista lista-grade">${tanques.map((t) => {
+        const ls = lotes.filter((l) => l.tanque_id === t.id);
+        const peixes = ls.reduce((a, l) => a + (Number(l.quantidade_inicial) || 0), 0);
+        const sub = ls.length > 1 ? `${ls.length} lotes ativos · ${fmtInt(peixes)} peixes` : ls.length ? `${ROTULO_TIPO[ls[0].tipo] || ls[0].tipo} · ${fmtInt(peixes)} peixes` : 'sem lote ativo';
+        return `<li><a class="esq" href="#/tanque/${esc(t.id)}"><b>${esc(t.nome)}</b><small>${esc(sub)}${t.area_ha ? ` · ${haTxt(t.area_ha)}` : ''}</small></a><span class="seta">${icone('direita', 20)}</span></li>`;
       }).join('')}</ul>` : '<p class="mudo" style="margin:0">Nenhum tanque cadastrado ainda.</p>'}
     </div>
+    <div class="pc-duas">
     <form id="f-novo" class="card form" novalidate>
       <h3>Novo tanque</h3>
       <div class="duas">
@@ -43,7 +46,8 @@ export async function renderTanques(ctx, el) {
         <p id="erro-pl" class="erro" hidden></p>
         <button class="btn primario" id="b-importar" type="button" hidden>Cadastrar</button>
       </div>
-    </details>`;
+    </details>
+    </div>`;
 
   const f = el.querySelector('#f-novo');
   const erro = f.querySelector('#erro');
@@ -121,8 +125,9 @@ export async function renderTanque(ctx, el, id) {
   const ativos = todos.filter((l) => l.ativo);
   // peixe na água agora (mesma estimativa da tela Início: vivos × último peso médio)
   const resumo = Object.fromEntries((resumoRows || []).map((r) => [r.lote_id, r]));
-  let vivos = 0, biomassa = 0;
+  let vivos = 0, biomassa = 0, iniciais = 0;
   for (const l of ativos) {
+    iniciais += Number(l.quantidade_inicial) || 0;
     const r = resumo[l.id];
     const v = Math.max(0, Number(l.quantidade_inicial) - Number((r && r.mortos) || 0));
     const pm = r && r.ultimo_peso_medio_kg != null ? Number(r.ultimo_peso_medio_kg) : Number(l.peso_inicial_kg) / Math.max(1, Number(l.quantidade_inicial));
@@ -138,12 +143,13 @@ export async function renderTanque(ctx, el, id) {
     <h1>${esc(tanque.nome)}</h1>
     ${avisoOffline()}
     ${ativos.length || area ? `<div class="kpis tq-resumo">
-      <div class="kpi"><span>Peixes vivos</span><b>${fmtInt(vivos)}</b></div>
+      <div class="kpi"><span>Peixes vivos</span><b>${fmtInt(vivos)}</b>${iniciais > 0 ? `${progresso((vivos / iniciais) * 100, { tom: 'ok', fina: true, rotulo: `Sobrevivência ${fmtNum((vivos / iniciais) * 100, 1)}%` })}<small>${fmtNum((vivos / iniciais) * 100, 1)}% dos ${fmtInt(iniciais)} que entraram</small>` : ''}</div>
       <div class="kpi"><span>Peixe na água</span><b>${biomassa >= 1000 ? fmtNum(biomassa / 1000, 1) + ' t' : fmtNum(biomassa, 0) + ' kg'}</b></div>
       ${area ? `<div class="kpi"><span>Área</span><b>${haTxt(area)}</b></div>
       <div class="kpi"><span>Densidade</span><b>${fmtInt(vivos / area)} peixes/ha</b><small>${fmtNum(biomassa / 1000 / area, 1)} t/ha</small></div>` : ''}
     </div>` : ''}
 
+    <div class="pc-duas"><div>
     <h2>Lotes</h2>
     <div class="card">
       ${todos.length ? `<ul class="lista">${todos.map((l) => `
@@ -159,6 +165,7 @@ export async function renderTanque(ctx, el, id) {
         </li>`).join('')}</ul>` : '<p class="mudo" style="margin:0">Nenhum lote neste tanque ainda.</p>'}
     </div>
 
+    </div><div>
     <form id="f-lote" class="card form" novalidate>
       <h3>Novo lote de peixes</h3>
       <div class="duas">
@@ -194,6 +201,7 @@ export async function renderTanque(ctx, el, id) {
       <p id="erro-nome" class="erro" hidden></p>
       <button class="btn" type="submit">Salvar</button>
     </form>
+    </div></div>
     ${dono ? `<details class="avancado">
       <summary>Opções avançadas</summary>
       <div class="card">

@@ -6,7 +6,7 @@ import { gerarPdfFazenda } from '../pdf_fazenda.js';
 import { gerarPdfRacao } from '../pdf_racao.js';
 import { confirmar, formulario } from '../dialogo.js';
 import { icone } from '../icons.js';
-import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num, ROTULO_TIPO, faseCss, nomeArquivo, dataArquivo } from '../util.js';
+import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num, ROTULO_TIPO, faseCss, nomeArquivo, dataArquivo, progresso } from '../util.js';
 import { calcularLote, precoMedioKg, pontosPeso, pesoMedioKg, evolucaoPeso, racaoPorSemana, matrizRacao, situacaoEstoque } from '../calc.js';
 
 export function svgPeso(pts) {
@@ -55,13 +55,20 @@ export async function renderRelatorios(ctx, el) {
     el.innerHTML = '<h1>Relatórios</h1><div class="card vazio"><p>Os relatórios precisam de internet, porque usam os dados já enviados ao servidor.</p></div>';
     return;
   }
-  const lotes = await ctx.api.lotes();
+  const [lotes, resumoRows] = await Promise.all([ctx.api.lotes(), ctx.api.resumoLotes().catch(() => [])]);
+  const resumo = Object.fromEntries((resumoRows || []).map((x) => [x.lote_id, x]));
   const tanques = ctx.state.ref.tanques;
   const nat = (x, y) => String(x).localeCompare(String(y), 'pt-BR', { numeric: true, sensitivity: 'base' });
   const nomeDe = (tid) => (tanques.find((t) => t.id === tid) || {}).nome || '';
   const porTanque = (l1, l2) => nat(nomeDe(l1.tanque_id), nomeDe(l2.tanque_id)) || String(l2.data_entrada).localeCompare(String(l1.data_entrada));
   const linhaLote = (l) => `<li><a class="item" href="#/relatorio/${esc(l.id)}"><span class="esq"><b>${esc(nomeDe(l.tanque_id))}</b>
-      <small>${esc(ROTULO_TIPO[l.tipo] || l.tipo)} · ${esc(l.especie)} · desde ${fmtData(l.data_entrada)} · ${fmtInt(l.quantidade_inicial)} peixes</small></span><span class="seta">${icone('direita', 20)}</span></a></li>`;
+      <small>${esc(ROTULO_TIPO[l.tipo] || l.tipo)} · ${esc(l.especie)} · desde ${fmtData(l.data_entrada)} · ${fmtInt(l.quantidade_inicial)} peixes</small>${sobreLote(l)}</span><span class="seta">${icone('direita', 20)}</span></a></li>`;
+  function sobreLote(l) {
+    const x = resumo[l.id], ini = Number(l.quantidade_inicial) || 0;
+    if (!x || !ini || !l.ativo) return '';
+    const pct = (Math.max(0, ini - Number(x.mortos || 0)) / ini) * 100;
+    return `${progresso(pct, { fina: true, tom: pct >= 90 ? 'ok' : pct >= 75 ? 'alerta' : 'erro', rotulo: `Sobrevivência ${fmtNum(pct, 1)}%` })}<small class="prog-leg">Sobrevivência ${fmtNum(pct, 1)}%</small>`;
+  }
   const ativos = lotes.filter((l) => l.ativo).sort(porTanque);
   const encerrados = lotes.filter((l) => !l.ativo).sort(porTanque);
   el.innerHTML = `<h1>Relatórios</h1>
@@ -73,7 +80,7 @@ export async function renderRelatorios(ctx, el) {
     </div>
     <h2>Relatório de um lote</h2>
     <p class="mudo" style="margin-top:-.4rem">Peso, mortalidade e ração de cada lote de peixes.</p>
-    ${ativos.length ? `<div class="card"><ul class="lista">${ativos.map(linhaLote).join('')}</ul></div>` : '<div class="card vazio"><p>Ainda não há lotes ativos.</p></div>'}
+    ${ativos.length ? `<div class="card"><ul class="lista lista-grade">${ativos.map(linhaLote).join('')}</ul></div>` : '<div class="card vazio"><p>Ainda não há lotes ativos.</p></div>'}
     ${encerrados.length ? `<details class="avancado"><summary>Lotes encerrados (${encerrados.length})</summary><div class="card"><ul class="lista">${encerrados.map(linhaLote).join('')}</ul></div></details>` : ''}`;
 
   const bf = el.querySelector('#b-pdf-fazenda');
@@ -447,8 +454,9 @@ export async function renderRacaoDia(ctx, el) {
     el.querySelectorAll('[data-per]').forEach((b) => b.classList.toggle('on', b.dataset.per === per));
     r = calcular();
     const marcado = (t) => !desmarcados.has(t.id);
+    const maxKg = Math.max(1, ...r.todos.map((t) => t.kg || 0));
     const ranque = r.todos.map((t) => `
-      <li class="racao-item${marcado(t) ? '' : ' fora'}"><label class="marca no-print" title="Incluir no relatório"><input type="checkbox" data-marca="${esc(t.id)}"${marcado(t) ? ' checked' : ''}><span></span></label><span class="esq"><b>${esc(t.nome)}</b>${t.kg > 0 || t.lote ? `<small>${[t.kg > 0 ? `${kgTxt(t.kg)} kg` : '', t.lote, t.pesoVivoPct != null && t.kg > 0 ? `${fmtNum(t.pesoVivoPct, 1)}% do peso vivo` : ''].filter(Boolean).map(esc).join(' · ')}</small>` : ''}</span>
+      <li class="racao-item${marcado(t) ? '' : ' fora'}"><label class="marca no-print" title="Incluir no relatório"><input type="checkbox" data-marca="${esc(t.id)}"${marcado(t) ? ' checked' : ''}><span></span></label><span class="esq"><b>${esc(t.nome)}</b>${t.kg > 0 || t.lote ? `<small>${[t.kg > 0 ? `${kgTxt(t.kg)} kg` : '', t.lote, t.pesoVivoPct != null && t.kg > 0 ? `${fmtNum(t.pesoVivoPct, 1)}% do peso vivo` : ''].filter(Boolean).map(esc).join(' · ')}</small>` : ''}${t.kg > 0 ? progresso((t.kg / maxKg) * 100, { fina: true, rotulo: `${t.nome}: ${kgTxt(t.kg)} kg` }) : ''}</span>
       ${t.kg > 0 ? `<b class="valor">${sacos(t.kg)} <small>sacos</small></b>` : `<span class="tag ${t.ativo ? 'aviso' : ''}">${t.ativo ? 'sem lançamento' : '–'}</span>`}</li>`).join('');
     const grafico = r.um || !r.lista.length ? '' : svgDias(r.linhasDia);
     const detalhe = r.um || !r.lista.length ? '' : `
@@ -467,7 +475,7 @@ export async function renderRacaoDia(ctx, el) {
       <p class="mudo nota so-pc">Valores em kg. “–” significa que nada foi lançado naquele dia.</p>
       <p class="mudo nota so-cel">Toque num dia para ver a ração de cada tanque. A tabela completa vai no PDF.</p>`;
     const quem = r.individual ? r.lista[0].nome : r.parcial ? `${r.lista.length} de ${r.todos.length} tanques` : r.todos.length > 1 ? 'todos os tanques' : '';
-    el.querySelector('#resumo').innerHTML = !r.todos.length ? '' : `<div class="racao-total"><small>${esc(r.periodo)}${quem ? ` · ${esc(quem)}` : ''}</small><b>${sacos(r.total)} sacos</b><span>${kgTxt(r.total)} kg no total</span></div>`;
+    el.querySelector('#resumo').innerHTML = !r.todos.length ? '' : `<div class="racao-total"><small>${esc(r.periodo)}${quem ? ` · ${esc(quem)}` : ''}</small><b>${sacos(r.total)} sacos</b><span>${kgTxt(r.total)} kg no total</span>${(() => { const at = r.todos.filter((t) => t.ativo), com = at.filter((t) => t.kg > 0).length; return at.length > 1 ? `<div class="hero-prog">${progresso((com / at.length) * 100, { tom: com === at.length ? 'ok' : '', rotulo: `${com} de ${at.length} tanques com ração lançada` })}<p class="h-trilho-leg"><span>${fmtInt(com)} de ${fmtInt(at.length)} tanques com ração lançada</span></p></div>` : ''; })()}</div>`;
     el.querySelector('#acoes-racao').hidden = !r.todos.length;
     const bpdf = el.querySelector('#b-pdf-racao'); bpdf.disabled = !r.lista.length;
     el.querySelector('#b-csv').disabled = !r.lista.length;

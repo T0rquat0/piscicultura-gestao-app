@@ -774,3 +774,52 @@ h2, h3, .h-bloco h2 { font-weight: 700; letter-spacing: -.015em; }
 .tq.vazio b { font-weight: 600; }
 .grande-num, .kpi b, .destaque b, .h-num, .estoque-hero b, .racao-total b, .td-hero b, .td-stats b { font-weight: 600; letter-spacing: -.035em; }
 .h-de, .h-meta, .tq-fase { letter-spacing: 0; }
+
+/* ----- barras de progresso: trilho claro, preenchimento na cor do estado ----- */
+.prog { height: 8px; border-radius: 99px; background: var(--campo-bg); overflow: hidden; margin: .55rem 0 .3rem; }
+.prog > i { display: block; height: 100%; min-width: 0; border-radius: inherit; background: var(--rio); transition: width .5s var(--ease); }
+.prog.fina { height: 5px; margin: .45rem 0 .15rem; }
+.prog.ok > i { background: var(--ok); }
+.prog.alerta > i { background: #d97706; }
+.prog.erro > i { background: var(--erro); }
+.prog.claro > i { background: var(--alevino); }
+.prog-leg { font-size: .78rem; color: var(--tinta-2); }
+.h-prog { display: grid; gap: .1rem; max-width: 420px; margin-top: .55rem; }
+.h-prog .prog { margin: 0; }
+.h-prog > span { font-size: .85rem; color: var(--tinta-2); }
+.h-prog > span b { color: var(--tinta); font-weight: 600; }
+.h-cobre { margin-top: .4rem; }
+.h-cobre .prog { margin-bottom: .2rem; }
+.h-cobre .h-trilho-leg b { color: var(--tinta); font-weight: 600; }
+.tq .prog { margin: .4rem 0 0; }
+.tq.vazio .prog, .tq.novo .prog { display: none; }
+.td-sobre { margin: .2rem 0 .6rem; }
+.td-sobre .h-trilho-leg b { color: var(--tinta); font-weight: 600; }
+.kpi .prog { margin: .45rem 0 .25rem; }
+.hero-prog { margin-top: .5rem; }
+.estoque-hero .prog, .racao-total .prog { background: var(--card); }
+.estoque-hero .hero-prog p, .racao-total .hero-prog p { margin: .3rem 0 0; padding: 0; background: none; box-shadow: none; color: var(--tinta-2); font-weight: 400; font-size: .8rem; }
+.ex-tot .prog { max-width: 220px; }
+.prog { display: block; width: 100%; padding: 0; }
+@media (prefers-reduced-motion: reduce) { .prog > i { transition: none; } }
+
+/* ----- computador: duas colunas e listas em grade nas outras telas ----- */
+@media (min-width: 900px) {
+  .view > div:has(.pc-duas), .view > div:has(.lista-grade), .view > div:has(.hub) { max-width: 1240px; }
+  .pc-duas { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 2.4rem; align-items: start; }
+  .pc-duas > div > h2:first-child { margin-top: 0; }
+  .hub { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .hub-card { align-items: flex-start; min-height: 96px; }
+  .lista-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); column-gap: 2rem; }
+  .lista-grade li, .lista-grade li:first-child, .lista-grade li:last-child { padding: .85rem 0; border-bottom: 1px solid var(--linha-2); }
+  .kpis.tq-resumo { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (min-width: 1240px) {
+  .pc-duas { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .pc-duas > div > :first-child { margin-top: 0; }
+}
+
+/* quadro estreito (celular): "+ 10 sacos" no lugar de "Lançar 10 sacos", para caber numa linha */
+.tq-mais { display: none; }
+@media (max-width: 599px) { .tq-verbo { display: none; } .tq-mais { display: inline; font-weight: 700; } .tq-acao { white-space: nowrap; } }
+@media (min-width: 900px) { .acoes-reg { flex-wrap: nowrap; } }

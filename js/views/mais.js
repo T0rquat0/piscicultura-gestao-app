@@ -21,6 +21,7 @@ export function renderMais(ctx, el) {
 
   el.innerHTML = `
     <h1>Mais</h1>
+    <div class="pc-duas"><div>
     <div class="card"><ul class="lista">${itens.map(([href, ic, t, s]) => `
       <li><a class="item" href="${href}"><span class="item-ic">${icone(ic)}</span><span class="esq"><b>${esc(t)}</b><small>${esc(s)}</small></span><span class="seta">${icone('direita', 20)}</span></a></li>`).join('')}</ul></div>
 
@@ -34,6 +35,7 @@ export function renderMais(ctx, el) {
     </div>
 
     <div id="teste"></div>
+    </div><div>
 
     ${p.papel === 'dono' ? `<div class="card">
       <b>Peso do saco de ração</b>
@@ -65,6 +67,7 @@ export function renderMais(ctx, el) {
         <button class="hub-card" id="b-importar" type="button"><span class="item-ic">${icone('subir')}</span><span class="esq"><b>Importar cópia</b><small>Devolve o que faltar, sem alterar o que existe</small></span><span class="seta">${icone('direita', 20)}</span></button>
       </div>
       <input id="in-copia" type="file" accept=".json,application/json" hidden></div>` : ''}
+    </div></div>
 
     ${TERMOS_VERSAO ? '<p class="mudo nota" style="text-align:center"><a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> · <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>' : ''}
     ${state.admin ? `<p class="mudo nota" style="text-align:center">Banco em uso: ${esc(AMBIENTE_NOME)}</p>` : ''}
