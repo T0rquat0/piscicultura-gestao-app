@@ -21,6 +21,8 @@ export function fmtNum(n, dec = 1) {
   return (_fmts[dec] ||= _num(dec)).format(Number(n));
 }
 export const fmtInt = (n) => fmtNum(n, 0);
+// número + palavra no singular ou no plural: plural(1, 'tanque', 'tanques') → "1 tanque"; plural(3, ...) → "3 tanques"
+export const plural = (n, um, varios) => `${fmtInt(n)} ${Number(n) === 1 ? um : varios}`;
 // porcentagem sem enganar nos extremos: 99,96 não vira "100,0" (houve perda) e 0,04 não vira "0,0"
 export const fmtPct = (v) => { const x = Number(v) || 0; return fmtNum(x, (x > 99.9 && x < 100) || (x > 0 && x < 0.1) ? 2 : 1); };
 // barra de progresso: pct de 0 a 100; tom = '' (verde da marca), 'ok', 'alerta', 'erro' ou 'claro'; rotulo vai para leitor de tela
@@ -114,7 +116,7 @@ export async function reduzirLogo(file, max = 256) {
   if (!file || !/^image\//.test(file.type)) throw new Error('Escolha um arquivo de imagem (PNG ou JPG).');
   const url = URL.createObjectURL(file);
   try {
-    const img = await new Promise((ok, falha) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => falha(new Error('Não consegui abrir essa imagem.')); i.src = url; });
+    const img = await new Promise((ok, falha) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => falha(new Error('Não foi possível abrir essa imagem.')); i.src = url; });
     const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
     const w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k));
     const c = document.createElement('canvas'); c.width = w; c.height = h;

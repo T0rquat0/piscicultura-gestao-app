@@ -1,7 +1,7 @@
 // Lançamento de ração, biometria e mortalidade. Funciona sem internet:
 // o item é gravado na fila local (IndexedDB) e enviado quando houver conexão.
 import { icone } from '../icons.js';
-import { esc, hojeISO, fmtData, fmtNum, fmtInt, num, uuid, ROTULO_TIPO, progresso, fmtPct } from '../util.js';
+import { esc, hojeISO, fmtData, fmtNum, fmtInt, num, uuid, ROTULO_TIPO, progresso, fmtPct, plural } from '../util.js';
 import * as db from '../db.js';
 import { confirmar } from '../dialogo.js';
 import { ordemNatural } from './home.js';
@@ -316,7 +316,7 @@ export async function renderLancar(ctx, el, params = {}) {
         const r = igual || recente; if (!r) return null;
         return `Este tanque já recebeu ${sacosTxt(Number(r.q) / kgSaco)} neste dia${r.em ? ` (às ${hora(r.em)})` : ''}.`;
       }
-      if (tp === 'mortalidade') { const r = regs.find((x) => Number(x.q) === pl.quantidade); return r ? `Já há ${fmtInt(pl.quantidade)} peixe(s) morto(s) lançado(s) neste lote nesta data${r.em ? ` (às ${hora(r.em)})` : ''}.` : null; }
+      if (tp === 'mortalidade') { const r = regs.find((x) => Number(x.q) === pl.quantidade); return r ? `Já há ${plural(pl.quantidade, 'peixe morto lançado', 'peixes mortos lançados')} neste lote nesta data${r.em ? ` (às ${hora(r.em)})` : ''}.` : null; }
       return regs.length ? 'Já existe uma biometria deste lote nesta data.' : null;
     } catch { return null; }
   }
@@ -394,7 +394,7 @@ export async function renderLancar(ctx, el, params = {}) {
     const nomeTanque = (tanques.find((t) => t.id === selTanque.value) || {}).nome || '';
     const resumo = tipo === 'racao' ? `${sacosTxt(num(f.querySelector('#qtd').value))} de ração (${kgTxt(payload.quantidade_kg)} kg)`
       : tipo === 'biometria' ? `${fmtNum((payload.peso_amostra_kg / payload.quantidade_amostrada) * 1000, 0)} g de peso médio (${fmtInt(payload.quantidade_amostrada)} peixes pesados)`
-      : `${fmtInt(payload.quantidade)} peixe(s) morto(s)`;
+      : `${plural(payload.quantidade, 'peixe morto', 'peixes mortos')}`;
     ctx.toast(navigator.onLine ? 'Salvo. Enviando…' : 'Salvo no celular. Será enviado quando houver internet.', 'ok');
     // sugestão de ronda: o próximo tanque (em ordem) que ainda não recebeu ração hoje
     let proximo = null;

@@ -2,7 +2,7 @@
 // EstratÃ©gia: rede primeiro (sempre pega a versÃ£o nova quando hÃ¡ sinal), com limite de 4 s;
 // se a rede falhar ou demorar, usa a cÃ³pia guardada. RequisiÃ§Ãµes ao Supabase (outro domÃ­nio)
 // NÃƒO passam por aqui: os dados offline ficam no IndexedDB (js/db.js), nÃ£o neste cache.
-const CACHE = 'piscicultura-shell-v88';
+const CACHE = 'piscicultura-shell-v89';
 const SHELL = [
   './',
   'index.html',

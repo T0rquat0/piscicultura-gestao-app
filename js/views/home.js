@@ -155,11 +155,11 @@ export async function renderHome(ctx, el) {
     <div class="h-grade">
       <div class="h-col">
         ${blocoRacao()}
+        ${gerir ? blocoDespescas() : ''}
         ${gerir ? blocoMortes() : ''}
       </div>
       <div class="h-col">
         <section class="h-bloco" aria-labelledby="h-tempo" id="b-tempo"><header><h2 id="h-tempo">Tempo na fazenda</h2></header><p class="h-calmo">Carregando a previsão…</p></section>
-        ${gerir ? blocoDespescas() : ''}
         ${blocoEstoque()}
         ${gerir ? blocoPeixe() : ''}
       </div>
@@ -252,9 +252,9 @@ export async function renderHome(ctx, el) {
     const comData = ps.filter((x) => x.p.estado !== 'sem-dado').sort((a, b) => ordem[a.p.estado] - ordem[b.p.estado] || String(a.p.data).localeCompare(String(b.p.data)));
     const sem = ps.length - comData.length;
     return `<section class="h-bloco" aria-labelledby="h-desp">
-      <header><h2 id="h-desp">Próximas despescas</h2><span class="h-meta">pelo crescimento</span></header>
-      ${comData.length ? `<ul class="h-desp">${comData.slice(0, 6).map(({ l, p }) => `<li><a href="#/t/${esc(l.tanque_id)}"><b>${esc(nomeT(l.tanque_id))}</b><span>${esc(ROTULO_TIPO[l.tipo] || l.tipo)}</span></a>${htmlPrevisao(p)}</li>`).join('')}</ul>` : ''}
-      ${sem ? `<p class="h-calmo">${comData.length ? `Mais ${fmtInt(sem)}` : fmtInt(sem)} ${sem === 1 ? 'lote' : 'lotes'} sem biometria depois da entrada: lance uma pesagem para prever a despesca.</p>` : ''}
+      <header><h2 id="h-desp">Despescas e mudanças de fase</h2><span class="h-meta">pelo crescimento</span></header>
+      ${comData.length ? `<ul class="h-desp">${comData.slice(0, 6).map(({ l, p }) => `<li><a href="#/t/${esc(l.tanque_id)}"><b>${esc(nomeT(l.tanque_id))}</b><span>${esc(ROTULO_TIPO[l.tipo] || l.tipo)}</span></a>${htmlPrevisao(p, l.tipo)}</li>`).join('')}</ul>` : ''}
+      ${sem ? `<p class="h-calmo">${comData.length ? `Mais ${fmtInt(sem)}` : fmtInt(sem)} ${sem === 1 ? 'lote' : 'lotes'} sem biometria depois da entrada: lance uma pesagem para prever.</p>` : ''}
     </section>`;
   }
 
@@ -310,15 +310,15 @@ export async function renderHome(ctx, el) {
       const fim = new Date(`${hoje}T12:00:00`); fim.setDate(fim.getDate() + Math.floor(sit.dias));
       const quando = fim.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' });
       const txt = `No ritmo de ${esc(nSacos(sacos(sit.porDia)))} por dia, acaba em <b>${esc(quando)}</b>.`;
-      nota = sit.nivel === 'ok' ? `<p class="h-nota">${txt}</p>` : `<p class="${sit.nivel === 'critico' ? 'h-alerta' : 'aviso'}">${txt} Hora de comprar.</p>`;
+      nota = sit.nivel === 'ok' ? `<p class="h-nota">${txt}</p>` : `<p class="${sit.nivel === 'critico' ? 'h-alerta' : 'aviso'}">${sit.nivel === 'critico' ? 'Está acabando: compre ração já.' : 'Hora de planejar a compra.'} Gasta ~${esc(nSacos(sacos(sit.porDia)))} por dia.</p>`;
     } else nota = '<p class="h-nota">Sem consumo na última semana para estimar a duração.</p>';
-    const dur = sit.dias != null ? ` · dura ${fmtInt(Math.floor(sit.dias))} ${Math.floor(sit.dias) === 1 ? 'dia' : 'dias'}` : '';
     const tomEst = { atencao: 'alerta', critico: 'erro', negativo: 'erro' }[sit.nivel] || '';
-    const barra = sit.dias != null || sit.nivel === 'negativo'
-      ? `<div class="h-cobre">${progresso(((sit.dias || 0) / ESTOQUE_COBERTURA_DIAS) * 100, { tom: tomEst, rotulo: `Estoque para ${fmtInt(Math.floor(sit.dias || 0))} de ${ESTOQUE_COBERTURA_DIAS} dias` })}<p class="h-trilho-leg"><span>hoje</span><span>${ESTOQUE_COBERTURA_DIAS} dias</span></p></div>` : '';
-    return `<div class="h-estoque">${titulo ? `<p class="h-sub">${esc(titulo)}</p>` : ''}
-      <p class="h-lead"><span class="h-num">${saldo < 0 ? '−' : ''}${fmtNum(Math.abs(sacos(saldo)), 0)}</span><span class="h-de">sacos${dur}</span></p>
-      ${barra}${nota}</div>`;
+    const quando = sit.dias != null ? (() => { const f = new Date(`${hoje}T12:00:00`); f.setDate(f.getDate() + Math.floor(sit.dias)); return f.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }).replace('.', ''); })() : '';
+    return `<div class="h-est-linha">
+      <div class="h-est-cab"><span>${esc(titulo || 'Ração')}</span><b>${saldo < 0 ? '−' : ''}${fmtNum(Math.abs(sacos(saldo)), 0)} <small>sacos</small></b></div>
+      ${sit.dias != null || sit.nivel === 'negativo' ? progresso(((sit.dias || 0) / ESTOQUE_COBERTURA_DIAS) * 100, { fina: true, tom: tomEst, rotulo: `Estoque para ${fmtInt(Math.floor(sit.dias || 0))} de ${ESTOQUE_COBERTURA_DIAS} dias` }) : ''}
+      <small class="h-est-sub">${sit.nivel === 'negativo' ? 'saldo negativo: confira no galpão' : sit.dias != null ? `dura ${fmtInt(Math.floor(sit.dias))} ${Math.floor(sit.dias) === 1 ? 'dia' : 'dias'} · acaba por volta de ${esc(quando)}` : 'sem consumo na semana para estimar'}</small>
+      ${sit.nivel === 'critico' || sit.nivel === 'atencao' || sit.nivel === 'negativo' ? nota : ''}</div>`;
   }
 
   function blocoEstoque() {
@@ -328,7 +328,7 @@ export async function renderHome(ctx, el) {
     return `<section class="h-bloco" aria-labelledby="h-est">
       <header><h2 id="h-est"><a href="#/estoque" style="color:inherit;text-decoration:none">Estoque de ração</a></h2><span class="h-meta">no galpão</span></header>
       ${duas ? pizza(usadas.map((s) => ({ nome: s.tipo_racao === 'alevino' ? 'Alevino' : 'Engorda', valor: Math.max(0, sacos(Number(s.saldo_kg) || 0)), cor: COR_RACAO[s.tipo_racao === 'alevino' ? 'alevino' : 'engorda'], txt: nSacos(Math.max(0, sacos(Number(s.saldo_kg) || 0))) })), { centro: fmtNum(usadas.reduce((a, s) => a + Math.max(0, sacos(Number(s.saldo_kg) || 0)), 0), 0), sub: 'sacos', rotulo: 'Estoque de ração por tipo' }) : ''}
-      ${usadas.map((s) => linhaEstoque(s, duas ? (s.tipo_racao === 'alevino' ? 'Ração de alevino' : 'Ração de engorda') : '')).join('')}
+      ${usadas.map((s) => linhaEstoque(s, duas ? (s.tipo_racao === 'alevino' ? 'Alevino' : 'Engorda') : 'Ração')).join('')}
       ${temDias ? `<div class="h-graf">${barras14()}</div><p class="h-graf-leg">Sacos dados por dia nos últimos 14 dias${duas ? ', somando as duas rações' : ''}. Hoje, em verde, ainda em andamento.</p>` : ''}
     </section>`;
   }

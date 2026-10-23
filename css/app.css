@@ -1015,3 +1015,21 @@ table.cmp td b { font-weight: 600; }
 .sug-racao { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .6rem; margin-top: .5rem; }
 .sug-racao small { font-size: .78rem; color: var(--tinta-2); }
 #b-sug { border-color: var(--rio); color: var(--rio); font-weight: 600; }
+
+/* ----- Início: estoque compacto e despescas em grade no computador ----- */
+.h-est-linha { padding: .55rem 0; }
+.h-est-linha + .h-est-linha { border-top: 1px solid var(--linha-2); }
+.h-est-cab { display: flex; justify-content: space-between; align-items: baseline; gap: .6rem; }
+.h-est-cab span { font-size: .9rem; font-weight: 500; }
+.h-est-cab b { font: 700 1.25rem var(--fonte-titulo); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.h-est-cab b small { font: 400 .78rem var(--fonte); color: var(--tinta-2); letter-spacing: 0; }
+.h-est-linha .prog { margin: .35rem 0 .15rem; }
+.h-est-sub { display: block; font-size: .78rem; color: var(--tinta-2); }
+.h-est-linha .aviso, .h-est-linha .h-alerta { margin-top: .5rem; }
+@media (min-width: 900px) { .h-desp { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); column-gap: 2rem; } }
+
+/* avisos do tempo: lista compacta com marca de cor (alerta = vermelho, atenção = âmbar) */
+.h-tempo-av { list-style: none; margin: .7rem 0 0; padding: .55rem .8rem; border-radius: var(--r-card); background: var(--campo-bg); display: grid; gap: .45rem; }
+.h-tempo-av li { position: relative; padding-left: 1rem; font-size: .84rem; line-height: 1.4; color: var(--tinta); }
+.h-tempo-av li::before { content: ''; position: absolute; left: 0; top: .45em; width: 7px; height: 7px; border-radius: 50%; background: #d97706; }
+.h-tempo-av li.alerta::before { background: var(--erro); }

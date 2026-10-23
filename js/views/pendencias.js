@@ -1,5 +1,5 @@
 // Lançamentos guardados no aparelho que ainda não chegaram ao servidor.
-import { esc, fmtData, fmtNum } from '../util.js';
+import { esc, fmtData, fmtNum, plural } from '../util.js';
 import { confirmar } from '../dialogo.js';
 import * as db from '../db.js';
 
@@ -12,8 +12,8 @@ function descricao(it, ref) {
   const tanque = ref.tanques.find((t) => t.id === tanqueId);
   let valor = '';
   if (it.tabela === 'racao_consumo') valor = `${fmtNum(p.quantidade_kg, 2)} kg`;
-  else if (it.tabela === 'biometrias') valor = `${fmtNum(p.peso_amostra_kg, 3)} kg em ${p.quantidade_amostrada} peixe(s) (médio ${fmtNum((p.peso_amostra_kg / p.quantidade_amostrada) * 1000, 0)} g)`;
-  else valor = `${p.quantidade} peixe(s)`;
+  else if (it.tabela === 'biometrias') valor = `${fmtNum(p.peso_amostra_kg, 3)} kg em ${plural(p.quantidade_amostrada, 'peixe', 'peixes')} (médio ${fmtNum((p.peso_amostra_kg / p.quantidade_amostrada) * 1000, 0)} g)`;
+  else valor = `${plural(p.quantidade, 'peixe', 'peixes')}`;
   return { titulo: `${ROTULO[it.tabela] || it.tabela} · ${tanque ? tanque.nome : 'tanque'}`, sub: `${fmtData(p.data)} · ${valor}` };
 }
 
@@ -25,7 +25,7 @@ export async function renderPendencias(ctx, el) {
 
   el.innerHTML = `
     <h1>Pendentes de envio</h1>
-    ${outros ? `<p class="aviso">Há ${outros} lançamento(s) de outro usuário neste aparelho. Eles serão enviados quando essa pessoa entrar.</p>` : ''}
+    ${outros ? `<p class="aviso">Há ${plural(outros, 'lançamento', 'lançamentos')} de outro usuário neste aparelho. Eles serão enviados quando essa pessoa entrar.</p>` : ''}
     ${meus.length ? `
       <div class="acoes" style="margin:0 0 .8rem"><button class="btn primario" id="b-enviar" type="button"${navigator.onLine ? '' : ' disabled'}>Enviar agora</button></div>
       ${navigator.onLine ? '' : '<p class="aviso">Sem internet. Os lançamentos serão enviados assim que a conexão voltar.</p>'}

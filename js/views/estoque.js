@@ -154,7 +154,7 @@ export async function renderEstoque(ctx, el) {
     </div>` : ''}
     <div class="card">
       ${extrato.length ? `<ul class="extrato">${extrato.map((x) => `<li class="${x.kg < 0 ? 'sai' : 'entra'}">
-        <span class="ex-d">${fmtData(x.d).slice(0, 5)}</span><span class="ex-t">${esc(x.t)}<i class="ex-tag ${x.kg < 0 ? 'sai' : 'entra'}">${x.kg < 0 ? 'Saída' : 'Entrada'}</i></span>
+        <span class="ex-d">${fmtData(x.d).slice(0, 5)}</span><span class="ex-t">${esc(x.t)} <i class="ex-tag ${x.kg < 0 ? 'sai' : 'entra'}">${x.kg < 0 ? 'Saída' : 'Entrada'}</i></span>
         <b>${sinal(x.kg)}<em> sacos</em></b>
         ${x.cid && ctx.state.perfil.papel === 'dono' ? `<button class="btn mini perigo" data-delc="${esc(x.cid)}" type="button">Excluir</button>` : ''}</li>`).join('')}</ul>`
         : '<p class="mudo" style="margin:0">Nenhum movimento nos últimos 30 dias.</p>'}
@@ -241,7 +241,7 @@ export async function renderEstoque(ctx, el) {
     const t = total(), nota = num(f.querySelector('#sacos').value), rec = recebidos(), kgs = fmtNum(num(f.querySelector('#kgsaco').value), 1);
     f.querySelector('#total').textContent = t == null ? 'Total: —'
       : conferir.checked && rec < nota ? `Entra no estoque: ${fmtNum(t, 1)} kg (${fmtNum(rec, rec % 1 ? 1 : 0)} sacos × ${kgs} kg)
-Faltaram ${fmtNum(nota - rec, (nota - rec) % 1 ? 1 : 0)} saco(s) da nota.`
+Faltaram ${fmtNum(nota - rec, (nota - rec) % 1 ? 1 : 0)} ${nota - rec === 1 ? 'saco' : 'sacos'} da nota.`
       : `Total: ${fmtNum(t, 1)} kg (${fmtInt(nota)} sacos × ${kgs} kg)`;
   };
   f.addEventListener('input', () => { erro.hidden = true; }); // corrigiu um campo: a mensagem antiga some

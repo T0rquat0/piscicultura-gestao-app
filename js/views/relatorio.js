@@ -76,7 +76,7 @@ export async function renderRelatorios(ctx, el) {
   el.innerHTML = `<h1>Relatórios</h1>
     <p class="mudo" style="margin-top:-.4rem">O que você quer saber?</p>
     <div class="hub">
-      <a class="hub-card" href="#/relatorio/racao"><span class="item-ic">${icone('lancar')}</span><span class="esq"><b>Ração fornecida</b><small>Quanto foi jogado em cada tanque, hoje ou na semana. Dá para enviar ao dono.</small></span><span class="seta">${icone('direita', 20)}</span></a>
+      <a class="hub-card" href="#/relatorio/racao"><span class="item-ic">${icone('lancar')}</span><span class="esq"><b>Ração fornecida</b><small>Quanta ração cada tanque recebeu, hoje ou na semana. Dá para enviar ao dono.</small></span><span class="seta">${icone('direita', 20)}</span></a>
       <a class="hub-card" href="#/estoque"><span class="item-ic">${icone('estoque')}</span><span class="esq"><b>Estoque de ração</b><small>Quanto resta no galpão e para quantos dias dá.</small></span><span class="seta">${icone('direita', 20)}</span></a>
       <button class="hub-card" id="b-pdf-fazenda" type="button"><span class="item-ic">${icone('relatorio')}</span><span class="esq"><b>Relatório geral da fazenda</b><small>PDF com estoque, lotes e mortalidade, para compartilhar.</small></span><span class="seta">${icone('direita', 20)}</span></button>
     </div>

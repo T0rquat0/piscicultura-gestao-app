@@ -83,7 +83,7 @@ export async function renderAceitarConvite(ctx, root, user, token) {
   const papel = c && (ROTULO_PAPEL[c.papel] || c.papel);
   root.innerHTML = `
   <main class="login"><div class="login-card">
-    ${valido ? cabeca(`Entrar na ${c.fazenda}`, `Você foi convidado como <b>${esc(papel)}</b>. O convite vale até ${fmtData(c.expira_em)}.`)
+    ${valido ? cabeca(`Entrar na ${c.fazenda}`, `Seu convite é para entrar como <b>${esc(papel)}</b>. O convite vale até ${fmtData(c.expira_em)}.`)
       : cabeca('Convite não disponível', esc(falhou || `${MOTIVO[c && c.estado] || 'Convite inválido.'} Peça um link novo ao dono da fazenda.`))}
     ${valido ? `<form id="f-conv" class="form" novalidate>
       <label>Seu nome <input id="nome" type="text" maxlength="80" autocomplete="name" required><small class="mudo">É assim que você vai aparecer para a equipe.</small></label>

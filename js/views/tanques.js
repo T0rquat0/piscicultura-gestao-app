@@ -2,7 +2,7 @@
 import { confirmar, ocupado, formulario } from '../dialogo.js';
 import { icone } from '../icons.js';
 import { ESPECIES } from '../config.js';
-import { esc, fmtData, fmtInt, fmtNum, hojeISO, num, ROTULO_TIPO, FASES, areaHa, progresso, fmtPct } from '../util.js';
+import { esc, fmtData, fmtInt, fmtNum, hojeISO, num, ROTULO_TIPO, FASES, areaHa, progresso, fmtPct, plural } from '../util.js';
 import { lerPlanilha } from '../planilha.js';
 
 
@@ -83,9 +83,9 @@ export async function renderTanques(ctx, el) {
         : `<tr><td>${esc(l.nome)}${l.existe ? ' <small class="mudo">(já existe)</small>' : ''}</td><td class="n">${l.area ? haTxt(l.area).replace(' ha', '') : '—'}</td><td>${l.tipo ? esc(ROTULO_TIPO[l.tipo]) : '—'}</td>
            <td class="n">${l.qtd ? fmtInt(l.qtd) : '—'}</td><td class="n">${l.pm ? (l.pm < 1 ? fmtNum(l.pm * 1000, 0) + ' g' : fmtNum(l.pm, 2) + ' kg') : '—'}</td>
            <td>${l.data ? fmtData(l.data) : '—'}</td><td class="n">${l.qtd ? fmtNum(l.qtd * l.pm, 0) + ' kg' : '—'}</td></tr>`).join('')}</tbody></table></div>
-      <p class="mudo">${validas.length} linha(s) prontas${linhas.length - validas.length ? `, ${linhas.length - validas.length} com problema (corrija ou apague)` : ''}.</p>` : '';
+      <p class="mudo">${plural(validas.length, 'linha pronta', 'linhas prontas')}${linhas.length - validas.length ? `, ${linhas.length - validas.length} com problema (corrija ou apague)` : ''}.</p>` : '';
     bImp.hidden = !validas.length;
-    bImp.textContent = `Cadastrar ${validas.length} linha(s)`;
+    bImp.textContent = `Cadastrar ${plural(validas.length, 'linha', 'linhas')}`;
   };
   ta.addEventListener('input', mostrar);
   bImp.addEventListener('click', async () => {
@@ -105,7 +105,7 @@ export async function renderTanques(ctx, el) {
         feitos++;
       }
       await ctx.atualizarRef(true);
-      ctx.toast(`${feitos} linha(s) cadastrada(s)`, 'ok');
+      ctx.toast(`${plural(feitos, 'linha cadastrada', 'linhas cadastradas')}`, 'ok');
       renderTanques(ctx, el);
     } catch (e) {
       erroPl.textContent = `Parou na linha ${validas[feitos]?.n}: ${e.message}${feitos ? ` (as ${feitos} anteriores foram cadastradas)` : ''}`; erroPl.hidden = false;
@@ -316,7 +316,7 @@ export async function renderTanque(ctx, el, id) {
     }
     return r;
   }
-  const txtResumo = (r) => `${r.bios} biometria(s), ${r.mort} registro(s) de mortalidade e ${r.racN} lançamento(s) de ração (${fmtNum(r.racKg, 0)} kg). A ração apagada volta para o saldo do estoque.`;
+  const txtResumo = (r) => `${plural(r.bios, 'biometria', 'biometrias')}, ${plural(r.mort, 'registro', 'registros')} de mortalidade e ${plural(r.racN, 'lançamento', 'lançamentos')} de ração (${fmtNum(r.racKg, 0)} kg). A ração apagada volta para o saldo do estoque.`;
 
   el.querySelectorAll('[data-excluir-lote]').forEach((b) => b.addEventListener('click', async () => {
     if (!navigator.onLine) return ctx.toast('Sem internet', 'erro');
@@ -338,7 +338,7 @@ export async function renderTanque(ctx, el, id) {
     try {
       const livre0 = ocupado('Conferindo o que será apagado…');
       let r, lixo; try { [r, lixo] = await Promise.all([resumoDe(todos.map((l) => l.id)), ctx.api.temLixeira()]); } finally { livre0(); }
-      if (!(await confirmar({ titulo: `Apagar "${tanque.nome}"?`, texto: `Serão apagados ${todos.length} lote(s), ${txtResumo(r)} ${lixo ? 'Fica na lixeira por 180 dias: dá para restaurar em Mais > Histórico e lixeira.' : 'Não dá para desfazer.'}`, ok: 'Apagar tanque', perigo: true, digitar: tanque.nome }))) return;
+      if (!(await confirmar({ titulo: `Apagar "${tanque.nome}"?`, texto: `Serão apagados ${plural(todos.length, 'lote', 'lotes')}, ${txtResumo(r)} ${lixo ? 'Fica na lixeira por 180 dias: dá para restaurar em Mais > Histórico e lixeira.' : 'Não dá para desfazer.'}`, ok: 'Apagar tanque', perigo: true, digitar: tanque.nome }))) return;
       const livre = ocupado('Apagando o tanque…');
       try {
         await ctx.api.excluirTanque(id);

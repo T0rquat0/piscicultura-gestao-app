@@ -2,7 +2,7 @@
 // números grandes, sem cartões coloridos. Desenha com jsPDF (vetorial, texto selecionável).
 // Recebe o construtor jsPDF (com o plugin autoTable aplicado) e, opcionalmente, as fontes
 // em base64 { regular, bold } (Schibsted Grotesk). Sem fontes, usa Helvetica.
-import { fmtNum, fmtInt, fmtData, fmtBRL, fmtPct, ROTULO_TIPO, diasEntre } from './util.js';
+import { fmtNum, fmtInt, fmtData, fmtBRL, fmtPct, ROTULO_TIPO, diasEntre, plural } from './util.js';
 import { pesoMedioKg } from './calc.js';
 
 export const COR = {
@@ -116,7 +116,7 @@ export function gerarPdfLote(jsPDF, d) {
     ['Dias de cultivo', fmtInt(c.diasCultivo), 'dias', `desde ${fmtData(lote.data_entrada)}`],
     ['Peso médio atual', c.pmAtualG != null ? n(c.pmAtualG, 0) : '-', c.pmAtualG != null ? 'g' : '', c.dataUltimaBio ? `biometria de ${fmtData(c.dataUltimaBio)}` : 'sem biometria'],
     ['Peixes vivos', fmtInt(c.vivos), 'estim.', `de ${fmtInt(lote.quantidade_inicial)} na entrada`],
-    ['Sobrevivência', c.sobrevivencia != null ? fmtPct(c.sobrevivencia) : '-', '%', `${fmtInt(c.mortos)} morto(s)`],
+    ['Sobrevivência', c.sobrevivencia != null ? fmtPct(c.sobrevivencia) : '-', '%', `${plural(c.mortos, 'morto', 'mortos')}`],
     ['Biomassa', c.biomassaAtual != null ? n(c.biomassaAtual, 0) : '-', c.biomassaAtual != null ? 'kg' : '', `na entrada: ${n(c.biomassaInicial, 0)} kg`],
     ['Ração fornecida', n(c.racaoTotal, 0), 'kg', `${n(c.racaoTotal / kgSaco, 1)} sacos de ${n(kgSaco, 0)} kg`],
     ['Conversão alimentar', c.ca != null ? n(c.ca, 2) : '-', '', c.ca != null ? 'kg de ração por kg ganho' : 'precisa de biometria'],
@@ -148,7 +148,7 @@ export function gerarPdfLote(jsPDF, d) {
   obs.push(['Crescimento', c.pmAtualG != null
     ? `Peso médio de ${n(c.pmInicialG, 1)} g na entrada para ${n(c.pmAtualG, 0)} g em ${fmtData(c.dataUltimaBio)}${c.gpd != null ? ` (${n(c.gpd, 1)} g por dia por peixe)` : ''}.`
     : 'Sem biometria registrada. Pese uma amostra para calcular peso médio, biomassa e conversão alimentar.']);
-  obs.push(['Sobrevivência', `${fmtInt(c.mortos)} morte(s) em ${fmtInt(lote.quantidade_inicial)} peixes (${fmtPct(100 - (c.sobrevivencia ?? 100))}%). Restam cerca de ${fmtInt(c.vivos)}.`]);
+  obs.push(['Sobrevivência', `${plural(c.mortos, 'morte', 'mortes')} em ${fmtInt(lote.quantidade_inicial)} peixes (${fmtPct(100 - (c.sobrevivencia ?? 100))}%). Restam cerca de ${fmtInt(c.vivos)}.`]);
   obs.push(['Ração', `${n(c.racaoTotal, 0)} kg fornecidos (${n(c.racaoTotal / kgSaco, 1)} sacos de ${n(kgSaco, 0)} kg)${c.racaoMediaDia != null ? `, média de ${n(c.racaoMediaDia, 1)} kg por dia` : ''}.`]);
   if (c.ca != null) obs.push(['Conversão', `${n(c.ca, 2)} kg de ração por kg de peixe ganho até a última biometria. Referência usual: 1,2 a 2,0, conforme espécie e fase.`]);
   if (gerir && c.custoRacao != null) obs.push(['Custo', `${fmtBRL(c.custoRacao)} em ração, calculado pelo preço médio das compras com valor informado.`]);

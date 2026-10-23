@@ -1,7 +1,7 @@
-import { esc, ROTULO_PAPEL, fmtData, hojeISO, diasEntre, nomeArquivo, dataArquivo } from '../util.js';
+import { esc, ROTULO_PAPEL, fmtData, hojeISO, diasEntre, nomeArquivo, dataArquivo, plural } from '../util.js';
 import { icone } from '../icons.js';
 import { confirmar } from '../dialogo.js';
-import { num, fmtNum } from '../util.js';
+import { num, fmtNum, fmtInt } from '../util.js';
 import { PESO_SACO_PADRAO_KG, TERMOS_VERSAO, AMBIENTE_NOME } from '../config.js';
 import { reduzirLogo } from '../util.js';
 import { catalogoAtalhos, atalhosEscolhidos, salvarAtalhos, pintarAtalhos } from '../lateral.js';
@@ -69,7 +69,7 @@ export function renderMais(ctx, el) {
       <b>Cópia de segurança dos dados</b>
       <small style="display:block">Um arquivo com tudo da fazenda: tanques, lotes, lançamentos, compras, contagens e equipe.</small>
       <div class="cfg-lista">
-        <button class="hub-card" id="b-copia" type="button"><span class="item-ic">${icone('baixar')}</span><span class="esq"><b>Baixar cópia</b><small>Salva um arquivo para guardar no Drive ou e-mail</small></span><span class="seta">${icone('direita', 20)}</span></button>
+        <button class="hub-card" id="b-copia" type="button"><span class="item-ic">${icone('baixar')}</span><span class="esq"><b>Baixar cópia</b><small>Salva um arquivo para guardar no Drive ou mandar por e-mail</small></span><span class="seta">${icone('direita', 20)}</span></button>
         <button class="hub-card" id="b-importar" type="button"><span class="item-ic">${icone('subir')}</span><span class="esq"><b>Importar cópia</b><small>Devolve o que faltar, sem alterar o que existe</small></span><span class="seta">${icone('direita', 20)}</span></button>
       </div>
       <input id="in-copia" type="file" accept=".json,application/json" hidden></div>` : ''}
@@ -163,7 +163,7 @@ export function renderMais(ctx, el) {
       a.href = URL.createObjectURL(new Blob([JSON.stringify(dados, null, 1)], { type: 'application/json' }));
       a.download = nome; document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-      ctx.toast(`Cópia baixada: ${n} registro(s)`, 'ok');
+      ctx.toast(`Cópia baixada: ${plural(n, 'registro', 'registros')}`, 'ok');
     } catch (e) { ctx.toast('Não foi possível gerar a cópia: ' + e.message, 'erro'); }
     bcop.disabled = false; bcop.textContent = txt;
   });
@@ -175,14 +175,14 @@ export function renderMais(ctx, el) {
     try { copia = JSON.parse(await arq.text()); } catch { return ctx.toast('Este arquivo não é uma cópia do app.', 'erro'); }
     if (!copia || typeof copia.tabelas !== 'object' || Array.isArray(copia.tabelas)) return ctx.toast('Este arquivo não é uma cópia do app.', 'erro');
     const qtd = (t) => (Array.isArray(copia.tabelas[t]) ? copia.tabelas[t].length : 0);
-    const resumo = `${qtd('tanques')} tanque(s), ${qtd('lotes')} lote(s), ${qtd('racao_consumo') + qtd('biometrias') + qtd('mortalidade')} lançamento(s) e ${qtd('racao_estoque')} compra(s)`;
+    const resumo = `${plural(qtd('tanques'), 'tanque', 'tanques')}, ${plural(qtd('lotes'), 'lote', 'lotes')}, ${plural(qtd('racao_consumo') + qtd('biometrias') + qtd('mortalidade'), 'lançamento', 'lançamentos')} e ${plural(qtd('racao_estoque'), 'compra', 'compras')}`;
     if (!(await confirmar({ titulo: 'Importar esta cópia?', texto: `Cópia de ${copia.gerado_em ? fmtData(copia.gerado_em) : 'data desconhecida'} com ${resumo}. Só volta o que estiver faltando; nada que já existe é alterado.`, ok: 'Importar' }))) return;
     bimp.disabled = true;
     try {
       const r = await ctx.api.importarCopia(copia);
       const n = Object.values(r).reduce((s, v) => s + Number(v || 0), 0);
       await ctx.atualizarRef(true);
-      ctx.toast(n ? `${n} registro(s) voltaram para a fazenda` : 'Nada para importar: tudo da cópia já está na fazenda.', 'ok');
+      ctx.toast(n ? `${n === 1 ? '1 registro voltou' : `${fmtInt(n)} registros voltaram`} para a fazenda` : 'Nada para importar: tudo da cópia já está na fazenda.', 'ok');
     } catch (e) { ctx.toast(e.message, 'erro'); }
     bimp.disabled = false;
   });
@@ -198,7 +198,7 @@ export function renderMais(ctx, el) {
       if (!ate) return;
       const falta = diasEntre(hojeISO(), ate);
       el.querySelector('#teste').innerHTML = `<div class="card"><b>${falta >= 0 ? 'Período de teste grátis' : 'Período de teste terminou'}</b>
-        <small style="display:block">${falta > 0 ? `Faltam ${falta} dia(s): vai até ${fmtData(ate)}.` : falta === 0 ? 'Termina hoje.' : `Terminou em ${fmtData(ate)}.`}</small></div>`;
+        <small style="display:block">${falta > 0 ? `${falta === 1 ? 'Falta 1 dia' : `Faltam ${falta} dias`}: vai até ${fmtData(ate)}.` : falta === 0 ? 'Termina hoje.' : `Terminou em ${fmtData(ate)}.`}</small></div>`;
     }).catch(() => {});
   }
 }

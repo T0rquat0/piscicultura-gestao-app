@@ -2,7 +2,7 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY, TIMEOUT_REDE_MS, TERMOS_VERSAO } from './config.js';
 import { iniciarSeg } from './seg.js';
 import { DEV_LOGIN, loginAutomaticoAtivo } from './dev-login.js';
-import { esc, parseHash, ROTULO_PAPEL, traduzErro, ehErroDeRede } from './util.js';
+import { esc, parseHash, ROTULO_PAPEL, traduzErro, ehErroDeRede, plural } from './util.js';
 import { criarApi } from './api.js';
 import * as db from './db.js';
 import { sincronizar } from './sync.js';
@@ -63,8 +63,8 @@ function atualizarPill() {
   const n = state.pendentes;
   for (const pill of [document.getElementById('pill'), document.getElementById('pill-lateral')]) {
     if (!pill) continue;
-    if (off) { pill.textContent = n ? `Sem internet · ${n} pendente(s)` : 'Sem internet'; pill.className = 'pill off'; }
-    else if (n) { pill.textContent = `${n} pendente(s)`; pill.className = 'pill off'; }
+    if (off) { pill.textContent = n ? `Sem internet · ${plural(n, 'pendente', 'pendentes')}` : 'Sem internet'; pill.className = 'pill off'; }
+    else if (n) { pill.textContent = `${plural(n, 'pendente', 'pendentes')}`; pill.className = 'pill off'; }
     else { pill.textContent = 'Online'; pill.className = 'pill'; }
   }
 }
@@ -113,10 +113,10 @@ async function sincronizarAgora() {
   await atualizarPendentes();
   if (r.sessaoExpirada) { mostrarLogin('Sua sessão expirou. Entre novamente para enviar os lançamentos pendentes.'); return r; }
   if (r.enviados) {
-    toast(`${r.enviados} lançamento(s) enviado(s)`, 'ok');
+    toast(`${plural(r.enviados, 'lançamento enviado', 'lançamentos enviados')}`, 'ok');
     atualizarRef().then(() => { if (rotaAtual === '') rotear(); });
   }
-  if (r.falhas) toast(`${r.falhas} lançamento(s) com erro — veja em Pendentes`, 'erro');
+  if (r.falhas) toast(`${plural(r.falhas, 'lançamento', 'lançamentos')} com erro — veja em Pendentes`, 'erro');
   return r;
 }
 
@@ -322,7 +322,7 @@ async function restaurarSessao() {
 
 async function sair(forcar = false) {
   await atualizarPendentes();
-  if (!forcar && state.pendentes && !(await confirmar({ titulo: 'Há lançamentos sem enviar', texto: `${state.pendentes} lançamento(s) neste aparelho ainda não foram enviados. Eles continuam guardados e saem quando você entrar de novo. Sair mesmo assim?`, ok: 'Sair mesmo assim', cancelar: 'Ficar', perigo: true }))) return;
+  if (!forcar && state.pendentes && !(await confirmar({ titulo: 'Há lançamentos sem enviar', texto: `${state.pendentes === 1 ? 'Um lançamento neste aparelho ainda não foi enviado.' : `${state.pendentes} lançamentos neste aparelho ainda não foram enviados.`} Eles continuam guardados e saem quando você entrar de novo. Sair mesmo assim?`, ok: 'Sair mesmo assim', cancelar: 'Ficar', perigo: true }))) return;
   saindo = true;
   try { sessionStorage.setItem('sem-auto-login', '1'); } catch { /* ignora */ }
   try { await client.auth.signOut(); } catch { /* ignora */ }

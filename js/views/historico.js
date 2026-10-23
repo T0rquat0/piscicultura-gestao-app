@@ -2,7 +2,7 @@
 // Precisa do sql/12. Os registros vêm da tabela historico, gravados por gatilhos no banco.
 import { confirmar } from '../dialogo.js';
 import { icone } from '../icons.js';
-import { esc, fmtData, fmtNum, fmtInt, fmtBRL, ROTULO_PAPEL, ROTULO_TIPO } from '../util.js';
+import { esc, fmtData, fmtNum, fmtInt, fmtBRL, ROTULO_PAPEL, ROTULO_TIPO, plural } from '../util.js';
 
 const voltar = `<p><a class="voltar" href="#/mais">${icone('voltar', 18)} Mais</a></p>`;
 // ordem de importância: o item "principal" de uma operação é o de nível mais alto (tanque > lote > lançamento)
@@ -81,7 +81,7 @@ export async function renderHistorico(ctx, el, aba = 'lixeira') {
 
   const itemLixo = (g) => `<li>
       <div class="esq"><b>${esc(descrever(g.principal, nomeTanque, nomePessoa))}</b>
-        <small>${g.junto ? `e mais ${g.junto} registro(s) apagado(s) junto · ` : ''}excluído por ${esc(quem(g.quem))} em ${quando(g.quando)}</small></div>
+        <small>${g.junto ? `e mais ${plural(g.junto, 'registro apagado', 'registros apagados')} junto · ` : ''}excluído por ${esc(quem(g.quem))} em ${quando(g.quando)}</small></div>
       ${g.restaurado ? '<span class="tag ok">Restaurado</span>' : `<button class="btn mini" data-restaurar="${esc(g.op)}" type="button">Restaurar</button>`}
     </li>`;
   const itemAlt = (h) => {
@@ -107,12 +107,12 @@ export async function renderHistorico(ctx, el, aba = 'lixeira') {
   el.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => renderHistorico(ctx, el, b.dataset.aba)));
   el.querySelectorAll('[data-restaurar]').forEach((b) => b.addEventListener('click', async () => {
     const g = lixeira.find((x) => String(x.op) === b.dataset.restaurar);
-    if (!(await confirmar({ titulo: 'Restaurar?', texto: `${descrever(g.principal, nomeTanque, nomePessoa)}${g.junto ? ` e mais ${g.junto} registro(s) apagado(s) junto` : ''} voltam como estavam.`, ok: 'Restaurar' }))) return;
+    if (!(await confirmar({ titulo: 'Restaurar?', texto: `${descrever(g.principal, nomeTanque, nomePessoa)}${g.junto ? ` e mais ${plural(g.junto, 'registro apagado', 'registros apagados')} junto` : ''} voltam como estavam.`, ok: 'Restaurar' }))) return;
     b.disabled = true;
     try {
       const n = await ctx.api.restaurarExclusao(g.op);
       await ctx.atualizarRef(true);
-      ctx.toast(`${n} registro(s) restaurado(s)`, 'ok');
+      ctx.toast(`${plural(n, 'registro restaurado', 'registros restaurados')}`, 'ok');
       renderHistorico(ctx, el, 'lixeira');
     } catch (e) { ctx.toast(e.message, 'erro'); b.disabled = false; }
   }));

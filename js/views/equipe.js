@@ -1,5 +1,5 @@
 // Equipe (somente dono): vincular pessoas, definir papel, liberar tanques, desativar acesso.
-import { esc, fmtData, ROTULO_PAPEL } from '../util.js';
+import { esc, fmtData, ROTULO_PAPEL, plural } from '../util.js';
 import { confirmar } from '../dialogo.js';
 
 export async function renderEquipe(ctx, el) {
@@ -18,7 +18,7 @@ export async function renderEquipe(ctx, el) {
       return `<details class="card" data-uid="${esc(u.id)}">
         <summary>${esc(u.nome)} <span class="tag">${esc(ROTULO_PAPEL[u.papel] || u.papel)}</span>
           ${u.ativo ? '' : '<span class="tag erro">Desativado</span>'}
-          ${u.papel !== 'dono' ? `<small class="mudo"> · ${meus.size} tanque(s)</small>` : ''}</summary>
+          ${u.papel !== 'dono' ? `<small class="mudo"> · ${plural(meus.size, 'tanque', 'tanques')}</small>` : ''}</summary>
         ${eu ? '<p class="mudo">Este é o seu usuário.</p>' : `
         <form class="form" data-form="${esc(u.id)}" novalidate>
           <label>Papel
@@ -39,7 +39,7 @@ export async function renderEquipe(ctx, el) {
     <h2>Adicionar pessoa</h2>
     ${convites ? `<div class="card form" id="convite">
       <b>Convidar por link</b>
-      <p class="mudo" style="margin:0">Gere um link e mande pelo WhatsApp. A pessoa cria a conta (ou entra) e já cai nesta fazenda. Cada link serve para uma pessoa e vale 7 dias.</p>
+      <p class="mudo" style="margin:0">Gere um link e mande pelo WhatsApp. A pessoa cria a conta (ou entra com a que já tem) e fica ligada a esta fazenda. Cada link serve para uma pessoa e vale 7 dias.</p>
       <label>Papel <select id="conv-papel"><option value="funcionario">Funcionário</option><option value="gerente">Gerente</option></select></label>
       <button class="btn primario" id="b-convite" type="button">Gerar link de convite</button>
       <div id="conv-novo" hidden>

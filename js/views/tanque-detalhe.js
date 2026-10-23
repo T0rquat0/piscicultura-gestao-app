@@ -4,7 +4,7 @@ import * as db from '../db.js';
 import { previsaoDespesca } from '../calc.js';
 import { icone } from '../icons.js';
 import { pedirTexto } from '../dialogo.js';
-import { metaDe, htmlPrevisao } from './despesca.js';
+import { metaDe, htmlPrevisao, PROXIMA_FASE } from './despesca.js';
 
 export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje, metas = {}) {
   const nomeLote = (l) => `${ROTULO_TIPO[l.tipo] || l.tipo} · ${l.especie}`;
@@ -26,7 +26,7 @@ export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje, meta
             <div><span>Peixes vivos (estim.)</span><b>${fmtInt(vivos ?? l.quantidade_inicial)}</b></div>
           </div>
           ${vivos != null && l.quantidade_inicial > 0 ? `<div class="td-sobre">${progresso((vivos / l.quantidade_inicial) * 100, { tom: 'ok', rotulo: `Sobrevivência ${fmtPct((vivos / l.quantidade_inicial) * 100)}%` })}<p class="h-trilho-leg"><span>Sobrevivência: ${fmtInt(vivos)} de ${fmtInt(l.quantidade_inicial)} peixes</span><b>${fmtPct((vivos / l.quantidade_inicial) * 100)}%</b></p></div>` : ''}
-          ${r ? `<div class="td-prev"><div class="td-prev-cab"><span>Despesca</span><button class="link" type="button" data-meta="${esc(l.id)}">Mudar meta</button></div>${htmlPrevisao(previsaoDespesca(l, r, metaDe(l, metas), hoje))}</div>` : ''}
+          ${r ? `<div class="td-prev"><div class="td-prev-cab"><span>${PROXIMA_FASE[l.tipo] ? 'Mudança de fase' : 'Despesca'}</span><button class="link" type="button" data-meta="${esc(l.id)}">Mudar meta</button></div>${htmlPrevisao(previsaoDespesca(l, r, metaDe(l, metas), hoje), l.tipo)}</div>` : ''}
         </section>`;
       }).join('')
     : '<div class="card vazio"><p>Sem lote ativo neste tanque.</p></div>';

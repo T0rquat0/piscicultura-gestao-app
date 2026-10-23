@@ -84,7 +84,7 @@ export async function atualizarLateral(ctx) {
   }
   if (ctx.podeGerir() && cache.resumo) {
     const metas = (await db.kvGet('metasDespesca')) || {};
-    const prox = lotes.map((l) => ({ l, p: previsaoDespesca(l, resumo[l.id], metaDe(l, metas), hoje) }))
+    const prox = lotes.filter((l) => l.tipo === 'engorda').map((l) => ({ l, p: previsaoDespesca(l, resumo[l.id], metaDe(l, metas), hoje) }))
       .filter((x) => x.p.estado !== 'sem-dado').sort((a, b) => (a.p.estado === 'pronto' ? -1 : 0) - (b.p.estado === 'pronto' ? -1 : 0) || String(a.p.data).localeCompare(String(b.p.data)))[0];
     if (prox) {
       const nome = (tanques.find((t) => t.id === prox.l.tanque_id) || {}).nome || 'Tanque';
