@@ -27,7 +27,7 @@ checa(not fora, 'todo arquivo .js do app está na lista do cache offline' + ('' 
 
 errs = []
 with sync_playwright() as pw:
-    b = pw.chromium.launch(**LANCAR); ctx = b.new_context(viewport={'width': 390, 'height': 844}); pg = ctx.new_page()
+    b = pw.chromium.launch(**LANCAR); ctx = b.new_context(reduced_motion='reduce', viewport={'width': 390, 'height': 844}); pg = ctx.new_page()
     pg.on('pageerror', lambda e: errs.append(str(e)))
     perfil = {'id': U, 'nome': 'Zé', 'papel': 'funcionario', 'fazenda_id': F, 'ativo': True, 'fazendas': {'nome': 'Fazenda Sol'}}
     def rota(route, req):

@@ -28,7 +28,7 @@ def sessao(uid):
 def montar(pw, uid, estado):
     """estado: dict com perfis, convite_estado; registra rpc chamadas em estado['rpc']"""
     b = pw.chromium.launch(**LANCAR)
-    pg = b.new_page(viewport={'width': 390, 'height': 844})
+    pg = b.new_page(reduced_motion='reduce', viewport={'width': 390, 'height': 844})
     estado.setdefault('rpc', []); estado.setdefault('externos', []); estado.setdefault('erros', []); estado.setdefault('signup', [])
     pg.on('pageerror', lambda e: estado['erros'].append(str(e)))
     def rota(route, req):

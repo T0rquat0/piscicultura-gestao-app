@@ -88,7 +88,7 @@ Tanque 8
 
 with sync_playwright() as pw:
     b = pw.chromium.launch(**LANCAR)
-    pg = b.new_page(viewport={'width': 390, 'height': 844})
+    pg = b.new_page(reduced_motion='reduce', viewport={'width': 390, 'height': 844})
     pg.on('pageerror', lambda e: erros_js.append(str(e)))
     pg.route('**/*', rota)
     pg.add_init_script(f"localStorage.setItem('sb-ppvliseblxpsepmeknnl-auth-token', {json.dumps(json.dumps(sessao))});")

@@ -19,7 +19,7 @@ def checa(c, m):
     print(('OK   ' if c else 'FALHA ') + m); ok = ok and c
 
 def abrir(pw, termos_ligado, logado=True, meta=None):
-    b = pw.chromium.launch(**LANCAR); pg = b.new_context(viewport={'width': 390, 'height': 844}, service_workers='block').new_page()  # sem cache offline: a config simulada sempre vale
+    b = pw.chromium.launch(**LANCAR); pg = b.new_context(reduced_motion='reduce', viewport={'width': 390, 'height': 844}, service_workers='block').new_page()  # sem cache offline: a config simulada sempre vale
     est = {'auth': [], 'fora': [], 'erros': []}
     pg.on('pageerror', lambda e: est['erros'].append(str(e)))
     perfil = {'id': U, 'nome': 'Ana', 'papel': 'dono', 'fazenda_id': F, 'ativo': True, 'fazendas': {'nome': 'Fazenda Sol'}}

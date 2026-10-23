@@ -20,7 +20,7 @@ def checa(c, m):
     print(('OK   ' if c else 'FALHA ') + m); ok = ok and c
 
 def abrir(pw, sem14=False):
-    b = pw.chromium.launch(**LANCAR); pg = b.new_page(viewport={'width': 390, 'height': 844})
+    b = pw.chromium.launch(**LANCAR); pg = b.new_page(reduced_motion='reduce', viewport={'width': 390, 'height': 844})
     est = {'rpc': [], 'insert': [], 'fora': [], 'erros': []}
     pg.on('pageerror', lambda e: est['erros'].append(str(e)))
     perfil = {'id': D, 'nome': 'Dona Ana', 'papel': 'dono', 'fazenda_id': F, 'ativo': True, 'fazendas': {'nome': 'Fazenda Sol'}}

@@ -31,7 +31,7 @@ PAC = [{'tanques_max': 5, 'nome': 'Até 5 tanques', 'preco_mensal': 200, 'ativo'
        {'tanques_max': 30, 'nome': 'Até 30 tanques', 'preco_mensal': 1450, 'ativo': False}]
 
 def abrir(pw, admin=True, bloqueada=False):
-    b = pw.chromium.launch(**LANCAR); pg = b.new_page(viewport={'width': 390, 'height': 844})
+    b = pw.chromium.launch(**LANCAR); pg = b.new_page(reduced_motion='reduce', viewport={'width': 390, 'height': 844})
     est = {'rpc': [], 'fora': [], 'erros': []}
     pg.on('pageerror', lambda e: est['erros'].append(str(e)))
     perfil = {'id': U, 'nome': 'Hugo', 'papel': 'dono', 'fazenda_id': F, 'ativo': True, 'fazendas': None if bloqueada else {'nome': 'Fazenda Teste'}}

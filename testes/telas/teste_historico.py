@@ -37,7 +37,7 @@ HIST = [
 ]
 
 def abrir(pw, uid, papel, est):
-    b = pw.chromium.launch(**LANCAR); pg = b.new_page(viewport={'width': 390, 'height': 844})
+    b = pw.chromium.launch(**LANCAR); pg = b.new_page(reduced_motion='reduce', viewport={'width': 390, 'height': 844})
     est.setdefault('rpc', []); est.setdefault('fora', []); est.setdefault('erros', [])
     pg.on('pageerror', lambda e: est['erros'].append(str(e)))
     perfil = {'id': uid, 'nome': 'Dona Ana' if papel == 'dono' else 'Zé', 'papel': papel, 'fazenda_id': F, 'ativo': True, 'fazendas': {'nome': 'Fazenda Sol'}}

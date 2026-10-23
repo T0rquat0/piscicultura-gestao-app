@@ -22,7 +22,7 @@ def checa(c, m):
     print(('OK   ' if c else 'FALHA ') + m); ok = ok and c
 
 def abrir(pw, papel, plano, saldo, contagens):
-    b = pw.chromium.launch(**LANCAR); ctx = b.new_context(viewport={'width': 390, 'height': 844}, accept_downloads=True); pg = ctx.new_page()
+    b = pw.chromium.launch(**LANCAR); ctx = b.new_context(reduced_motion='reduce', viewport={'width': 390, 'height': 844}, accept_downloads=True); pg = ctx.new_page()
     est = {'fora': [], 'erros': []}
     pg.on('pageerror', lambda e: est['erros'].append(str(e)))
     perfil = {'id': D, 'nome': 'Dona Ana', 'papel': papel, 'fazenda_id': F, 'ativo': True, 'fazendas': {'nome': 'Fazenda São João'}}
