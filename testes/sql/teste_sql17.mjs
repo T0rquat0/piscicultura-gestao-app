@@ -1,48 +1,62 @@
-// Testa o sql/17 (fases Berçário/Recria, área do tanque, tipo de ração) num Postgres de verdade (PGlite).
+// Testa o sql/17 (ração de engorda e de alevino em estoques separados) num Postgres de verdade (PGlite).
 import { PGlite } from '@electric-sql/pglite';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 const DIR = process.env.SQL_DIR || fileURLToPath(new URL('../../sql/', import.meta.url));
 const db = new PGlite(); let ok = true;
 const checa = (c, m) => { console.log((c ? 'OK    ' : 'FALHA ') + m); ok = ok && c; };
 await db.exec(`create role anon; create role authenticated; create schema auth; create table auth.users (id uuid primary key, email text);
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('teste.uid', true), '')::uuid $$; grant usage on schema auth to anon, authenticated;`);
-const arquivos = readdirSync(DIR).filter((f) => /^\d\d_.*\.sql$/.test(f) && !f.startsWith('05_')).sort();
-for (const f of arquivos) await db.exec(readFileSync(DIR + f, 'utf8'));
-await db.exec(readFileSync(DIR + '17_fases_area_e_tipo_de_racao.sql', 'utf8'));
-checa(arquivos.includes('17_fases_area_e_tipo_de_racao.sql'), `todos os sql/ rodaram em ordem (${arquivos.length} arquivos) e o 17 rodou de novo sem erro`);
+for (const f of ['01_schema', '02_correcoes_e_funcoes', '03_peso_do_saco', '04_controle_de_estoque', '06_cadastro_da_fazenda', '07_planos_e_pacotes', '08_causa_da_mortalidade',
+  '09_logo_da_fazenda', '10_convites_e_nomes', '11_trava_do_teste_gratis', '12_historico_e_lixeira', '13_datas_no_horario_local', '14_conferencia_e_importar_copia',
+  '15_painel_administrador', '16_preco_do_peixe', '17_racao_engorda_e_alevino', '17_racao_engorda_e_alevino'])
+  await db.exec(readFileSync(DIR + f + '.sql', 'utf8'));
+checa(true, 'sql/01 a 17 rodaram (o 17 duas vezes)');
 await db.exec(`grant usage on schema public to anon, authenticated; grant select, insert, update, delete on all tables in schema public to anon, authenticated;`);
-
 const id = (c) => `00000000-0000-4000-8000-0000000000${c}`;
-const [D1, F1, T1] = [id('a1'), id('f1'), id('c1')];
-await db.exec(`insert into auth.users values ('${D1}','dono1@x');
-  insert into fazendas (id, nome, teste_ate) values ('${F1}','Fazenda Um', current_date + 30);
-  insert into usuarios (id, fazenda_id, nome, papel) values ('${D1}','${F1}','Ana','dono');`);
+const [D1, FU, D2, F1, F2, T1, T2, LE, LA] = [id('a1'), id('a2'), id('b1'), id('f1'), id('f2'), id('c1'), id('c2'), id('d1'), id('d2')];
+const ontem = `(now() at time zone 'America/Boa_Vista')::date - 1`;
+await db.exec(`insert into auth.users values ('${D1}','dono1@x'),('${FU}','func@x'),('${D2}','dono2@x');
+  insert into fazendas (id, nome) values ('${F1}','Fazenda Um'),('${F2}','Fazenda Dois');
+  insert into usuarios (id, fazenda_id, nome, papel) values ('${D1}','${F1}','Ana','dono'),('${FU}','${F1}','Zé','funcionario'),('${D2}','${F2}','Beto','dono');
+  insert into tanques (id, fazenda_id, nome) values ('${T1}','${F1}','Engorda 1'),('${T2}','${F1}','Berçário');
+  insert into usuario_tanques values ('${FU}','${T1}'),('${FU}','${T2}');
+  insert into lotes (id, tanque_id, tipo, especie, data_entrada, quantidade_inicial, peso_inicial_kg) values
+    ('${LE}','${T1}','engorda','Tambaqui','2026-09-01',1000,500),('${LA}','${T2}','alevinagem','Tambaqui','2026-09-01',40000,200);
+  insert into racao_estoque (fazenda_id, data_compra, quantidade_kg, fornecedor) values ('${F1}', ${ontem}, 1000, 'antiga, sem tipo');
+  insert into racao_estoque (fazenda_id, data_compra, quantidade_kg, tipo_racao) values ('${F1}', ${ontem}, 250, 'alevino'), ('${F2}', ${ontem}, 9999, 'alevino');
+  insert into racao_consumo (uuid_local, lote_id, tanque_id, data, quantidade_kg, registrado_por) values
+    (gen_random_uuid(),'${LE}','${T1}', ${ontem}, 70, '${FU}'),(gen_random_uuid(),'${LA}','${T2}', ${ontem}, 7, '${FU}');`);
 async function como(uid, sql) {
   await db.exec(`set role authenticated; set teste.uid = '${uid}';`);
   try { return { rows: (await db.query(sql)).rows }; } catch (e) { return { erro: e.message, rows: [] }; } finally { await db.exec(`reset role; set teste.uid = '';`); }
 }
+const saldo = async (uid) => Object.fromEntries((await como(uid, 'select * from saldo_racao_por_tipo()')).rows.map((r) => [r.tipo_racao, r]));
 
-let r = await como(D1, `insert into tanques (id, fazenda_id, nome, area_ha) values ('${T1}','${F1}','Tanque 01', 5.5)`);
-checa(!r.erro, 'dono cria tanque com área (5,5 ha)');
-checa((await como(D1, `insert into tanques (fazenda_id, nome, area_ha) values ('${F1}','T2', 0)`)).erro, 'área zero é recusada');
-checa(!(await como(D1, `insert into tanques (fazenda_id, nome) values ('${F1}','T3')`)).erro, 'tanque sem área continua aceito');
+let s = await saldo(D1);
+checa(Number(s.engorda.saldo_kg) === 930 && Number(s.alevino.saldo_kg) === 243, `saldos separados: engorda 1000 − 70 = 930, alevino 250 − 7 = 243 (veio ${s.engorda.saldo_kg} e ${s.alevino.saldo_kg})`);
+checa(Number(s.engorda.consumo_7d_kg) === 70 && Number(s.alevino.consumo_7d_kg) === 7, 'o consumo de cada ração vem da fase do lote (alevinagem → alevino)');
+const tot = (await como(D1, 'select * from saldo_racao()')).rows[0];
+checa(Number(tot.saldo_kg) === 1173, 'saldo_racao() antigo continua dando o total das duas rações');
+checa((await como(D1, `select tipo_racao from racao_estoque where fornecedor = 'antiga, sem tipo'`)).rows[0].tipo_racao === 'engorda', 'compra antiga (sem tipo) fica como engorda');
+checa(!!(await como(D1, `insert into racao_estoque (fazenda_id, data_compra, quantidade_kg, tipo_racao) values ('${F1}', current_date, 10, 'peixe')`)).erro, 'tipo de ração inválido é recusado');
 
-for (const fase of ['bercario', 'alevinagem', 'recria', 'engorda']) {
-  r = await como(D1, `insert into lotes (tanque_id, tipo, especie, data_entrada, quantidade_inicial, peso_inicial_kg) values ('${T1}','${fase}','Tambaqui','2026-09-01',100,10)`);
-  checa(!r.erro, `lote na fase "${fase}" é aceito`);
-}
-checa((await como(D1, `insert into lotes (tanque_id, tipo, especie, data_entrada, quantidade_inicial, peso_inicial_kg) values ('${T1}','outra','Tambaqui','2026-09-01',100,10)`)).erro, 'fase inválida é recusada');
+let r = await como(D1, `select registrar_contagem(200, 'conferido', 'alevino') d`);
+s = await saldo(D1);
+checa(!r.erro && Number(r.rows[0].d) === -43 && Number(s.alevino.saldo_kg) === 200 && Number(s.engorda.saldo_kg) === 930, 'contagem de alevino corrige só a ração de alevino (−43 kg)' + (r.erro ? ': ' + r.erro : ''));
+r = await como(D1, `select registrar_contagem(900) d`);
+s = await saldo(D1);
+checa(!r.erro && Number(s.engorda.saldo_kg) === 900 && Number(s.alevino.saldo_kg) === 200, 'contagem pelo jeito antigo (sem tipo) vai para a ração de engorda');
+checa(!!(await como(FU, `select registrar_contagem(1, null, 'engorda')`)).erro, 'funcionário não registra contagem');
+checa(!!(await como(D1, `select registrar_contagem(1, null, 'outra')`)).erro, 'contagem com tipo inválido é recusada');
 
-r = await como(D1, `insert into racao_estoque (fazenda_id, data_compra, quantidade_kg, tipo_racao) values ('${F1}','2026-10-21', 2500, 'Alevino')`);
-checa(!r.erro, 'compra de ração com tipo "Alevino" é aceita');
-checa((await como(D1, `insert into racao_estoque (fazenda_id, data_compra, quantidade_kg, tipo_racao) values ('${F1}','2026-10-21', 25, '${'x'.repeat(41)}')`)).erro, 'tipo de ração com mais de 40 letras é recusado');
+r = await como(FU, `select * from consumo_diario_tipo(30, 'alevino')`);
+checa(r.rows.length === 1 && Number(r.rows[0].quantidade_kg) === 7, 'consumo diário só da ração de alevino');
+r = await como(FU, 'select * from racao_estoque_visivel()');
+checa(r.rows.length === 2 && r.rows.every((x) => x.custo_total === null) && r.rows.some((x) => x.tipo_racao === 'alevino'), 'funcionário vê as compras com o tipo, sem o custo');
+s = await saldo(D2);
+checa(Number(s.alevino.saldo_kg) === 9999 && Number(s.engorda.saldo_kg) === 0, 'cada fazenda só enxerga o próprio estoque');
+checa(!!(await como('', 'select * from saldo_racao_por_tipo()')).erro || (await como('', 'select * from saldo_racao_por_tipo()')).rows.every((x) => Number(x.saldo_kg) === 0), 'sem login não vê saldo de ninguém');
 
-// a cópia da fazenda (sql/14) leva e devolve as colunas novas
-const copia = { tabelas: { tanques: [{ id: id('c9'), fazenda_id: F1, nome: 'Importado', area_ha: 2.3, criado_em: new Date().toISOString() }] } };
-r = await como(D1, `select importar_copia('${JSON.stringify(copia)}'::jsonb) x`);
-const imp = (await db.query(`select area_ha from tanques where id = '${id('c9')}'`)).rows[0];
-checa(!r.erro && imp && Number(imp.area_ha) === 2.3, 'importar cópia traz a área do tanque');
-
-console.log(ok ? '\nRESULTADO: TUDO OK (sql/17)' : '\nRESULTADO: HÁ FALHAS (sql/17)');
+console.log(ok ? 'RESULTADO: TUDO OK' : 'RESULTADO: HÁ FALHAS');
 process.exit(ok ? 0 : 1);

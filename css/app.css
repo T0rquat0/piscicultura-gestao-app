@@ -743,3 +743,8 @@ body.sem-rolagem { overflow: hidden; }
   details > summary { display: none; }
   details[open] > *, details > * { display: block; }
 }
+
+/* ----- duas rações (engorda e alevino) ----- */
+.h-estoque + .h-estoque { margin-top: 1rem; padding-top: .9rem; border-top: 1px solid var(--linha-2); }
+.h-sub { margin: 0 0 .1rem; font-size: .85rem; font-weight: 500; color: var(--tinta-2); }
+.seg > button small { display: block; margin-top: .05rem; font-size: .78rem; font-weight: 400; color: var(--tinta-2); font-variant-numeric: tabular-nums; }

@@ -15,16 +15,27 @@ const MENSAGEM = {
   ok: 'Estoque tranquilo.',
 };
 
+// Duas rações em estoques separados (sql/17): engorda e alevino. A aba escolhida vale para a tela toda.
+const NOME_RACAO = { engorda: 'ração de engorda', alevino: 'ração de alevino' };
+let tipoAtual = 'engorda';
+
 export async function renderEstoque(ctx, el) {
   el.innerHTML = '<h1>Estoque de ração</h1><p class="carregando">Carregando…</p>';
   const gerir = ctx.podeGerir();
   const kgS = ctx.state.ref.kgSaco || PESO_SACO_PADRAO_KG;
   const sc = (kg, d = 1) => { const v = Number(kg) / kgS; return fmtNum(v, Math.abs(v - Math.round(v)) < 0.05 ? 0 : d); };
-  const [saldo, compras, consumo, contagens] = await Promise.all([
-    ctx.api.saldoRacao(), ctx.api.compras(gerir),
-    ctx.api.consumoDiario(30).catch(() => []),
+  const [saldos, todasCompras, todasContagens] = await Promise.all([
+    ctx.api.saldosRacao(), ctx.api.compras(gerir),
     gerir ? ctx.api.contagens().catch(() => []) : Promise.resolve([]),
   ]);
+  const porTipo = saldos.porTipo;
+  // consumo por ração só quando o banco já separa as duas (sql/17); antes disso, o total
+  const consumo = await ctx.api.consumoDiario(30, porTipo ? tipoAtual : null).catch(() => []);
+  if (!porTipo) tipoAtual = 'engorda';
+  const doTipo = (x) => !porTipo || (x.tipo_racao || 'engorda') === tipoAtual;
+  const saldo = saldos.linhas.find((x) => x.tipo_racao === tipoAtual) || saldos.linhas[0];
+  const compras = todasCompras.filter(doTipo), contagens = todasContagens.filter(doTipo);
+  const nomeR = porTipo ? NOME_RACAO[tipoAtual] : 'ração';
   const comprado = Number(saldo?.total_comprado_kg || 0);
   const consumido = Number(saldo?.total_consumido_kg || 0);
   const ajustes = Number(saldo?.total_ajustes_kg || 0);
@@ -36,22 +47,19 @@ export async function renderEstoque(ctx, el) {
   const diasSemContar = ult ? diasEntre(ult.data, hoje) : null;
   const corte = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
   const extrato = [
-    ...compras.filter((c) => c.data_compra >= corte).map((c) => ({ d: c.data_compra, o: 1, t: `Entrada${c.tipo_racao ? ' · ' + c.tipo_racao : ''}${c.fornecedor ? ' · ' + c.fornecedor : ''}`, kg: Number(c.quantidade_kg) })),
+    ...compras.filter((c) => c.data_compra >= corte).map((c) => ({ d: c.data_compra, o: 1, t: `Entrada${c.fornecedor ? ' · ' + c.fornecedor : ''}`, kg: Number(c.quantidade_kg) })),
     ...consumo.map((c) => ({ d: c.data, o: 0, t: 'Ração dada aos peixes', kg: -Number(c.quantidade_kg) })),
     ...contagens.filter((c) => c.data >= corte).map((c) => ({ d: c.data, o: 2, t: Number(c.diferenca_kg) < 0 ? 'Contagem: faltou ração' : Number(c.diferenca_kg) > 0 ? 'Contagem: sobrou a mais' : 'Contagem: bateu certinho', kg: Number(c.diferenca_kg), cid: c.id })),
   ].sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : b.o - a.o));
   const totEntradas = extrato.filter((x) => x.kg > 0).reduce((t, x) => t + x.kg, 0);
   const totSaidas = Math.abs(extrato.filter((x) => x.kg < 0).reduce((t, x) => t + x.kg, 0)); // abs: evita "-0" quando não houve saída
-  // tipos de ração já usados (sugestões) e total comprado por tipo
-  const tiposRacao = [...new Set(['Engorda', 'Recria', 'Alevino', 'Berçário', ...compras.map((c) => c.tipo_racao).filter(Boolean)])];
-  const porTipo = Object.entries(compras.reduce((m, c) => { const k = c.tipo_racao || ''; m[k] = (m[k] || 0) + Number(c.quantidade_kg || 0); return m; }, {}))
-    .sort((a, b) => b[1] - a[1]);
   const sinal = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${sc(Math.abs(v))}`;
 
   el.innerHTML = `
     <h1>Estoque de ração</h1>
+    ${porTipo ? `<div class="seg" style="--n:2" role="tablist">${Object.entries(NOME_RACAO).map(([k]) => `<button type="button" data-tipo-racao="${k}" class="${k === tipoAtual ? 'on' : ''}">${k === 'engorda' ? 'Engorda' : 'Alevino'} <small>${sc(Math.max(0, Number((saldos.linhas.find((x) => x.tipo_racao === k) || {}).saldo_kg || 0)), 0)} sacos</small></button>`).join('')}</div>` : ''}
     <div class="estoque-hero n-${sit.nivel}">
-      <span>Em estoque agora</span>
+      <span>${porTipo ? `Ração de ${tipoAtual} em estoque` : 'Em estoque agora'}</span>
       <b>${kg < 0 ? '−' : ''}${sc(Math.abs(kg), 0)}<em>sacos</em></b>
       <small>${fmtNum(kg, 0)} kg${sit.dias != null ? ` · dura cerca de <strong>${fmtInt(Math.floor(sit.dias))} dias</strong>` : ''}</small>
       ${sit.porDia > 0 ? `<small>Gasta ~${sc(sit.porDia)} sacos por dia (média dos últimos 7 dias)</small>` : ''}
@@ -66,7 +74,7 @@ export async function renderEstoque(ctx, el) {
 
     ${gerir ? `
     <details class="form-dobra dobra-passos" id="d-contagem">
-      <summary>Contar o estoque no galpão</summary>
+      <summary>Contar a ${nomeR} no galpão</summary>
       <form id="f-contagem" class="form passos" novalidate>
         <section class="passo tipo-estoque">
           <h2 class="passo-t"><i>1</i> Conte as pilhas <small class="mudo">(ajuda opcional)</small></h2>
@@ -91,7 +99,7 @@ export async function renderEstoque(ctx, el) {
       </form>
     </details>
     <details class="form-dobra dobra-passos" id="d-compra">
-      <summary>Registrar compra / entrada de ração</summary>
+      <summary>Registrar compra de ${nomeR}</summary>
       <form id="f-compra" class="form passos" novalidate>
         <section class="passo tipo-estoque">
           <h2 class="passo-t"><i>1</i> Quanto chegou</h2>
@@ -101,8 +109,6 @@ export async function renderEstoque(ctx, el) {
           </div>
           <label class="linha-check"><input type="checkbox" id="conferir"> Chegou menos sacos do que a nota</label>
           <label id="recebidos-wrap" hidden>Quantos sacos chegaram de fato? <input id="recebidos" class="grande" type="number" inputmode="decimal" step="0.5" min="0" placeholder="0"></label>
-          <label>Tipo de ração <small class="mudo">(opcional)</small> <input id="tipo-racao" maxlength="40" list="dl-tipos-racao" placeholder="Ex.: Engorda, Alevino, Recria"></label>
-          <datalist id="dl-tipos-racao">${tiposRacao.map((x) => `<option value="${esc(x)}"></option>`).join('')}</datalist>
           <div class="calc" id="total">Total: —</div>
           <div class="data-linha"><span>Data: <b id="data-txt">hoje</b></span><button type="button" class="link" id="b-data">Mudar</button></div>
           <label id="data-wrap" hidden>Data da compra <input id="data" type="date" value="${hoje}" max="${hoje}" required></label>
@@ -136,23 +142,23 @@ export async function renderEstoque(ctx, el) {
       <div class="kpi"><span>Consumido</span><b>${sc(consumido, 0)} ${Math.round(consumido / kgS) === 1 ? 'saco' : 'sacos'}</b></div>
       ${ajustes && gerir ? `<div class="kpi" style="grid-column:1/-1"><span>Ajustes de contagem</span><b>${sinal(ajustes)} sacos</b></div>` : ''}
     </div>
-    ${porTipo.length > 1 || (porTipo.length === 1 && porTipo[0][0] !== '') ? `<h3 class="sub-tipo">Comprado por tipo de ração</h3>
-    <div class="kpis">${porTipo.map(([tp, k]) => `<div class="kpi"><span>${esc(tp || 'Sem tipo informado')}</span><b>${sc(k, 0)} sacos</b></div>`).join('')}</div>
-    <p class="mudo pequeno">O saldo do estoque continua sendo um só: o app ainda não separa o consumo de cada tipo.</p>` : ''}
 
     ${gerir ? `<h2>Entradas registradas</h2>
     <div class="card rolagem">
       ${compras.length ? `<table>
-        <thead><tr><th>Data</th><th class="n">Sacos</th><th>Tipo</th><th class="n">Valor</th><th>Fornecedor</th><th></th></tr></thead>
+        <thead><tr><th>Data</th><th class="n">Sacos</th><th class="n">Valor</th><th>Fornecedor</th><th></th></tr></thead>
         <tbody>${compras.map((c) => `<tr>
           <td>${fmtData(c.data_compra)}</td><td class="n">${sc(c.quantidade_kg)}${c.sacos_nota != null && Number(c.sacos_recebidos) < Number(c.sacos_nota) ? `<small class="falta-nota">faltaram ${fmtNum(Number(c.sacos_nota) - Number(c.sacos_recebidos), 0)} da nota</small>` : ''}</td>
-          <td>${esc(c.tipo_racao || '—')}</td>
           <td class="n">${c.custo_total != null ? fmtBRL(c.custo_total) : '—'}</td>
           <td>${esc(c.fornecedor || '—')}</td>
           <td><span class="acoes-reg"><button class="btn mini" data-edit="${esc(c.id)}" type="button">Editar</button><button class="btn mini perigo" data-del="${esc(c.id)}" type="button">Excluir</button></span></td>
         </tr>`).join('')}</tbody></table>` : '<p class="mudo" style="margin:0">Nenhuma entrada registrada.</p>'}
     </div>` : ''}`;
 
+  el.querySelectorAll('[data-tipo-racao]').forEach((b) => b.addEventListener('click', () => {
+    if (b.dataset.tipoRacao === tipoAtual) return;
+    tipoAtual = b.dataset.tipoRacao; renderEstoque(ctx, el);
+  }));
   if (!gerir) return;
 
   // ---- contagem física ----
@@ -206,7 +212,7 @@ export async function renderEstoque(ctx, el) {
     if (!ok) return;
     const btn = fc.querySelector('button[type=submit]'); btn.disabled = true;
     try {
-      await ctx.api.registrarContagem(Math.round(n * kgS * 100) / 100, fc.querySelector('#obs').value.trim());
+      await ctx.api.registrarContagem(Math.round(n * kgS * 100) / 100, fc.querySelector('#obs').value.trim(), porTipo ? tipoAtual : null);
       ctx.toast('Contagem registrada', 'ok');
       renderEstoque(ctx, el);
     } catch (e) { ec.textContent = e.message; ec.hidden = false; btn.disabled = false; }
@@ -267,8 +273,7 @@ Faltaram ${fmtNum(nota - rec, (nota - rec) % 1 ? 1 : 0)} saco(s) da nota.`
       await ctx.api.registrarCompra({
         fazenda_id: ctx.state.perfil.fazenda_id, data_compra: f.querySelector('#data').value, quantidade_kg: t,
         custo_total: custo, fornecedor: f.querySelector('#forn').value.trim() || null,
-        sacos_nota: s, sacos_recebidos: recebidos(),
-        tipo_racao: f.querySelector('#tipo-racao').value.trim() || null,
+        sacos_nota: s, sacos_recebidos: recebidos(), ...(porTipo ? { tipo_racao: tipoAtual } : {}),
       });
       ctx.toast('Entrada registrada', 'ok');
       renderEstoque(ctx, el);
@@ -294,13 +299,13 @@ Faltaram ${fmtNum(nota - rec, (nota - rec) % 1 ? 1 : 0)} saco(s) da nota.`
           { nome: 'kg', rotulo: 'Quantidade (kg)', tipo: 'number', valor: c.quantidade_kg, step: '0.1', min: '0.1', inputmode: 'decimal', ajuda: `Hoje equivale a ${sc(c.quantidade_kg)} sacos de ${fmtNum(kgS, 0)} kg.` },
           { nome: 'custo', rotulo: 'Valor pago (R$, opcional)', tipo: 'number', valor: c.custo_total ?? '', step: '0.01', min: '0', inputmode: 'decimal' },
           { nome: 'forn', rotulo: 'Fornecedor (opcional)', tipo: 'text', valor: c.fornecedor || '', maxlength: '80' },
-          ...('tipo_racao' in c ? [{ nome: 'tipo', rotulo: 'Tipo de ração (opcional)', tipo: 'text', valor: c.tipo_racao || '', maxlength: '40' }] : []),
+          ...(porTipo ? [{ nome: 'tipo', rotulo: 'Qual ração', tipo: 'select', valor: c.tipo_racao || 'engorda', opcoes: [['engorda', 'Ração de engorda'], ['alevino', 'Ração de alevino']] }] : []),
         ],
         validar: (x) => (!x.data ? 'Informe a data.' : x.data > hoje ? 'A data não pode ser no futuro.' : !(num(x.kg) > 0) ? 'Informe a quantidade em kg.' : x.custo !== '' && !(num(x.custo) >= 0) ? 'Valor pago inválido.' : null),
       });
       if (!v) return;
       try {
-        await ctx.api.atualizar('racao_estoque', c.id, { data_compra: v.data, quantidade_kg: num(v.kg), custo_total: v.custo === '' ? null : num(v.custo), fornecedor: v.forn.trim() || null, ...('tipo_racao' in c ? { tipo_racao: (v.tipo || '').trim() || null } : {}) });
+        await ctx.api.atualizar('racao_estoque', c.id, { data_compra: v.data, quantidade_kg: num(v.kg), custo_total: v.custo === '' ? null : num(v.custo), fornecedor: v.forn.trim() || null, ...(porTipo ? { tipo_racao: v.tipo } : {}) });
         ctx.toast('Entrada corrigida', 'ok'); renderEstoque(ctx, el);
       } catch (e) { ctx.toast(e.message, 'erro'); }
     }));

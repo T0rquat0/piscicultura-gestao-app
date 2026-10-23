@@ -1,6 +1,6 @@
 # Teste das melhorias de 22/10/26 com o Supabase SIMULADO (nenhuma requisição sai para o banco real):
 # área do tanque, fases Berçário/Recria, peso médio por peixe, lote em andamento (pesagem de hoje),
-# cadastrar vários tanques colando a mensagem do WhatsApp, tipo de ração e o "−-0" do extrato.
+# cadastrar vários tanques colando a mensagem do WhatsApp e o "−-0" do extrato.
 import os
 _AQUI = os.path.dirname(os.path.abspath(__file__))
 os.makedirs(os.path.join(_AQUI, 'saida'), exist_ok=True); os.chdir(os.path.join(_AQUI, 'saida'))
@@ -23,7 +23,7 @@ dados = {
   'tanques': [{'id': T, 'nome': 'Tanque 01', 'area_ha': 2}, {'id': T2, 'nome': 'Tanque 02', 'area_ha': None}],
   'lotes': [{'id': L1, 'tanque_id': T, 'tipo': 'recria', 'especie': 'Tambaqui', 'data_entrada': '2026-09-01', 'quantidade_inicial': 10000, 'peso_inicial_kg': 5000, 'ativo': True, 'tanques': {'nome': 'Tanque 01'}}],
   'racao_consumo': [], 'biometrias': [], 'mortalidade': [],
-  'racao_estoque': [{'id': 'c1', 'data_compra': time.strftime('%Y-%m-%d'), 'quantidade_kg': 500, 'custo_total': None, 'fornecedor': 'Agro X', 'tipo_racao': 'Engorda'}],
+  'racao_estoque': [{'id': 'c1', 'data_compra': time.strftime('%Y-%m-%d'), 'quantidade_kg': 500, 'custo_total': None, 'fornecedor': 'Agro X', 'tipo_racao': 'engorda'}],
   'racao_contagens': [], 'usuario_tanques': [],
 }
 posts, externos, erros_js = [], [], []
@@ -138,12 +138,11 @@ with sync_playwright() as pw:
     pg.goto(BASE + '#/estoque'); pg.wait_for_selector('.ex-resumo', timeout=15000)
     sai = pg.inner_text('.ex-tot.sai b')
     checa('-' not in sai and '−' not in sai, f'saídas zeradas aparecem sem sinal ("{sai.strip()}")')
-    checa('Engorda' in pg.inner_text('.extrato'), 'extrato mostra o tipo da ração')
-    pg.click('#d-compra summary'); pg.fill('#sacos', '100'); pg.fill('#tipo-racao', 'Alevino'); pg.click('#f-compra button[type=submit]'); pg.wait_for_timeout(1000)
-    checa(achou('racao_estoque', tipo_racao='Alevino', quantidade_kg=2500), 'compra grava tipo "Alevino" (100 sacos × 25 kg)')
+    pg.click('#d-compra summary'); pg.fill('#sacos', '100'); pg.click('#f-compra button[type=submit]'); pg.wait_for_timeout(1000)
+    checa(achou('racao_estoque', quantidade_kg=2500), 'compra de ração grava 100 sacos × 25 kg (o tipo engorda/alevino é da tela do Torquato)')
 
     checa(not erros_js, 'sem erro de JavaScript' + (f': {erros_js}' if erros_js else ''))
     checa(not externos, 'nenhuma requisição para fora' + (f': {externos[:3]}' if externos else ''))
     b.close()
 
-print('\nRESULTADO: ' + ('TUDO OK' if ok else 'HÁ FALHAS') + ' (fases, área, peso médio, planilha, tipo de ração)')
+print('\nRESULTADO: ' + ('TUDO OK' if ok else 'HÁ FALHAS') + ' (fases, área, peso médio, planilha, estoque)')
