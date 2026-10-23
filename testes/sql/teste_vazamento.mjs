@@ -14,14 +14,14 @@ await db.exec(`create role anon; create role authenticated; create schema auth;
   create table auth.users (id uuid primary key, email text);
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('teste.uid', true), '')::uuid $$;
   grant usage on schema auth to anon, authenticated;`);
-for (const f of ['01_schema', '02_correcoes_e_funcoes', '03_peso_do_saco', '04_controle_de_estoque', '06_cadastro_da_fazenda', '07_planos_e_pacotes', '08_causa_da_mortalidade', '09_logo_da_fazenda', '10_convites_e_nomes', '11_trava_do_teste_gratis', '12_historico_e_lixeira', '13_datas_no_horario_local', '14_conferencia_e_importar_copia', '15_painel_administrador'])
+for (const f of ['01_schema', '02_correcoes_e_funcoes', '03_peso_do_saco', '04_controle_de_estoque', '06_cadastro_da_fazenda', '07_planos_e_pacotes', '08_causa_da_mortalidade', '09_logo_da_fazenda', '10_convites_e_nomes', '11_trava_do_teste_gratis', '12_historico_e_lixeira', '13_datas_no_horario_local', '14_conferencia_e_importar_copia', '15_painel_administrador', '16_preco_do_peixe', '17_racao_engorda_e_alevino'])
   await db.exec(readFileSync(DIR + f + '.sql', 'utf8'));
 // privilégios padrão do Supabase: anon e authenticated têm acesso às tabelas; só o RLS segura
 await db.exec(`grant usage on schema public to anon, authenticated;
   grant select, insert, update, delete on all tables in schema public to anon, authenticated;
   grant execute on all functions in schema public to anon, authenticated;`);
 // (o grant acima imita o padrão do Supabase; os revoke dos arquivos SQL vêm antes, então reaplico para valer)
-for (const f of ['02_correcoes_e_funcoes', '04_controle_de_estoque', '06_cadastro_da_fazenda', '07_planos_e_pacotes', '10_convites_e_nomes']) {
+for (const f of ['02_correcoes_e_funcoes', '04_controle_de_estoque', '06_cadastro_da_fazenda', '07_planos_e_pacotes', '10_convites_e_nomes', '17_racao_engorda_e_alevino']) {
   const s = readFileSync(DIR + f + '.sql', 'utf8').split('\n').filter((l) => /^\s*(revoke|grant) execute/i.test(l)).join('\n');
   await db.exec(s);
 }
