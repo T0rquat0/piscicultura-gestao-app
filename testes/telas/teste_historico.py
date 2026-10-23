@@ -69,9 +69,9 @@ def abrir(pw, uid, papel, est):
 
 with sync_playwright() as pw:
     est = {}; b, pg = abrir(pw, D, 'dono', est)
-    pg.goto(BASE + '#/mais'); pg.wait_for_selector('a[href="#/historico"]', timeout=20000)
+    pg.goto(BASE + '#/mais'); pg.wait_for_selector('#view a[href="#/historico"]', timeout=20000)
     checa(True, 'dono: "Histórico e lixeira" aparece em Mais')
-    pg.click('a[href="#/historico"]'); pg.wait_for_selector('.seg button[data-aba=lixeira]', timeout=15000)
+    pg.click('#view a[href="#/historico"]'); pg.wait_for_selector('.seg button[data-aba=lixeira]', timeout=15000)
     itens = pg.locator('#view .registros li')
     checa(itens.count() == 2, f'lixeira: 2 operações (lote + ração avulsa); vínculo removido não entra como lixo [{itens.count()}]')
     t = itens.nth(0).inner_text()
@@ -106,7 +106,7 @@ with sync_playwright() as pw:
 
     est = {}; b, pg = abrir(pw, FN, 'funcionario', est)
     pg.goto(BASE + '#/mais'); pg.wait_for_selector('#b-sair', timeout=20000)
-    checa(pg.locator('a[href="#/historico"]').count() == 0, 'funcionário: não vê o item no menu')
+    checa(pg.locator('#view a[href="#/historico"]').count() == 0, 'funcionário: não vê o item no menu')
     pg.goto(BASE + '#/historico'); pg.wait_for_selector('.card.vazio', timeout=15000)
     checa('Somente o dono' in pg.inner_text('#view') and not any(r[0] == 'restaurar_exclusao' for r in est['rpc']), 'funcionário: endereço direto mostra "somente o dono"')
     errs += est['erros'] + est['fora']; b.close()

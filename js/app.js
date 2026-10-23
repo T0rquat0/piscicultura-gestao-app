@@ -22,6 +22,7 @@ import { renderHistorico } from './views/historico.js';
 import { renderAdmin } from './views/admin.js';
 import { renderPendencias } from './views/pendencias.js';
 import { renderMais } from './views/mais.js';
+import { htmlAtalhos, atualizarLateral, marcarAtalho } from './lateral.js';
 
 const root = document.getElementById('root');
 splashDoDia();
@@ -351,6 +352,7 @@ function montarShell() {
     <aside class="lateral" aria-label="Navegação">
       <div class="marca"><span class="logo-sm"></span><div><strong>${fazenda}</strong><small>Piscicultura</small></div></div>
       <nav>${links.map(([aba, href, ic, txt]) => `<a data-aba="${aba}" href="${href}">${icone(ic, 19)}<span>${txt}</span></a>`).join('')}</nav>
+      ${htmlAtalhos(state, ctx.podeGerir())}
       <div class="lateral-pe">
         <a id="pill-lateral" class="pill" href="#/pendencias"></a>
         <div class="perfil-linha"><span class="avatar">${esc((p.nome || '?').trim().charAt(0).toUpperCase())}</span><div><b>${esc(p.nome)}</b><small>${papel}</small></div></div>
@@ -384,6 +386,7 @@ async function rotear() {
     if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   });
 
+  marcarAtalho(rota);
   const el = document.createElement('div'); // contêiner novo por rota: renderizações atrasadas não sujam a tela atual
   view.replaceChildren(el);
   const meu = ++tokenRota;
@@ -407,6 +410,7 @@ async function rotear() {
   } catch (e) {
     if (meu === tokenRota) renderErro(el, e);
   }
+  atualizarLateral(ctx).catch(() => {}); // resumo do dia na lateral (computador)
 }
 
 // ---------- inicialização ----------
