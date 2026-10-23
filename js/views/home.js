@@ -1,8 +1,8 @@
 import { esc, fmtInt, fmtNum, fmtData, hojeISO, diasEntre, num, ROTULO_TIPO, faseCss, progresso, fmtPct } from '../util.js';
 import * as db from '../db.js';
-import { situacaoEstoque, previsaoDespesca } from '../calc.js';
+import { situacaoEstoque, previsaoDespesca, alertasManejo } from '../calc.js';
 import { localGuardado, pedirLocal, previsao, descricao, avisosClima } from '../clima.js';
-import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, ESTOQUE_COBERTURA_DIAS, PESO_SACO_PADRAO_KG, CONTAGEM_LEMBRETE_DIAS, PLANO_AVISO_DIAS, ALVO_PADRAO_KG } from '../config.js';
+import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, ESTOQUE_COBERTURA_DIAS, PESO_SACO_PADRAO_KG, CONTAGEM_LEMBRETE_DIAS, PLANO_AVISO_DIAS, ALVO_PADRAO_KG, ALERTAS } from '../config.js';
 import { icone } from '../icons.js';
 import { pedirTexto } from '../dialogo.js';
 import { pizza, COR_FASE, ORDEM_FASE, COR_RACAO } from '../graficos.js';
@@ -236,6 +236,7 @@ export async function renderHome(ctx, el) {
     <div id="avisos">${avisoContagem(ctx, paraContar, hoje)}</div>
     ${semDetalhe ? '<p class="aviso">Sem conexão: mostrando só o que está guardado no aparelho. Os totais aparecem quando houver internet.</p>' : ''}
     ${comLote ? `<div class="h-topo">${cartaoAgora()}${painelKpis()}</div>` : ''}
+    ${gerir ? blocoAlertas() : ''}
     <div class="h-grade">
       <div class="h-col">
         ${blocoRacao()}
@@ -251,6 +252,38 @@ export async function renderHome(ctx, el) {
   const bn = el.querySelector('#b-novo-tanque'); if (bn) bn.addEventListener('click', () => novoTanque(ctx, el));
   avisoPlano(ctx, el.querySelector('#avisos'));
   pintarTempo(el.querySelector('#b-tempo'));
+
+  // alertas de manejo: biometria vencida, ração fora da média, mortes repetidas (dono/gerente)
+  function blocoAlertas() {
+    if (semDetalhe) return '';
+    const racaoHoje = {}, mediaSemana = {};
+    for (const t of tanques) {
+      const kg = (porTanque[t.id] || {}).hojeKg; if (kg) racaoHoje[t.id] = kg;
+      const m = mediaKg(t.id); if (m) mediaSemana[t.id] = m;
+    }
+    const als = alertasManejo({ lotes, resumo, racaoHoje, mediaSemana, mortes: mortes || [], hoje, cfg: ALERTAS });
+    if (!als.length) return '';
+    const nomeT = (id) => (tanques.find((t) => t.id === id) || {}).nome || 'Tanque';
+    const lista = (itens, f) => { const n = itens.slice(0, 3).map(f).join(', '); return itens.length > 3 ? `${n} e mais ${itens.length - 3}` : n; };
+    const linhas = als.map((a) => {
+      if (a.tipo === 'biometria') {
+        const p = a.itens[0];
+        return `<li class="al-bio"><div><b>${a.itens.length === 1 ? 'Biometria atrasada' : `${fmtInt(a.itens.length)} tanques sem biometria recente`}</b>
+          <span>${esc(lista(a.itens, (x) => `${nomeT(x.tanque)} (${fmtInt(x.dias)} dias)`))}. Sem pesagem, peso, biomassa e previsão de despesca ficam desatualizados.</span></div>
+          <a class="btn mini" href="#/lancar?tipo=biometria&tanque=${esc(p.tanque)}">Pesar ${esc(nomeT(p.tanque))}</a></li>`;
+      }
+      if (a.tipo === 'racao') {
+        return `<li class="al-racao"><div><b>Ração fora da média hoje</b>
+          <span>${esc(lista(a.itens, (x) => `${nomeT(x.tanque)}: ${fmtNum(x.kg, 0)} kg, ${x.desvio > 0 ? '+' : '−'}${fmtInt(Math.abs(x.desvio) * 100)}% da média`))}. Confira se o lançamento está certo ou se o peixe mudou de apetite.</span></div>
+          <a class="btn mini" href="#/relatorio/racao">Ver ração</a></li>`;
+      }
+      const p = a.itens[0];
+      return `<li class="al-morte"><div><b>Mortes ${a.itens.length === 1 ? `no ${esc(nomeT(p.tanque))}` : 'repetidas'} há ${fmtInt(p.dias)} dias seguidos</b>
+        <span>${esc(lista(a.itens, (x) => `${nomeT(x.tanque)}: ${fmtInt(x.total)} peixes em ${fmtInt(x.dias)} dias`))}. Verifique oxigênio, sobra de ração e sinais de doença.</span></div>
+        <a class="btn mini" href="#/t/${esc(p.tanque)}">Abrir tanque</a></li>`;
+    }).join('');
+    return `<section class="h-alertas" aria-labelledby="h-at"><h2 id="h-at">Atenção</h2><ul>${linhas}</ul></section>`;
+  }
 
   function cartaoAgora() {
     const pct = comLote ? feitos.length / comLote : 0;

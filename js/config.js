@@ -69,3 +69,10 @@ export const CLIMA = {
   chuvaForteMm: 30,     // chuva do dia acima disso
   validadeMin: 180,     // quanto tempo a previsão guardada vale antes de buscar de novo
 };
+
+// Alertas de manejo na Início (dono/gerente)
+export const ALERTAS = {
+  biometriaDias: 30,     // lote sem pesagem há mais que isso: números estimados desatualizados
+  racaoDesvio: 0.4,      // ração de hoje 40% abaixo ou acima da média do tanque na semana
+  morteDiasSeguidos: 3,  // mortes no mesmo tanque por esse número de dias seguidos
+};

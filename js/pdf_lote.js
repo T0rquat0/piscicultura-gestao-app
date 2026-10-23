@@ -2,7 +2,7 @@
 // números grandes, sem cartões coloridos. Desenha com jsPDF (vetorial, texto selecionável).
 // Recebe o construtor jsPDF (com o plugin autoTable aplicado) e, opcionalmente, as fontes
 // em base64 { regular, bold } (Schibsted Grotesk). Sem fontes, usa Helvetica.
-import { fmtNum, fmtInt, fmtData, fmtBRL, ROTULO_TIPO, diasEntre } from './util.js';
+import { fmtNum, fmtInt, fmtData, fmtBRL, fmtPct, ROTULO_TIPO, diasEntre } from './util.js';
 import { pesoMedioKg } from './calc.js';
 
 export const COR = {
@@ -116,16 +116,15 @@ export function gerarPdfLote(jsPDF, d) {
     ['Dias de cultivo', fmtInt(c.diasCultivo), 'dias', `desde ${fmtData(lote.data_entrada)}`],
     ['Peso médio atual', c.pmAtualG != null ? n(c.pmAtualG, 0) : '-', c.pmAtualG != null ? 'g' : '', c.dataUltimaBio ? `biometria de ${fmtData(c.dataUltimaBio)}` : 'sem biometria'],
     ['Peixes vivos', fmtInt(c.vivos), 'estim.', `de ${fmtInt(lote.quantidade_inicial)} na entrada`],
-    ['Sobrevivência', c.sobrevivencia != null ? n(c.sobrevivencia, 1) : '-', '%', `${fmtInt(c.mortos)} morto(s)`],
+    ['Sobrevivência', c.sobrevivencia != null ? fmtPct(c.sobrevivencia) : '-', '%', `${fmtInt(c.mortos)} morto(s)`],
     ['Biomassa', c.biomassaAtual != null ? n(c.biomassaAtual, 0) : '-', c.biomassaAtual != null ? 'kg' : '', `na entrada: ${n(c.biomassaInicial, 0)} kg`],
     ['Ração fornecida', n(c.racaoTotal, 0), 'kg', `${n(c.racaoTotal / kgSaco, 1)} sacos de ${n(kgSaco, 0)} kg`],
     ['Conversão alimentar', c.ca != null ? n(c.ca, 2) : '-', '', c.ca != null ? 'kg de ração por kg ganho' : 'precisa de biometria'],
     ['Ganho diário', c.gpd != null ? n(c.gpd, 1) : '-', c.gpd != null ? 'g/dia' : '', 'por peixe desde a entrada'],
   ];
   if (gerir) {
-    const custoKg = c.custoRacao != null && c.ganhoBiomassa > 0 ? c.custoRacao / c.ganhoBiomassa : null;
     ind.push(['Custo de ração', c.custoRacao != null ? fmtBRL(c.custoRacao) : '-', '', c.custoRacao != null ? 'preço médio pago por kg' : 'sem valor nas compras']);
-    ind.push(['Custo por kg ganho', custoKg != null ? fmtBRL(custoKg) : '-', '', 'ração / ganho de biomassa']);
+    ind.push(['Custo por kg produzido', c.custoKgProduzido != null ? fmtBRL(c.custoKgProduzido) : '-', '', c.custoKgProduzido != null ? 'ração até a biometria / peso ganho' : 'precisa de preço e biometria com ganho']);
   }
   const ch = 25, linhas = Math.ceil(ind.length / 4), cw = (LARG - 12) / 4;
   cabe(linhas * ch + 6);
@@ -149,7 +148,7 @@ export function gerarPdfLote(jsPDF, d) {
   obs.push(['Crescimento', c.pmAtualG != null
     ? `Peso médio de ${n(c.pmInicialG, 1)} g na entrada para ${n(c.pmAtualG, 0)} g em ${fmtData(c.dataUltimaBio)}${c.gpd != null ? ` (${n(c.gpd, 1)} g por dia por peixe)` : ''}.`
     : 'Sem biometria registrada. Pese uma amostra para calcular peso médio, biomassa e conversão alimentar.']);
-  obs.push(['Sobrevivência', `${fmtInt(c.mortos)} morte(s) em ${fmtInt(lote.quantidade_inicial)} peixes (${n(100 - (c.sobrevivencia ?? 100), 1)}%). Restam cerca de ${fmtInt(c.vivos)}.`]);
+  obs.push(['Sobrevivência', `${fmtInt(c.mortos)} morte(s) em ${fmtInt(lote.quantidade_inicial)} peixes (${fmtPct(100 - (c.sobrevivencia ?? 100))}%). Restam cerca de ${fmtInt(c.vivos)}.`]);
   obs.push(['Ração', `${n(c.racaoTotal, 0)} kg fornecidos (${n(c.racaoTotal / kgSaco, 1)} sacos de ${n(kgSaco, 0)} kg)${c.racaoMediaDia != null ? `, média de ${n(c.racaoMediaDia, 1)} kg por dia` : ''}.`]);
   if (c.ca != null) obs.push(['Conversão', `${n(c.ca, 2)} kg de ração por kg de peixe ganho até a última biometria. Referência usual: 1,2 a 2,0, conforme espécie e fase.`]);
   if (gerir && c.custoRacao != null) obs.push(['Custo', `${fmtBRL(c.custoRacao)} em ração, calculado pelo preço médio das compras com valor informado.`]);
@@ -222,6 +221,17 @@ export function gerarPdfLote(jsPDF, d) {
     if (todas.length > lim.length) { txt(`Mostrando os ${lim.length} registros mais recentes de ${todas.length}.`, M, y + 2, { size: 7.5, color: COR.mudo }); y += 6; }
     y += 7;
   } else { txt('Nenhuma mortalidade registrada.', M, y + 1, { size: 9, color: COR.mudo }); y += 10; }
+
+  // ---------- comparação com ciclos anteriores (quando houver ciclo encerrado) ----------
+  if (d.cmp) {
+    secao('Comparação com ciclos anteriores', 50);
+    txt(`Situação no dia ${fmtInt(d.cmp.idade)} do ciclo, comparada com os ciclos encerrados na mesma idade.`, M, y, { size: 8, color: COR.mudo });
+    y += 3;
+    tabela(doc, y, [d.cmp.cab], d.cmp.corpo, d.cmp.cab.map((_, i) => (i ? 'right' : 'left')));
+    y = doc.lastAutoTable.finalY + 3;
+    if (d.cmp.fim) { const ls = quebra(d.cmp.fim, LARG, 8.5, false); cabe(ls.length * 4 + 4); txt(ls, M, y + 2, { size: 8.5 }); y += ls.length * 4 + 3; }
+    y += 7;
+  }
 
   // ---------- 7. notas ----------
   secao('Notas', 50);

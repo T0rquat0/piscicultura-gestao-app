@@ -8,6 +8,7 @@ import { confirmar, formulario } from '../dialogo.js';
 import { icone } from '../icons.js';
 import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num, ROTULO_TIPO, faseCss, nomeArquivo, dataArquivo, progresso, fmtPct } from '../util.js';
 import { pizza, COR_FASE, ORDEM_FASE } from '../graficos.js';
+import { calcularNaIdade, fimDoLote, mediaDe } from '../calc.js';
 import { calcularLote, precoMedioKg, pontosPeso, pesoMedioKg, evolucaoPeso, racaoPorSemana, matrizRacao, situacaoEstoque } from '../calc.js';
 
 export function svgPeso(pts) {
@@ -155,6 +156,71 @@ export async function renderRelatorioLote(ctx, el, id) {
     <section class="bloco"><h2>${titulo} <span class="contagem">${itens.length}</span></h2>
       <div class="card">${itens.length ? `<ul class="lista registros">${itens.join('')}</ul>` : `<p class="mudo" style="margin:0">${vazio}</p>`}</div></section>`;
 
+  // ---- comparação com ciclos encerrados: na mesma idade deste lote e como terminaram ----
+  let cmpHtml = '', cmpPdf = null;
+  async function compararCiclos() {
+    const precoKg = gerir ? precoMedioKg(compras) : null;
+    const todos = await ctx.api.lotes().catch(() => []);
+    const enc = todos.filter((l) => !l.ativo && l.id !== lote.id && l.especie === lote.especie);
+    const recentes = (a, b) => String(b.data_entrada).localeCompare(String(a.data_entrada));
+    const anteriorTanque = enc.filter((l) => l.tanque_id === lote.tanque_id).sort(recentes)[0] || null;
+    const mesmaFase = enc.filter((l) => l.tipo === lote.tipo).sort(recentes).slice(0, 6);
+    if (!anteriorTanque && !mesmaFase.length) {
+      return `<div class="card"><p class="mudo" style="margin:0">Ainda não há ciclos de ${esc(lote.especie)} encerrados para comparar. Quando um lote for encerrado (Tanques &gt; lote &gt; Encerrar), este quadro mostra como este ciclo está em relação aos anteriores na mesma idade.</p></div>`;
+    }
+    const ids = [...new Set([anteriorTanque && anteriorTanque.id, ...mesmaFase.map((l) => l.id)].filter(Boolean))];
+    const dados = Object.fromEntries(await Promise.all(ids.map(async (lid) => [lid, await ctx.api.dadosLote(lid).catch(() => null)])));
+    const idade = c.diasCultivo;
+    const naIdade = (l) => { const d = dados[l.id]; return d ? calcularNaIdade(l, d.bios, d.mort, d.rac, idade, precoKg) : null; };
+    const porMil = (x, l) => (x && Number(l.quantidade_inicial) > 0 ? (x.racaoTotal / Number(l.quantidade_inicial)) * 1000 : null);
+    const ant = anteriorTanque ? naIdade(anteriorTanque) : null;
+    const fase = mesmaFase.map((l) => ({ l, x: naIdade(l) })).filter((o) => o.x);
+    const med = (k) => mediaDe(fase.map((o) => o.x), k);
+    const medPorMil = mediaDe(fase.map((o) => ({ v: porMil(o.x, o.l) })), 'v');
+    const g = (v) => (v == null ? '—' : v >= 1000 ? `${fmtNum(v / 1000, 2)} kg` : `${fmtNum(v, v < 10 ? 1 : 0)} g`);
+    // [rótulo, este lote, ciclo anterior, média, formato, maior é melhor? (null = neutro)]
+    const linhas = [
+      ['Peso médio', c.pmAtualG, ant && ant.pmAtualG, med('pmAtualG'), g, true],
+      ['Ganho diário', c.gpd, ant && ant.gpd, med('gpd'), (v) => (v == null ? '—' : `${fmtNum(v, 1)} g/dia`), true],
+      ['Conversão alimentar', c.ca, ant && ant.ca, med('ca'), (v) => (v == null ? '—' : fmtNum(v, 2)), false],
+      ['Sobrevivência', c.sobrevivencia, ant && ant.sobrevivencia, med('sobrevivencia'), (v) => (v == null ? '—' : `${fmtPct(v)}%`), true],
+      ['Ração por mil peixes', porMil(c, lote), ant && porMil(ant, anteriorTanque), medPorMil, (v) => (v == null ? '—' : `${fmtNum(v, 0)} kg`), null],
+      ...(gerir ? [['Custo da ração por kg produzido', c.custoKgProduzido, ant && ant.custoKgProduzido, med('custoKgProduzido'), (v) => (v == null ? '—' : fmtBRL(v)), false]] : []),
+    ];
+    // marca melhor/pior em relação à média da fase (ou ao ciclo anterior); só diferenças de 5% ou mais
+    const marca = (este, ref, maior) => {
+      if (maior == null || este == null || ref == null || !ref) return '';
+      const dif = (este - ref) / Math.abs(ref);
+      if (Math.abs(dif) < 0.05) return '<span class="cmp-tag igual">na média</span>';
+      const melhor = maior ? dif > 0 : dif < 0;
+      return `<span class="cmp-tag ${melhor ? 'melhor' : 'pior'}">${melhor ? 'melhor' : 'pior'} ${fmtInt(Math.abs(dif) * 100)}%</span>`;
+    };
+    const colAnt = anteriorTanque ? `<th class="n">Ciclo anterior<small>${esc(nomeTanque)} · ${fmtData(anteriorTanque.data_entrada)}</small></th>` : '';
+    const colMed = fase.length ? `<th class="n">Média da fazenda<small>${fmtInt(fase.length)} ${fase.length === 1 ? 'ciclo' : 'ciclos'} de ${esc((ROTULO_TIPO[lote.tipo] || lote.tipo).toLowerCase())}</small></th>` : '';
+    const tabela = `<div class="card"><table class="cmp">
+      <thead><tr><th>No dia ${fmtInt(idade)} do ciclo</th><th class="n">Este lote</th>${colAnt}${colMed}</tr></thead>
+      <tbody>${linhas.map(([r, e, a, m, f, maior]) => `<tr><td>${r}</td><td class="n" data-r="Este lote"><b>${f(e)}</b>${marca(e, fase.length ? m : a, maior)}</td>${anteriorTanque ? `<td class="n" data-r="Ciclo anterior">${f(a)}</td>` : ''}${fase.length ? `<td class="n" data-r="Média">${f(m)}</td>` : ''}</tr>`).join('')}</tbody></table></div>`;
+    const tagTxt = (este, ref, maior) => marca(este, ref, maior).replace(/<[^>]+>/g, '');
+    cmpPdf = {
+      idade,
+      cab: ['INDICADOR', 'ESTE LOTE', ...(anteriorTanque ? [`CICLO ANTERIOR (${fmtData(anteriorTanque.data_entrada)})`] : []), ...(fase.length ? [`MÉDIA (${fase.length} ${fase.length === 1 ? 'CICLO' : 'CICLOS'})`] : [])],
+      corpo: linhas.map(([r, e, a, m, f, maior]) => { const t = tagTxt(e, fase.length ? m : a, maior); return [r, `${f(e)}${t ? ` (${t})` : ''}`, ...(anteriorTanque ? [f(a)] : []), ...(fase.length ? [f(m)] : [])]; }),
+      fim: '',
+    };
+    let fim = '';
+    const dAnt = anteriorTanque && dados[anteriorTanque.id];
+    if (dAnt) {
+      const dataFim = fimDoLote(anteriorTanque, dAnt.bios, dAnt.mort, dAnt.rac, hoje);
+      const fz = calcularLote(anteriorTanque, dAnt.bios, dAnt.mort, dAnt.rac, dataFim, precoKg);
+      const dur = Math.max(0, Math.round((new Date(`${dataFim}T12:00:00`) - new Date(`${anteriorTanque.data_entrada}T12:00:00`)) / 864e5));
+      cmpPdf.fim = `O ciclo anterior deste tanque durou ${fmtInt(dur)} dias e terminou com ${g(fz.pmAtualG)}${fz.ca != null ? `, conversão ${fmtNum(fz.ca, 2)}` : ''} e ${fmtPct(fz.sobrevivencia)}% de sobrevivência.`;
+      fim = `<p class="cmp-fim">O ciclo anterior deste tanque durou <b>${fmtInt(dur)} dias</b> e terminou com <b>${g(fz.pmAtualG)}</b>${fz.ca != null ? `, conversão <b>${fmtNum(fz.ca, 2)}</b>` : ''} e <b>${fmtPct(fz.sobrevivencia)}%</b> de sobrevivência${gerir && fz.custoKgProduzido != null ? ` (ração a ${fmtBRL(fz.custoKgProduzido)} por kg produzido)` : ''}.</p>`;
+    }
+    return `${tabela}${fim}<p class="mudo nota">Comparação na mesma idade: os ciclos anteriores são recortados no dia ${fmtInt(idade)} depois da entrada; ciclo encerrado termina no último registro. Melhor/pior em relação à ${fase.length ? 'média da fazenda' : 'ciclo anterior'}, só com 5% ou mais de diferença.</p>`;
+  }
+  const pintarCmp = (h) => { cmpHtml = h; const box = el.querySelector('#cmp-ciclos'); if (box) box.innerHTML = `<h2>Comparação com ciclos anteriores</h2>${h}`; };
+  compararCiclos().then(pintarCmp).catch(() => pintarCmp('<div class="card"><p class="mudo" style="margin:0">Não foi possível buscar os ciclos anteriores agora.</p></div>'));
+
   const abas = [['resumo', 'Resumo'], ['peso', 'Peso'], ['racao', 'Ração'], ...(gerir ? [['registros', 'Registros']] : [])];
   let aba = 'resumo';
 
@@ -173,7 +239,8 @@ export async function renderRelatorioLote(ctx, el, id) {
         ${gerir ? linhaNum('Custo de ração por kg produzido', c.custoKgProduzido != null ? fmtBRL(c.custoKgProduzido) : '—', c.custoKgProduzido != null ? 'ração até a última biometria ÷ peixe que ganhou peso' : 'precisa de preço nas compras e biometria com ganho') : ''}
       </ul></div>
       <p class="mudo nota">Valores estimados usam o peso médio da última biometria e a mortalidade registrada. Quanto mais biometrias, mais confiável.</p>
-    </section>`;
+    </section>
+    <section class="bloco" id="cmp-ciclos"><h2>Comparação com ciclos anteriores</h2>${cmpHtml || '<div class="card"><p class="mudo" style="margin:0">Buscando os ciclos anteriores…</p></div>'}</section>`;
 
   const painelPeso = () => {
     const ev = evolucaoPeso(lote, bios);
@@ -296,15 +363,15 @@ export async function renderRelatorioLote(ctx, el, id) {
       const [jsPDF, fontes] = await Promise.all([carregarGerador(), carregarFontes()]);
       const doc = gerarPdfLote(jsPDF, {
         logo: ctx.state.ref.logo || null, fazenda: (ctx.state.perfil.fazendas && ctx.state.perfil.fazendas.nome) || 'Piscicultura', lote, nomeTanque, c, bios, mort, rac,
-        evo: evolucaoPeso(lote, bios), semanas: racaoPorSemana(rac), kgSaco: kgS, gerir, geradoEm: hoje, fontes,
+        evo: evolucaoPeso(lote, bios), semanas: racaoPorSemana(rac), kgSaco: kgS, gerir, geradoEm: hoje, fontes, cmp: cmpPdf,
       });
       const blob = doc.output('blob');
-      const nome = nomeArquivo(['Relatório do lote', nomeTanque || 'Tanque', lote.especie, dataArquivo(hoje)], 'pdf');
+      const nome = nomeArquivo(['Relatório do lote', nomeTanque || 'Tanque', lote.especie, `lote de ${dataArquivo(lote.data_entrada)}`, dataArquivo(hoje)], 'pdf');
       bpdf.disabled = false; bpdf.textContent = texto;
       await abrirVisualizador({ blob, nome, titulo: `${nomeTanque} · ${lote.especie}`, toast: ctx.toast });
     } catch (e) { ctx.toast(e.message || 'Não foi possível gerar o PDF', 'erro'); bpdf.disabled = false; bpdf.textContent = texto; }
   });
-  el.querySelector('#b-csv').addEventListener('click', () => baixarCsv(nomeArquivo(['Relatório do lote', nomeTanque || 'Tanque', lote.especie, dataArquivo(hojeISO())], 'csv'), montarCsv(lote, nomeTanque, c, bios, mort, rac, quem)));
+  el.querySelector('#b-csv').addEventListener('click', () => baixarCsv(nomeArquivo(['Relatório do lote', nomeTanque || 'Tanque', lote.especie, `lote de ${dataArquivo(lote.data_entrada)}`, dataArquivo(hojeISO())], 'csv'), montarCsv(lote, nomeTanque, c, bios, mort, rac, quem)));
 }
 
 function baixarCsv(nome, texto) {

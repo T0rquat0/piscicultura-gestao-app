@@ -172,3 +172,71 @@ export function previsaoDespesca(lote, r, alvoKg, hoje) {
   const data = d.toISOString().slice(0, 10);
   return { ...base, estado: 'previsto', gpdG: gpd * 1000, data, dias: Math.max(0, diasEntre(hoje, data)) };
 }
+
+/**
+ * Alertas de manejo (funções puras, testáveis em Node).
+ * lotes: ativos; resumo: {lote_id: linha do resumo_lotes}; racaoHoje/mediaSemana: {tanque_id: kg};
+ * mortes: [{data, lote_id, quantidade}] dos últimos dias; cfg: { biometriaDias, racaoDesvio, morteDiasSeguidos }.
+ * Retorna [{ tipo: 'biometria' | 'racao' | 'morte', tanques: [tanque_id], ...detalhes }]
+ */
+export function alertasManejo({ lotes, resumo, racaoHoje, mediaSemana, mortes, hoje, cfg }) {
+  const out = [];
+  // 1) biometria vencida: última pesagem (ou a entrada, se nunca pesou) há mais de N dias
+  const vencidos = [];
+  for (const l of lotes) {
+    const r = resumo[l.id];
+    const ref = (r && r.ultima_biometria) || l.data_entrada;
+    const dias = diasEntre(ref, hoje);
+    if (dias > cfg.biometriaDias) vencidos.push({ tanque: l.tanque_id, lote: l.id, dias, nunca: !(r && r.ultima_biometria) });
+  }
+  if (vencidos.length) out.push({ tipo: 'biometria', itens: vencidos.sort((a, b) => b.dias - a.dias) });
+  // 2) ração de hoje fora da média da semana (só tanques que já receberam hoje e têm média)
+  const fora = [];
+  for (const [tid, kg] of Object.entries(racaoHoje || {})) {
+    const m = (mediaSemana || {})[tid];
+    if (!(kg > 0) || !(m > 0)) continue;
+    const desvio = kg / m - 1;
+    if (Math.abs(desvio) >= cfg.racaoDesvio - 1e-9) fora.push({ tanque: tid, kg, media: m, desvio });
+  }
+  if (fora.length) out.push({ tipo: 'racao', itens: fora.sort((a, b) => Math.abs(b.desvio) - Math.abs(a.desvio)) });
+  // 3) mortes no mesmo tanque em N dias seguidos, terminando ontem ou hoje
+  const tanqueDoLote = Object.fromEntries(lotes.map((l) => [l.id, l.tanque_id]));
+  const diasPorTanque = {};
+  for (const m of mortes || []) {
+    const t = tanqueDoLote[m.lote_id]; if (!t || !(Number(m.quantidade) > 0)) continue;
+    const d = (diasPorTanque[t] ||= {}); d[m.data] = (d[m.data] || 0) + Number(m.quantidade);
+  }
+  const repetidas = [];
+  for (const [t, d] of Object.entries(diasPorTanque)) {
+    for (const fim of [0, 1]) { // sequência que termina hoje ou ontem
+      let seq = 0, total = 0;
+      for (let i = fim; ; i++) {
+        const dt = new Date(`${hoje}T12:00:00`); dt.setDate(dt.getDate() - i);
+        const iso = dt.toISOString().slice(0, 10);
+        if (!d[iso]) break;
+        seq++; total += d[iso];
+      }
+      if (seq >= cfg.morteDiasSeguidos) { repetidas.push({ tanque: t, dias: seq, total }); break; }
+    }
+  }
+  if (repetidas.length) out.push({ tipo: 'morte', itens: repetidas.sort((a, b) => b.dias - a.dias || b.total - a.total) });
+  return out;
+}
+
+// Data de fim de um lote encerrado: o último registro (o banco não guarda a data de encerramento)
+export function fimDoLote(lote, bios, mort, rac, hoje) {
+  if (lote.ativo) return hoje;
+  const ds = [...bios, ...mort, ...rac].map((x) => x.data).sort();
+  return ds.length ? ds[ds.length - 1] : lote.data_entrada;
+}
+
+// O mesmo cálculo do lote, mas só com o que aconteceu até "dias" depois da entrada (comparar ciclos na mesma idade)
+export function calcularNaIdade(lote, bios, mort, rac, dias, precoKg = null) {
+  const d = new Date(`${lote.data_entrada}T12:00:00`); d.setDate(d.getDate() + dias);
+  const corte = d.toISOString().slice(0, 10);
+  const ate = (x) => x.data <= corte;
+  return calcularLote(lote, bios.filter(ate), mort.filter(ate), rac.filter(ate), corte, precoKg);
+}
+
+// média de um campo numérico, ignorando vazios
+export const mediaDe = (lista, k) => { const v = lista.map((x) => x && x[k]).filter((x) => x != null && Number.isFinite(x)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
