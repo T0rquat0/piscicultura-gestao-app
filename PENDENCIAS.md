@@ -34,7 +34,16 @@ Marque com [x] ao concluir. Tudo aqui foi deixado de propósito para depois do c
 - [ ] Mesmo alerta por e-mail (depende do SMTP próprio).
 - [ ] Teste grátis: hoje 30 dias, sem limite de tanques.
 
+## Segurança (verificação de 22/10/26)
+- [ ] **Rodar `sql/19_piloto_sem_acumular.sql`** (23/10/26): no modo piloto, apertar "contratar" de novo somava 12 meses grátis a cada vez (5 vezes = 5 anos) e desligar o piloto não desfazia. Depois de rodar, conferir com a consulta comentada no fim do arquivo se alguém já acumulou.
+- [x] Banco no ar testado com login de dono: vê só a própria fazenda e a própria equipe; não estende o teste, não vira administrador, não cria assinatura paga, não abre o painel de admin; sem login não lê nada.
+- [x] Cabeçalhos de segurança no `vercel.json`: CSP (só arquivos do próprio site + Supabase), X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy. Conferido na cópia: 13 telas e os PDFs sem nenhum bloqueio.
+- [ ] **Trocar a senha da conta de teste** (login automático da cópia já foi tirado em 22/10/26; a senha antiga ainda entra em 23/10/26). Contexto: o `js/dev-login.js` publicado em pisciapp-copia-hugo.vercel.app tem a senha e entra sozinho como DONO. Desde 22/10/26 essa conta tem os dados reais da fazenda do Guilherme. Decidir: tirar o login automático / trocar a senha / mover os dados reais para a conta dele.
+- [x] Supabase Auth: confirmação de e-mail LIGADA (lido em /auth/v1/settings em 23/10/26); só login por e-mail. Falta só ver a senha mínima no painel.
+
 ## Produto
+- [x] **Rodar `sql/18_fases_area_e_conserto_racao.sql` no Supabase** (rodado e conferido em 23/10/26: compras com tipo, saldo por tipo certo, fases e área no banco), DEPOIS do 17. Conserta a coluna `racao_estoque.tipo_racao`: um 17 paralelo (fases/área, rodado em 22/10) criou a coluna antes do 17 oficial, as compras antigas ficaram sem tipo e o saldo por tipo mostrava 0. Também põe Berçário para comer ração de alevino.
+- [x] Cadastro do lote pelo **peso médio de cada peixe** (o app calcula o peso total), lote em andamento (início do ciclo + pesagem de hoje), colar vários tanques de uma vez (planilha ou mensagem de WhatsApp), densidade por hectare na tela do tanque, "−-0" do extrato corrigido (22/10/26, teste `telas/teste_fases_area.py`).
 - [x] Rodar `sql/16_preco_do_peixe.sql` no Supabase (rodado em 22/10/26). Falta o dono informar o preço em Mais > Preço do peixe.
 - [ ] Visual "folha emoldurada" (PR visual-premium-folha): conferir no celular de verdade (sol, toque, teclado) e no computador.
 - [x] Corrigir em vez de só excluir: editar ração, biometria, mortalidade, compras e dados do lote; reabrir lote encerrado (PR #1, no ar em 20/10/26).
@@ -57,7 +66,7 @@ Marque com [x] ao concluir. Tudo aqui foi deixado de propósito para depois do c
 
 - [x] Rodar `sql/09_logo_da_fazenda.sql` no Supabase (coluna `fazendas.logo`; conferido no banco no ar em 20/10/26).
 - [x] Rodar `sql/10_convites_e_nomes.sql` no Supabase (convite por link + nomes da equipe no relatório; conferido no banco no ar em 20/10/26).
-- [ ] **Conferir** se o `sql/11_trava_do_teste_gratis.sql` está no Supabase. **Segurança:** sem ele, o dono consegue mudar `fazendas.teste_ate` pela API (chave pública) e usar de graça para sempre. Os SQLs 12 a 15 já estão no banco, então é provável que o 11 também esteja, mas o gatilho não aparece pela chave pública. No SQL Editor: `select tgname from pg_trigger where tgname = 'fazendas_campos_protegidos';` precisa voltar 1 linha.
+- [x] `sql/11` (trava do teste grátis) **está no banco no ar**: conferido em 22/10/26 tentando estender o teste pela API com a chave pública e login de dono; o banco recusou.
 - [x] Varredura de segredos no código e em todo o histórico do Git (20/10/26): nenhuma chave secreta; só a publishable, que é pública por desenho. O repositório é público, então o RLS é a única barreira: testado com 73 cenários de acesso entre fazendas/papéis num Postgres real (único furo achado: o do sql/11).
 - [ ] Login automático de teste (PRs do Hugo): preencher `DEV_LOGIN` em `js/dev-login.js` com uma conta de TESTE. Só roda em links de preview do Vercel e localhost; em produção o login segue obrigatório.
   - **Atenção (segurança):** o login automático não roda em produção, mas o ARQUIVO vai junto para o site oficial e para o GitHub, que é público. Quem abrir o código lê o e-mail e a senha. E a conta fica no mesmo Supabase dos clientes. Recomendado: não preencher. Se preencher, usar só um **funcionário** de uma fazenda de demonstração, sem dado real, sabendo que a senha é pública.

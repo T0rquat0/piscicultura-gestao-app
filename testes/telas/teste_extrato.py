@@ -27,7 +27,7 @@ errs = []
 with sync_playwright() as pw:
     b = pw.chromium.launch(**LANCAR)
     for largura, nome in [(390, 'celular'), (1200, 'computador')]:
-        pg = b.new_page(viewport={'width': largura, 'height': 900})
+        pg = b.new_page(reduced_motion='reduce', viewport={'width': largura, 'height': 900})
         pg.on('pageerror', lambda e: errs.append(str(e)))
         perfil = {'id': U, 'nome': 'Hugo', 'papel': 'dono', 'fazenda_id': F, 'ativo': True, 'fazendas': {'nome': 'Suvaco de cobra'}}
         def rota(route, req):

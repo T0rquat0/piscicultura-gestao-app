@@ -21,6 +21,15 @@ export function fmtNum(n, dec = 1) {
   return (_fmts[dec] ||= _num(dec)).format(Number(n));
 }
 export const fmtInt = (n) => fmtNum(n, 0);
+// número + palavra no singular ou no plural: plural(1, 'tanque', 'tanques') → "1 tanque"; plural(3, ...) → "3 tanques"
+export const plural = (n, um, varios) => `${fmtInt(n)} ${Number(n) === 1 ? um : varios}`;
+// porcentagem sem enganar nos extremos: 99,96 não vira "100,0" (houve perda) e 0,04 não vira "0,0"
+export const fmtPct = (v) => { const x = Number(v) || 0; return fmtNum(x, (x > 99.9 && x < 100) || (x > 0 && x < 0.1) ? 2 : 1); };
+// barra de progresso: pct de 0 a 100; tom = '' (verde da marca), 'ok', 'alerta', 'erro' ou 'claro'; rotulo vai para leitor de tela
+export function progresso(pct, { tom = '', rotulo = '', fina = false } = {}) {
+  const v = Math.max(0, Math.min(100, Number(pct) || 0));
+  return `<div class="prog${tom ? ' ' + tom : ''}${fina ? ' fina' : ''}" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(v)}"${rotulo ? ` aria-label="${esc(rotulo)}"` : ''}><i style="width:${v.toFixed(1)}%"></i></div>`;
+}
 export function fmtBRL(n) {
   if (n === null || n === undefined || Number.isNaN(Number(n))) return '—';
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n));
@@ -93,7 +102,13 @@ export function parseHash(h) {
 }
 
 export const ROTULO_PAPEL = { dono: 'Dono', gerente: 'Gerente', funcionario: 'Funcionário' };
-export const ROTULO_TIPO = { alevinagem: 'Alevinagem', engorda: 'Engorda' };
+export const ROTULO_TIPO = { bercario: 'Berçário', alevinagem: 'Alevinagem', recria: 'Recria', engorda: 'Engorda' };
+// fases na ordem do ciclo (Berçário e Recria precisam do sql/17 no banco)
+export const FASES = [['bercario', 'Berçário'], ['alevinagem', 'Alevinagem'], ['recria', 'Recria'], ['engorda', 'Engorda']];
+// classe de cor da bolinha de fase
+export const faseCss = (tipo) => ({ bercario: 'berc', alevinagem: 'alev', recria: 'recr', engorda: 'eng' }[tipo] || 'eng');
+// "5,5" / "0.91" -> número; vazio -> null
+export const areaHa = (v) => { const x = num(v); return v === '' || v == null || !(x > 0) ? null : Math.round(x * 100) / 100; };
 
 // Reduz a imagem escolhida (foto/arquivo) para no máximo 256 px e devolve um data URL pequeno.
 // PNG preserva fundo transparente; se ficar grande (foto), cai para JPEG com fundo branco.
@@ -101,7 +116,7 @@ export async function reduzirLogo(file, max = 256) {
   if (!file || !/^image\//.test(file.type)) throw new Error('Escolha um arquivo de imagem (PNG ou JPG).');
   const url = URL.createObjectURL(file);
   try {
-    const img = await new Promise((ok, falha) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => falha(new Error('Não consegui abrir essa imagem.')); i.src = url; });
+    const img = await new Promise((ok, falha) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => falha(new Error('Não foi possível abrir essa imagem.')); i.src = url; });
     const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
     const w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k));
     const c = document.createElement('canvas'); c.width = w; c.height = h;

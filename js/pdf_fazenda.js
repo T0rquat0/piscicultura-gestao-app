@@ -1,5 +1,5 @@
 // Relatório geral da fazenda em PDF: estoque de ração, lotes ativos e ração dos últimos 30 dias.
-import { fmtNum, fmtInt, fmtData, fmtBRL, ROTULO_TIPO } from './util.js';
+import { fmtNum, fmtInt, fmtData, fmtBRL, fmtPct, ROTULO_TIPO } from './util.js';
 import { COR, M, LARG, TOPO, BASE, ferramentas, rodape, logoPdf, tabela, barras } from './pdf_lote.js';
 
 const n = (v, d = 1) => fmtNum(v, d);
@@ -32,7 +32,7 @@ export function gerarPdfFazenda(jsPDF, d) {
   const racao30 = racaoDia.reduce((s, r) => s + r.kg, 0);
   const mortos = lotes.reduce((s, l) => s + (l.c.mortos || 0), 0);
   const inicial = lotes.reduce((s, l) => s + (Number(l.lote.quantidade_inicial) || 0), 0);
-  const meta = [['Lotes ativos', fmtInt(lotes.length)], ['Peixes vivos (estim.)', fmtInt(vivos)], ['Mortos no total', `${fmtInt(mortos)}${inicial > 0 ? ` (${n((mortos / inicial) * 100, 1)}%)` : ''}`], ['Ração em 30 dias', `${n(racao30 / kgSaco, 0)} sacos`]];
+  const meta = [['Lotes ativos', fmtInt(lotes.length)], ['Peixes vivos (estim.)', fmtInt(vivos)], ['Mortos no total', `${fmtInt(mortos)}${inicial > 0 ? ` (${fmtPct((mortos / inicial) * 100)}%)` : ''}`], ['Ração em 30 dias', `${n(racao30 / kgSaco, 0)} sacos`]];
   cor('fill', COR.fundo); doc.roundedRect(M, y, LARG, 16, 5, 5, 'F');
   meta.forEach(([k, v], i) => { const x = M + 6 + ((LARG - 8) / 4) * i; caps(k, x, y + 6); txt(v, x, y + 11.4, { size: 10.5 }); });
   y += 28;
@@ -84,8 +84,8 @@ export function gerarPdfFazenda(jsPDF, d) {
   secao('Lotes ativos', 44);
   if (lotes.length) {
     const corpo = lotes.map((l) => [
-      l.nomeTanque, `${l.lote.especie} (${l.lote.tipo === 'alevinagem' ? 'alev.' : 'eng.'})`, fmtInt(l.c.diasCultivo),
-      l.c.pmAtualG != null ? n(l.c.pmAtualG, 0) : '-', fmtInt(l.c.vivos), fmtInt(l.c.mortos), l.c.sobrevivencia != null ? `${n(l.c.sobrevivencia, 1)}%` : '-',
+      l.nomeTanque, `${l.lote.especie} (${{ bercario: 'berç.', alevinagem: 'alev.', recria: 'recr.', engorda: 'eng.' }[l.lote.tipo] || l.lote.tipo})`, fmtInt(l.c.diasCultivo),
+      l.c.pmAtualG != null ? n(l.c.pmAtualG, 0) : '-', fmtInt(l.c.vivos), fmtInt(l.c.mortos), l.c.sobrevivencia != null ? `${fmtPct(l.c.sobrevivencia)}%` : '-',
       l.c.biomassaAtual != null ? n(l.c.biomassaAtual, 0) : '-', l.c.ca != null ? n(l.c.ca, 2) : '-',
     ]);
     tabela(doc, y, [['TANQUE', 'ESPÉCIE', 'DIAS', 'PESO (g)', 'VIVOS', 'MORTOS', 'SOBREV.', 'BIOMASSA', 'CONV.']], corpo, ['left', 'left', 'right', 'right', 'right', 'right', 'right', 'right', 'right'], [30, 34]);

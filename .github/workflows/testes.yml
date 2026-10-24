@@ -1,0 +1,42 @@
+# Roda TODOS os testes (telas com Supabase simulado + SQL em Postgres de memória) a cada envio e a cada PR.
+# Nada aqui fala com o banco de verdade nem precisa de senha.
+name: Testes
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  testes:
+    runs-on: ubuntu-24.04   # fixo: o 'latest' vai virar Ubuntu 26 e o instalador do navegador pode não suportar ainda
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Instalar dependências
+        run: |
+          pip install playwright==1.63.0 pypdf==6.12.2
+          python -m playwright install --with-deps chromium
+          cd testes/sql && npm install --silent --no-audit --no-fund
+
+      - name: Rodar todos os testes
+        env:
+          NAVEGADOR: ''   # vazio = Chromium do Playwright (no PC usa o Chrome instalado)
+        run: python testes/rodar_tudo.py
+
+      - name: Guardar capturas de tela se algo falhar
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas-dos-testes
+          path: testes/telas/saida/
+          retention-days: 7

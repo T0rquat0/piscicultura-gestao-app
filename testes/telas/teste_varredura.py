@@ -31,7 +31,7 @@ problemas = []
 with sync_playwright() as pw:
     b = pw.chromium.launch(**LANCAR)
     for papel in ['dono', 'gerente', 'funcionario']:
-        pg = b.new_page(viewport={'width': 390, 'height': 844})
+        pg = b.new_page(reduced_motion='reduce', viewport={'width': 390, 'height': 844})
         perfil = {'id': U, 'nome': 'Teste', 'papel': papel, 'fazenda_id': F, 'ativo': True, 'fazendas': {'nome': 'Fazenda Sol'}}
         atual = {'rota': ''}
         pg.on('pageerror', lambda e: problemas.append(f'{papel} {atual["rota"]}: ERRO JS {e}'))

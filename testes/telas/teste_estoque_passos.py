@@ -21,7 +21,7 @@ def checa(c, m):
 
 est = {'rpc': [], 'insert': [], 'fora': [], 'erros': []}
 with sync_playwright() as pw:
-    b = pw.chromium.launch(**LANCAR); pg = b.new_page(viewport={'width': 390, 'height': 844})
+    b = pw.chromium.launch(**LANCAR); pg = b.new_page(reduced_motion='reduce', viewport={'width': 390, 'height': 844})
     pg.on('pageerror', lambda e: est['erros'].append(str(e)))
     perfil = {'id': D, 'nome': 'Dona Ana', 'papel': 'dono', 'fazenda_id': F, 'ativo': True, 'fazendas': {'nome': 'Fazenda Sol'}}
     def rota(route, req):

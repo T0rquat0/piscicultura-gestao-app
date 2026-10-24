@@ -1,6 +1,7 @@
 // Estoque de ração: saldo (todos veem, só em kg) e compras (dono/gerente veem e lançam custo).
 import { confirmar, formulario } from '../dialogo.js';
-import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num } from '../util.js';
+import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num, progresso } from '../util.js';
+import { pizza, COR_RACAO } from '../graficos.js';
 import { PESO_SACO_PADRAO_KG } from '../config.js';
 
 import { situacaoEstoque, sugestaoCompraKg } from '../calc.js';
@@ -52,19 +53,22 @@ export async function renderEstoque(ctx, el) {
     ...contagens.filter((c) => c.data >= corte).map((c) => ({ d: c.data, o: 2, t: Number(c.diferenca_kg) < 0 ? 'Contagem: faltou ração' : Number(c.diferenca_kg) > 0 ? 'Contagem: sobrou a mais' : 'Contagem: bateu certinho', kg: Number(c.diferenca_kg), cid: c.id })),
   ].sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : b.o - a.o));
   const totEntradas = extrato.filter((x) => x.kg > 0).reduce((t, x) => t + x.kg, 0);
-  const totSaidas = -extrato.filter((x) => x.kg < 0).reduce((t, x) => t + x.kg, 0);
+  const totSaidas = Math.abs(extrato.filter((x) => x.kg < 0).reduce((t, x) => t + x.kg, 0)); // abs: evita "-0" quando não houve saída
   const sinal = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${sc(Math.abs(v))}`;
 
   el.innerHTML = `
     <h1>Estoque de ração</h1>
     ${porTipo ? `<div class="seg" style="--n:2" role="tablist">${Object.entries(NOME_RACAO).map(([k]) => `<button type="button" data-tipo-racao="${k}" class="${k === tipoAtual ? 'on' : ''}">${k === 'engorda' ? 'Engorda' : 'Alevino'} <small>${sc(Math.max(0, Number((saldos.linhas.find((x) => x.tipo_racao === k) || {}).saldo_kg || 0)), 0)} sacos</small></button>`).join('')}</div>` : ''}
+    <div class="pc-duas"><div>
     <div class="estoque-hero n-${sit.nivel}">
       <span>${porTipo ? `Ração de ${tipoAtual} em estoque` : 'Em estoque agora'}</span>
       <b>${kg < 0 ? '−' : ''}${sc(Math.abs(kg), 0)}<em>sacos</em></b>
       <small>${fmtNum(kg, 0)} kg${sit.dias != null ? ` · dura cerca de <strong>${fmtInt(Math.floor(sit.dias))} dias</strong>` : ''}</small>
       ${sit.porDia > 0 ? `<small>Gasta ~${sc(sit.porDia)} sacos por dia (média dos últimos 7 dias)</small>` : ''}
+      ${sit.dias != null || sit.nivel === 'negativo' ? `<div class="hero-prog">${progresso(((sit.dias || 0) / ESTOQUE_COBERTURA_DIAS) * 100, { tom: { atencao: 'alerta', critico: 'erro', negativo: 'erro' }[sit.nivel] || '', rotulo: `Ração para ${fmtInt(Math.floor(sit.dias || 0))} de ${ESTOQUE_COBERTURA_DIAS} dias` })}<p class="h-trilho-leg"><span>${fmtInt(Math.floor(sit.dias || 0))} de ${ESTOQUE_COBERTURA_DIAS} dias de ração</span><span>meta: ${ESTOQUE_COBERTURA_DIAS} dias</span></p></div>` : ''}
       ${sit.nivel === 'ok' ? '' : `<p>${MENSAGEM[sit.nivel]}</p>`}
     </div>
+    ${porTipo && saldos.linhas.length > 1 ? `<div class="card">${pizza(saldos.linhas.map((x) => { const v = Math.max(0, Number(x.saldo_kg || 0)) / kgS; return { nome: x.tipo_racao === 'alevino' ? 'Ração de alevino' : 'Ração de engorda', valor: v, cor: COR_RACAO[x.tipo_racao === 'alevino' ? 'alevino' : 'engorda'], txt: `${fmtNum(v, 0)} sacos` }; }), { centro: fmtNum(saldos.linhas.reduce((a, x) => a + Math.max(0, Number(x.saldo_kg || 0)), 0) / kgS, 0), sub: 'sacos', rotulo: 'Estoque por tipo de ração' })}</div>` : ''}
     ${!navigator.onLine ? '<p class="aviso">Sem internet: os valores podem estar desatualizados.</p>' : ''}
     ${gerir && sugKg > 0 ? `<p class="aviso" id="sugestao-compra">Sugestão de compra: <b>~${fmtInt(Math.ceil(sugKg / kgS))} sacos</b> para a ração durar ${ESTOQUE_COBERTURA_DIAS} dias no ritmo atual.</p>` : ''}
     ${gerir && diasSemContar != null && diasSemContar >= CONTAGEM_LEMBRETE_DIAS ? `<p class="aviso" id="lembrete-contagem">A última contagem foi há ${fmtInt(diasSemContar)} dias. Contar toda semana deixa o saldo confiável.</p>` : ''}
@@ -123,24 +127,12 @@ export async function renderEstoque(ctx, el) {
       </form>
     </details>` : ''}
 
-    <h2>Movimento dos últimos 30 dias</h2>
-    ${extrato.length ? `<div class="ex-resumo">
-      <div class="ex-tot entra"><span>Entradas</span><b>+${sc(totEntradas)}<em> sacos</em></b><small>${fmtNum(totEntradas, 0)} kg · compras e sobras de contagem</small></div>
-      <div class="ex-tot sai"><span>Saídas</span><b>−${sc(totSaidas)}<em> sacos</em></b><small>${fmtNum(totSaidas, 0)} kg · ração dada e faltas de contagem</small></div>
-    </div>` : ''}
-    <div class="card">
-      ${extrato.length ? `<ul class="extrato">${extrato.map((x) => `<li class="${x.kg < 0 ? 'sai' : 'entra'}">
-        <span class="ex-d">${fmtData(x.d).slice(0, 5)}</span><span class="ex-t">${esc(x.t)}<i class="ex-tag ${x.kg < 0 ? 'sai' : 'entra'}">${x.kg < 0 ? 'Saída' : 'Entrada'}</i></span>
-        <b>${sinal(x.kg)}<em> sacos</em></b>
-        ${x.cid && ctx.state.perfil.papel === 'dono' ? `<button class="btn mini perigo" data-delc="${esc(x.cid)}" type="button">Excluir</button>` : ''}</li>`).join('')}</ul>`
-        : '<p class="mudo" style="margin:0">Nenhum movimento nos últimos 30 dias.</p>'}
-    </div>
-
     <h2>Resumo geral</h2>
     <div class="kpis">
       <div class="kpi"><span>Comprado</span><b>${sc(comprado, 0)} ${Math.round(comprado / kgS) === 1 ? 'saco' : 'sacos'}</b></div>
       <div class="kpi"><span>Consumido</span><b>${sc(consumido, 0)} ${Math.round(consumido / kgS) === 1 ? 'saco' : 'sacos'}</b></div>
       ${ajustes && gerir ? `<div class="kpi" style="grid-column:1/-1"><span>Ajustes de contagem</span><b>${sinal(ajustes)} sacos</b></div>` : ''}
+      ${comprado > 0 ? `<div class="kpi" style="grid-column:1/-1">${progresso((consumido / comprado) * 100, { rotulo: 'Parte do comprado que já foi consumida' })}<small>${fmtNum(Math.min(100, (consumido / comprado) * 100), 0)}% de tudo o que foi comprado já foi dado aos peixes</small></div>` : ''}
     </div>
 
     ${gerir ? `<h2>Entradas registradas</h2>
@@ -153,7 +145,22 @@ export async function renderEstoque(ctx, el) {
           <td>${esc(c.fornecedor || '—')}</td>
           <td><span class="acoes-reg"><button class="btn mini" data-edit="${esc(c.id)}" type="button">Editar</button><button class="btn mini perigo" data-del="${esc(c.id)}" type="button">Excluir</button></span></td>
         </tr>`).join('')}</tbody></table>` : '<p class="mudo" style="margin:0">Nenhuma entrada registrada.</p>'}
-    </div>` : ''}`;
+    </div>` : ''}
+    </div><div>
+    <h2>Movimento dos últimos 30 dias</h2>
+    ${extrato.length ? `<div class="ex-resumo">
+      <div class="ex-tot entra"><span>Entradas</span><b>${totEntradas > 0 ? '+' : ''}${sc(totEntradas)}<em> sacos</em></b>${progresso((totEntradas / Math.max(totEntradas, totSaidas, 1)) * 100, { tom: 'ok', fina: true, rotulo: 'Entradas comparadas às saídas' })}<small>${fmtNum(totEntradas, 0)} kg · compras e sobras de contagem</small></div>
+      <div class="ex-tot sai"><span>Saídas</span><b>${totSaidas > 0 ? '−' : ''}${sc(totSaidas)}<em> sacos</em></b>${progresso((totSaidas / Math.max(totEntradas, totSaidas, 1)) * 100, { tom: 'erro', fina: true, rotulo: 'Saídas comparadas às entradas' })}<small>${fmtNum(totSaidas, 0)} kg · ração dada e faltas de contagem</small></div>
+    </div>` : ''}
+    <div class="card">
+      ${extrato.length ? `<ul class="extrato">${extrato.map((x) => `<li class="${x.kg < 0 ? 'sai' : 'entra'}">
+        <span class="ex-d">${fmtData(x.d).slice(0, 5)}</span><span class="ex-t">${esc(x.t)} <i class="ex-tag ${x.kg < 0 ? 'sai' : 'entra'}">${x.kg < 0 ? 'Saída' : 'Entrada'}</i></span>
+        <b>${sinal(x.kg)}<em> sacos</em></b>
+        ${x.cid && ctx.state.perfil.papel === 'dono' ? `<button class="btn mini perigo" data-delc="${esc(x.cid)}" type="button">Excluir</button>` : ''}</li>`).join('')}</ul>`
+        : '<p class="mudo" style="margin:0">Nenhum movimento nos últimos 30 dias.</p>'}
+    </div>
+
+    </div></div>`;
 
   el.querySelectorAll('[data-tipo-racao]').forEach((b) => b.addEventListener('click', () => {
     if (b.dataset.tipoRacao === tipoAtual) return;
@@ -234,7 +241,7 @@ export async function renderEstoque(ctx, el) {
     const t = total(), nota = num(f.querySelector('#sacos').value), rec = recebidos(), kgs = fmtNum(num(f.querySelector('#kgsaco').value), 1);
     f.querySelector('#total').textContent = t == null ? 'Total: —'
       : conferir.checked && rec < nota ? `Entra no estoque: ${fmtNum(t, 1)} kg (${fmtNum(rec, rec % 1 ? 1 : 0)} sacos × ${kgs} kg)
-Faltaram ${fmtNum(nota - rec, (nota - rec) % 1 ? 1 : 0)} saco(s) da nota.`
+Faltaram ${fmtNum(nota - rec, (nota - rec) % 1 ? 1 : 0)} ${nota - rec === 1 ? 'saco' : 'sacos'} da nota.`
       : `Total: ${fmtNum(t, 1)} kg (${fmtInt(nota)} sacos × ${kgs} kg)`;
   };
   f.addEventListener('input', () => { erro.hidden = true; }); // corrigiu um campo: a mensagem antiga some

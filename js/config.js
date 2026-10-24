@@ -56,3 +56,34 @@ export const CAUSAS_MORTE = [
 // da versão (ex.: '2026-11-01'). Quem já tem conta verá o pedido de aceite no próximo acesso;
 // quem criar conta marca o aceite no cadastro. Mudou o texto? Troque a data: todos aceitam de novo.
 export const TERMOS_VERSAO = null;
+
+// Peso médio de despesca (kg por peixe) usado na previsão quando o lote não tem meta própria.
+// É só um ponto de partida: cada lote pode ter a sua meta (tela do tanque > "Mudar meta").
+export const ALVO_PADRAO_KG = { bercario: 0.005, alevinagem: 0.05, recria: 0.8, engorda: 2.5 };
+
+// Avisos do tempo (sugestões de manejo; ajuste à realidade da fazenda)
+export const CLIMA = {
+  friagemMinC: 20,      // mínima abaixo disso: peixe tropical come menos
+  quedaC: 4,            // mínima de amanhã cai isso ou mais em relação a hoje
+  calorMaxC: 35,        // máxima acima disso: água quente, menos oxigênio
+  chuvaForteMm: 30,     // chuva do dia acima disso
+  validadeMin: 180,     // quanto tempo a previsão guardada vale antes de buscar de novo
+};
+
+// Alertas de manejo na Início (dono/gerente)
+export const ALERTAS = {
+  biometriaDias: 30,     // lote sem pesagem há mais que isso: números estimados desatualizados
+  racaoDesvio: 0.4,      // ração de hoje 40% abaixo ou acima da média do tanque na semana
+  morteDiasSeguidos: 3,  // mortes no mesmo tanque por esse número de dias seguidos
+};
+
+// Sugestão de ração do dia: % do peso vivo (biomassa) por faixa de peso médio do peixe — tambaqui.
+// Fontes: Embrapa Amazônia Ocidental e INPA (juvenil até 250 g: 5% deu a melhor conversão; redução de 5% para 3%
+// ao longo do cultivo). Faixas acima de 800 g SEM fonte confirmada: PROVISÓRIAS, confirmar com o técnico da fazenda.
+export const TAXA_RACAO = [
+  { ateKg: 0.05, pct: 6, provisoria: true },
+  { ateKg: 0.25, pct: 5 },
+  { ateKg: 0.8, pct: 3 },
+  { ateKg: 1.5, pct: 2, provisoria: true },
+  { ateKg: Infinity, pct: 1.5, provisoria: true },
+];

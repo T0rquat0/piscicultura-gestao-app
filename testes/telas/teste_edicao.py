@@ -80,7 +80,7 @@ def checa(cond, msg):
 
 with sync_playwright() as pw:
     b = pw.chromium.launch(**LANCAR)
-    pg = b.new_page(viewport={'width': 390, 'height': 844})
+    pg = b.new_page(reduced_motion='reduce', viewport={'width': 390, 'height': 844})
     pg.on('pageerror', lambda e: erros_js.append(str(e)))
     pg.route('**/*', rota)
     pg.add_init_script(f"localStorage.setItem('sb-ppvliseblxpsepmeknnl-auth-token', {json.dumps(json.dumps(sessao))});")
@@ -131,9 +131,9 @@ with sync_playwright() as pw:
     pg.screenshot(path='tanque.png', full_page=True)
     checa(pg.is_visible(f'[data-reabrir="{L2}"]') and not pg.is_visible(f'[data-reabrir="{L1}"]'), 'Reabrir aparece só no lote encerrado')
     pg.click(f'[data-editar-lote="{L1}"]'); pg.wait_for_selector('.dialogo form')
-    pg.fill('.dialogo [name=especie]', 'Tambacu'); pg.fill('.dialogo [name=qtd]', '1200'); pg.fill('.dialogo [name=peso]', '60')
+    pg.fill('.dialogo [name=especie]', 'Tambacu'); pg.fill('.dialogo [name=qtd]', '1200'); pg.fill('.dialogo [name=pm]', '0,05')
     pg.click('.dialogo button[type=submit]'); pg.wait_for_timeout(800)
-    checa(('lotes', L1, {'tipo': 'engorda', 'especie': 'Tambacu', 'data_entrada': '2026-09-01', 'quantidade_inicial': 1200, 'peso_inicial_kg': 60}) in patches, 'lote: grava espécie, quantidade e peso')
+    checa(('lotes', L1, {'tipo': 'engorda', 'especie': 'Tambacu', 'data_entrada': '2026-09-01', 'quantidade_inicial': 1200, 'peso_inicial_kg': 60}) in patches, 'lote: grava espécie, quantidade e peso (1.200 × 0,05 kg = 60 kg)')
     pg.wait_for_selector(f'[data-reabrir="{L2}"]')
     pg.click(f'[data-reabrir="{L2}"]'); pg.wait_for_selector('.dialogo [data-ok]')
     checa('já tem um lote ativo' in pg.inner_text('.dialogo'), 'reabrir: avisa que já há lote ativo')

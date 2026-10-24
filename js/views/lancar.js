@@ -1,11 +1,12 @@
 // Lançamento de ração, biometria e mortalidade. Funciona sem internet:
 // o item é gravado na fila local (IndexedDB) e enviado quando houver conexão.
 import { icone } from '../icons.js';
-import { esc, hojeISO, fmtData, fmtNum, fmtInt, num, uuid, ROTULO_TIPO } from '../util.js';
+import { esc, hojeISO, fmtData, fmtNum, fmtInt, num, uuid, ROTULO_TIPO, progresso, fmtPct, plural } from '../util.js';
 import * as db from '../db.js';
 import { confirmar } from '../dialogo.js';
 import { ordemNatural } from './home.js';
-import { PESO_SACO_PADRAO_KG, CAUSAS_MORTE } from '../config.js';
+import { PESO_SACO_PADRAO_KG, CAUSAS_MORTE, TAXA_RACAO } from '../config.js';
+import { sugestaoRacao } from '../calc.js';
 
 const TIPOS = {
   racao: { rotulo: 'Ração', tabela: 'racao_consumo' },
@@ -26,6 +27,7 @@ function camposDoTipo(tipo, kgSaco) {
       <input id="qtd" class="grande" type="number" inputmode="decimal" step="0.5" min="0" placeholder="0" required></label>
       <div class="calc" id="conv">Cada saco = ${fmtNum(kgSaco, 0)} kg</div>
       <button type="button" class="chip repetir" id="b-ultima" hidden></button>
+      <div class="sug-racao" id="sug-racao" hidden></div>
       <details class="como-det"><summary>Como lançar</summary>
       <ol class="como">
         <li>Conte os sacos de ração que foram dados hoje neste tanque.</li>
@@ -78,6 +80,7 @@ export async function renderLancar(ctx, el, params = {}) {
     <div class="seg" role="tablist">
       ${Object.entries(TIPOS).map(([k, v]) => `<button type="button" data-tipo="${k}" class="${k === tipo ? 'on' : ''}">${v.rotulo}</button>`).join('')}
     </div>
+    <div class="pc-duas lc-duas"><div>
     <form id="f" class="form passos" novalidate>
       <section class="passo">
         <h2 class="passo-t"><i>1</i> Tanque</h2>
@@ -109,7 +112,8 @@ export async function renderLancar(ctx, el, params = {}) {
       <p id="erro" class="erro" hidden></p>
       <button class="btn primario grande" type="submit">Salvar ${TIPOS[tipo].rotulo.toLowerCase()}</button>
       ${navigator.onLine ? '' : '<p class="mudo" style="margin:0;text-align:center">Sem internet: será salvo no celular e enviado depois.</p>'}
-    </form>`;
+    </form></div>
+    <aside class="lc-painel" id="painel-tq" aria-label="Resumo do tanque escolhido"></aside></div>`;
 
   if (params.de !== undefined) { const sg = el.querySelector('.seg'); if (sg) sg.dataset.de = params.de; }
   el.querySelectorAll('.seg button').forEach((b) =>
@@ -166,6 +170,57 @@ export async function renderLancar(ctx, el, params = {}) {
   selTanque.addEventListener('change', montarLotes);
   montarLotes();
 
+  // painel ao lado (computador): ração dos últimos 7 dias, hoje × média e sobrevivência do tanque escolhido
+  const painel = el.querySelector('#painel-tq');
+  let dadosPainel = null;
+  async function pintarPainel() {
+    if (!painel || getComputedStyle(painel).display === 'none') return;
+    const t = tanques.find((x) => x.id === selTanque.value);
+    if (!t) { painel.innerHTML = ''; return; }
+    const doTanque = lotes.filter((l) => l.tanque_id === t.id);
+    if (!dadosPainel && navigator.onLine) {
+      const d7 = new Date(`${hoje}T12:00:00`); d7.setDate(d7.getDate() - 6);
+      const desde = d7.toISOString().slice(0, 10);
+      dadosPainel = await Promise.all([ctx.api.racaoPeriodo(desde).catch(() => []), ctx.api.resumoLotes().catch(() => [])])
+        .then(([rac, res]) => ({ rac, res: Object.fromEntries(res.map((x) => [x.lote_id, x])), desde }));
+    }
+    const fila = (await db.filaList()).filter((i) => i.tabela === 'racao_consumo' && i.payload.tanque_id === t.id);
+    const dias = Array.from({ length: 7 }, (_, i) => { const d = new Date(`${hoje}T12:00:00`); d.setDate(d.getDate() - (6 - i)); return d.toISOString().slice(0, 10); });
+    const porDia = Object.fromEntries(dias.map((d) => [d, 0]));
+    for (const r of (dadosPainel && dadosPainel.rac) || []) if (r.tanque_id === t.id && r.data in porDia) porDia[r.data] += Number(r.quantidade_kg) || 0;
+    for (const i of fila) if (i.payload.data in porDia) porDia[i.payload.data] += Number(i.payload.quantidade_kg) || 0;
+    const ant = dias.slice(0, 6).map((d) => porDia[d]).filter((v) => v > 0);
+    const media = ant.length ? ant.reduce((a, b) => a + b, 0) / ant.length : 0;
+    const hojeKg = porDia[hoje];
+    const maxD = Math.max(1, ...Object.values(porDia));
+    const sc = (kg) => fmtNum(kg / kgSaco, kg / kgSaco < 10 && kg % kgSaco ? 1 : 0);
+    let vivos = 0, ini = 0, pm = null;
+    for (const l of doTanque) {
+      const r = dadosPainel && dadosPainel.res[l.id];
+      ini += Number(l.quantidade_inicial) || 0;
+      vivos += Math.max(0, Number(l.quantidade_inicial) - Number((r && r.mortos) || 0));
+      if (r && r.ultimo_peso_medio_kg != null) pm = Number(r.ultimo_peso_medio_kg);
+    }
+    painel.innerHTML = `
+      <p class="lc-cab">Resumo do tanque</p>
+      <h2>${esc(t.nome)}</h2>
+      <p class="mudo" style="margin:.1rem 0 0">${doTanque.length === 1 ? `${esc(ROTULO_TIPO[doTanque[0].tipo] || doTanque[0].tipo)} · ${esc(doTanque[0].especie)}` : doTanque.length ? `${doTanque.length} lotes ativos` : 'Sem lote ativo'}</p>
+      ${doTanque.length ? `<dl class="lc-num">
+        <div><dt>Peixes vivos</dt><dd>${fmtInt(vivos)}</dd></div>
+        <div><dt>Peso médio</dt><dd>${pm != null ? (pm < 1 ? fmtNum(pm * 1000, 0) + ' g' : fmtNum(pm, 2) + ' kg') : '—'}</dd></div>
+      </dl>
+      ${ini > 0 && dadosPainel ? `${progresso((vivos / ini) * 100, { tom: 'ok', fina: true, rotulo: 'Sobrevivência do lote' })}<p class="h-trilho-leg"><span>Sobrevivência</span><b>${fmtPct((vivos / ini) * 100)}%</b></p>` : ''}` : ''}
+      ${tipo === 'racao' || media || hojeKg ? `<h3 class="lc-sub">Ração de hoje</h3>
+      ${media ? `${progresso((hojeKg / media) * 100, { tom: hojeKg >= media ? 'ok' : '', rotulo: 'Ração de hoje comparada à média' })}
+        <p class="h-trilho-leg"><span><b>${sc(hojeKg)}</b> de ~${sc(media)} sacos (média dos dias com ração)</span></p>`
+        : `<p class="mudo pequeno">${hojeKg ? `${sc(hojeKg)} sacos lançados hoje.` : 'Sem ração nos últimos dias para comparar.'}</p>`}
+      <h3 class="lc-sub">Últimos 7 dias</h3>
+      <ul class="lc-dias">${dias.map((d) => `<li class="${d === hoje ? 'hoje' : ''}"><span>${d === hoje ? 'Hoje' : fmtData(d).slice(0, 5)}</span><i><em style="width:${((porDia[d] / maxD) * 100).toFixed(1)}%"></em></i><b>${porDia[d] ? sc(porDia[d]) : '–'}</b></li>`).join('')}</ul>
+      <p class="mudo pequeno" style="margin:.4rem 0 0">Em sacos de ${fmtNum(kgSaco, 0)} kg.</p>` : ''}`;
+  }
+  selTanque.addEventListener('change', pintarPainel);
+  pintarPainel();
+
   if (tipo === 'biometria') {
     // mortos por lote (só com internet): permite estimar os peixes vivos e a biomassa na hora
     let mortos = null;
@@ -204,6 +259,23 @@ export async function renderLancar(ctx, el, params = {}) {
     b.onclick = () => { f.querySelector('#qtd').value = String(sc); f.querySelector('#qtd').dispatchEvent(new Event('input')); f.querySelector('#qtd').focus(); };
   }
   mostrarUltima();
+
+  // sugestão do dia: % do peso vivo do tanque pela faixa de peso (tabela em config.js; faixas sem fonte são provisórias)
+  let resumoLotes = null;
+  async function mostrarSugestao() {
+    const box = f.querySelector('#sug-racao');
+    if (!box) return;
+    if (!resumoLotes && navigator.onLine) resumoLotes = Object.fromEntries(((await ctx.api.resumoLotes().catch(() => [])) || []).map((r) => [r.lote_id, r]));
+    const sug = sugestaoRacao(lotes.filter((l) => l.tanque_id === selTanque.value), resumoLotes || {}, TAXA_RACAO);
+    if (!sug) { box.hidden = true; return; }
+    const sacosSug = Math.max(0.5, Math.round((sug.kg / kgSaco) * 2) / 2);
+    const bio = sug.biomassaKg >= 1000 ? `${fmtNum(sug.biomassaKg / 1000, 1)} t` : `${fmtNum(sug.biomassaKg, 0)} kg`;
+    box.hidden = false;
+    box.innerHTML = `<button type="button" class="chip" id="b-sug">Sugestão: ${esc(sacosTxt(sacosSug))}</button>
+      <small>${fmtNum(sug.pct, 1)}% do peso vivo (${bio} de peixe)${sug.provisoria ? ' · taxa provisória, confirme com o técnico' : ''}</small>`;
+    box.querySelector('#b-sug').onclick = () => { const q = f.querySelector('#qtd'); q.value = String(sacosSug); q.dispatchEvent(new Event('input')); q.focus(); };
+  }
+  if (tipo === 'racao') { mostrarSugestao(); selTanque.addEventListener('change', mostrarSugestao); }
   if (tipo === 'racao') {
     const q = f.querySelector('#qtd'), conv = f.querySelector('#conv');
     q.addEventListener('input', () => { const n = num(q.value); conv.textContent = n > 0 ? `${sacosTxt(n)} = ${fmtNum(n * kgSaco, 1)} kg` : `Cada saco = ${fmtNum(kgSaco, 0)} kg`; });
@@ -244,7 +316,7 @@ export async function renderLancar(ctx, el, params = {}) {
         const r = igual || recente; if (!r) return null;
         return `Este tanque já recebeu ${sacosTxt(Number(r.q) / kgSaco)} neste dia${r.em ? ` (às ${hora(r.em)})` : ''}.`;
       }
-      if (tp === 'mortalidade') { const r = regs.find((x) => Number(x.q) === pl.quantidade); return r ? `Já há ${fmtInt(pl.quantidade)} peixe(s) morto(s) lançado(s) neste lote nesta data${r.em ? ` (às ${hora(r.em)})` : ''}.` : null; }
+      if (tp === 'mortalidade') { const r = regs.find((x) => Number(x.q) === pl.quantidade); return r ? `Já há ${plural(pl.quantidade, 'peixe morto lançado', 'peixes mortos lançados')} neste lote nesta data${r.em ? ` (às ${hora(r.em)})` : ''}.` : null; }
       return regs.length ? 'Já existe uma biometria deste lote nesta data.' : null;
     } catch { return null; }
   }
@@ -322,7 +394,7 @@ export async function renderLancar(ctx, el, params = {}) {
     const nomeTanque = (tanques.find((t) => t.id === selTanque.value) || {}).nome || '';
     const resumo = tipo === 'racao' ? `${sacosTxt(num(f.querySelector('#qtd').value))} de ração (${kgTxt(payload.quantidade_kg)} kg)`
       : tipo === 'biometria' ? `${fmtNum((payload.peso_amostra_kg / payload.quantidade_amostrada) * 1000, 0)} g de peso médio (${fmtInt(payload.quantidade_amostrada)} peixes pesados)`
-      : `${fmtInt(payload.quantidade)} peixe(s) morto(s)`;
+      : `${plural(payload.quantidade, 'peixe morto', 'peixes mortos')}`;
     ctx.toast(navigator.onLine ? 'Salvo. Enviando…' : 'Salvo no celular. Será enviado quando houver internet.', 'ok');
     // sugestão de ronda: o próximo tanque (em ordem) que ainda não recebeu ração hoje
     let proximo = null;

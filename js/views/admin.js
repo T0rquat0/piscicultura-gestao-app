@@ -2,7 +2,7 @@
 // Só aparece para quem está na tabela administradores; o banco confere de novo em cada ação.
 import { confirmar, formulario } from '../dialogo.js';
 import { icone } from '../icons.js';
-import { esc, fmtData, fmtBRL, fmtInt, num } from '../util.js';
+import { esc, fmtData, fmtBRL, fmtInt, num, plural } from '../util.js';
 
 const voltar = `<p><a class="voltar" href="#/mais">${icone('voltar', 18)} Mais</a></p>`;
 const ESTADO = {
@@ -49,7 +49,7 @@ export async function renderAdmin(ctx, el, aba = 'fazendas', estado = { filtro: 
         return `<article class="card adm-faz" data-faz="${esc(f.id)}">
           <header><b>${esc(f.nome)}</b><span class="tag ${s.classe}">${esc(s.rotulo)}${esc(validade)}</span></header>
           <small>${esc(f.dono_nome || 'sem dono')}${f.dono_email ? ` · ${esc(f.dono_email)}` : ''}</small>
-          <small>Entrou em ${fmtData(f.criado_em)} · ${fmtInt(f.pessoas)} pessoa(s) · ${fmtInt(f.tanques)} tanque(s), ${fmtInt(p.em_uso || 0)} em uso${p.limite ? ` de ${p.limite}` : ''}</small>
+          <small>Entrou em ${fmtData(f.criado_em)} · ${plural(f.pessoas, 'pessoa', 'pessoas')} · ${plural(f.tanques, 'tanque', 'tanques')}, ${fmtInt(p.em_uso || 0)} em uso${p.limite ? ` de ${p.limite}` : ''}</small>
           <small>Último lançamento de ração: ${f.ultimo_lancamento ? fmtData(f.ultimo_lancamento) : 'nenhum'}</small>
           <div class="acoes">
             <button class="btn mini" data-estender="${esc(f.id)}" type="button">Estender teste</button>
@@ -137,7 +137,7 @@ export async function renderAdmin(ctx, el, aba = 'fazendas', estado = { filtro: 
   el.querySelectorAll('[data-pagar]').forEach((b) => b.addEventListener('click', async () => {
     const c = cobrancas.find((x) => x.id === b.dataset.pagar);
     const v = await formulario({
-      titulo: `Marcar como paga: ${c.fazenda}`, texto: `Pacote de ${c.tanques_max} tanques, ${fmtBRL(c.valor)} por mês. Confira que o dinheiro entrou antes de confirmar.`,
+      titulo: `Marcar como paga: ${c.fazenda}`, texto: `Pacote de ${c.tanques_max} tanques, ${fmtBRL(c.valor)} por mês. Confira se o dinheiro entrou antes de confirmar.`,
       campos: [{ nome: 'meses', rotulo: 'Quantos meses foram pagos?', tipo: 'number', valor: c.meses || 1, step: '1', min: '1', max: '24', inputmode: 'numeric' }],
       validar: (x) => (Number.isInteger(num(x.meses)) && num(x.meses) >= 1 && num(x.meses) <= 24 ? null : 'Informe de 1 a 24 meses.'),
       ok: 'Confirmar pagamento',

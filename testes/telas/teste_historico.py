@@ -37,7 +37,7 @@ HIST = [
 ]
 
 def abrir(pw, uid, papel, est):
-    b = pw.chromium.launch(**LANCAR); pg = b.new_page(viewport={'width': 390, 'height': 844})
+    b = pw.chromium.launch(**LANCAR); pg = b.new_page(reduced_motion='reduce', viewport={'width': 390, 'height': 844})
     est.setdefault('rpc', []); est.setdefault('fora', []); est.setdefault('erros', [])
     pg.on('pageerror', lambda e: est['erros'].append(str(e)))
     perfil = {'id': uid, 'nome': 'Dona Ana' if papel == 'dono' else 'Zé', 'papel': papel, 'fazenda_id': F, 'ativo': True, 'fazendas': {'nome': 'Fazenda Sol'}}
@@ -69,21 +69,21 @@ def abrir(pw, uid, papel, est):
 
 with sync_playwright() as pw:
     est = {}; b, pg = abrir(pw, D, 'dono', est)
-    pg.goto(BASE + '#/mais'); pg.wait_for_selector('a[href="#/historico"]', timeout=20000)
+    pg.goto(BASE + '#/mais'); pg.wait_for_selector('#view a[href="#/historico"]', timeout=20000)
     checa(True, 'dono: "Histórico e lixeira" aparece em Mais')
-    pg.click('a[href="#/historico"]'); pg.wait_for_selector('.seg button[data-aba=lixeira]', timeout=15000)
+    pg.click('#view a[href="#/historico"]'); pg.wait_for_selector('.seg button[data-aba=lixeira]', timeout=15000)
     itens = pg.locator('#view .registros li')
     checa(itens.count() == 2, f'lixeira: 2 operações (lote + ração avulsa); vínculo removido não entra como lixo [{itens.count()}]')
     t = itens.nth(0).inner_text()
-    checa('Lote de Tambaqui (engorda) no tanque T1' in t and 'e mais 2 registro(s)' in t and 'Dona Ana' in t, 'lixeira: lote aparece como item principal, "e mais 2", quem excluiu')
+    checa('Lote de Tambaqui (engorda) no tanque T1' in t and 'e mais 2 registros apagados' in t and 'Dona Ana' in t, 'lixeira: lote aparece como item principal, "e mais 2", quem excluiu')
     t2 = itens.nth(1).inner_text()
     checa('Ração: 12,5 kg' in t2 and 'Zé' in t2 and 'Restaurado' in t2, 'lixeira: ração já restaurada aparece marcada, com quem excluiu (Zé)')
     pg.screenshot(path='lixeira.png', full_page=True)
     pg.click('[data-restaurar="100"]'); pg.wait_for_selector('.dialogo [data-ok]')
-    checa('e mais 2 registro(s)' in pg.inner_text('.dialogo'), 'restaurar: confirmação diz que traz junto os 2 registros')
+    checa('e mais 2 registros apagados' in pg.inner_text('.dialogo'), 'restaurar: confirmação diz que traz junto os 2 registros')
     pg.click('.dialogo [data-ok]'); pg.wait_for_timeout(1200)
     checa(('restaurar_exclusao', {'p_operacao': 100}) in est['rpc'], 'restaurar: pede ao banco a operação 100')
-    checa('3 registro(s) restaurado(s)' in pg.inner_text('#toast'), 'restaurar: avisa quantos voltaram')
+    checa('3 registros restaurados' in pg.inner_text('#toast'), 'restaurar: avisa quantos voltaram')
     pg.click('.seg button[data-aba=alteracoes]'); pg.wait_for_timeout(600)
     t = pg.inner_text('#view')
     checa('Peixes pesados: 10 → 20' in t, 'alterações: mostra antes → depois (Peixes pesados: 10 → 20)')
@@ -106,7 +106,7 @@ with sync_playwright() as pw:
 
     est = {}; b, pg = abrir(pw, FN, 'funcionario', est)
     pg.goto(BASE + '#/mais'); pg.wait_for_selector('#b-sair', timeout=20000)
-    checa(pg.locator('a[href="#/historico"]').count() == 0, 'funcionário: não vê o item no menu')
+    checa(pg.locator('#view a[href="#/historico"]').count() == 0, 'funcionário: não vê o item no menu')
     pg.goto(BASE + '#/historico'); pg.wait_for_selector('.card.vazio', timeout=15000)
     checa('Somente o dono' in pg.inner_text('#view') and not any(r[0] == 'restaurar_exclusao' for r in est['rpc']), 'funcionário: endereço direto mostra "somente o dono"')
     errs += est['erros'] + est['fora']; b.close()

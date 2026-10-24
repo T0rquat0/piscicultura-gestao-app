@@ -6,7 +6,9 @@ import { gerarPdfFazenda } from '../pdf_fazenda.js';
 import { gerarPdfRacao } from '../pdf_racao.js';
 import { confirmar, formulario } from '../dialogo.js';
 import { icone } from '../icons.js';
-import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num, ROTULO_TIPO, nomeArquivo, dataArquivo } from '../util.js';
+import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num, ROTULO_TIPO, faseCss, nomeArquivo, dataArquivo, progresso, fmtPct } from '../util.js';
+import { pizza, COR_FASE, ORDEM_FASE } from '../graficos.js';
+import { calcularNaIdade, fimDoLote, mediaDe } from '../calc.js';
 import { calcularLote, precoMedioKg, pontosPeso, pesoMedioKg, evolucaoPeso, racaoPorSemana, matrizRacao, situacaoEstoque } from '../calc.js';
 
 export function svgPeso(pts) {
@@ -39,7 +41,7 @@ export function montarCsv(lote, nomeTanque, calc, bios, mort, rac, quem) {
     ['Entrada', fmtData(lote.data_entrada)], ['Peixes iniciais', lote.quantidade_inicial], ['Peso total inicial (kg)', csvNum(lote.peso_inicial_kg)],
     [], ['RESUMO'], ['Dias de cultivo', calc.diasCultivo], ['Peixes vivos (estimado)', calc.vivos], ['Mortos', calc.mortos],
     ['Ração total (kg)', csvNum(calc.racaoTotal)], ['Peso médio atual (g)', csvNum(calc.pmAtualG, 1)],
-    ['Conversão alimentar aparente', csvNum(calc.ca)], ['Ganho de peso diário (g/dia)', csvNum(calc.gpd)], [],
+    ['Conversão alimentar aparente', csvNum(calc.ca)], ['Custo de ração por kg produzido (R$)', csvNum(calc.custoKgProduzido)], ['Ganho de peso diário (g/dia)', csvNum(calc.gpd)], [],
     ['RAÇÃO'], ['Data', 'Quantidade (kg)', 'Registrado por']);
   rac.forEach((r) => L.push([fmtData(r.data), csvNum(r.quantidade_kg), quem(r.registrado_por)]));
   L.push([], ['BIOMETRIAS'], ['Data', 'Peso da amostra (kg)', 'Peixes na amostra', 'Peso médio (g)', 'Registrado por']);
@@ -55,25 +57,32 @@ export async function renderRelatorios(ctx, el) {
     el.innerHTML = '<h1>Relatórios</h1><div class="card vazio"><p>Os relatórios precisam de internet, porque usam os dados já enviados ao servidor.</p></div>';
     return;
   }
-  const lotes = await ctx.api.lotes();
+  const [lotes, resumoRows] = await Promise.all([ctx.api.lotes(), ctx.api.resumoLotes().catch(() => [])]);
+  const resumo = Object.fromEntries((resumoRows || []).map((x) => [x.lote_id, x]));
   const tanques = ctx.state.ref.tanques;
   const nat = (x, y) => String(x).localeCompare(String(y), 'pt-BR', { numeric: true, sensitivity: 'base' });
   const nomeDe = (tid) => (tanques.find((t) => t.id === tid) || {}).nome || '';
   const porTanque = (l1, l2) => nat(nomeDe(l1.tanque_id), nomeDe(l2.tanque_id)) || String(l2.data_entrada).localeCompare(String(l1.data_entrada));
   const linhaLote = (l) => `<li><a class="item" href="#/relatorio/${esc(l.id)}"><span class="esq"><b>${esc(nomeDe(l.tanque_id))}</b>
-      <small>${esc(ROTULO_TIPO[l.tipo] || l.tipo)} · ${esc(l.especie)} · desde ${fmtData(l.data_entrada)} · ${fmtInt(l.quantidade_inicial)} peixes</small></span><span class="seta">${icone('direita', 20)}</span></a></li>`;
+      <small>${esc(ROTULO_TIPO[l.tipo] || l.tipo)} · ${esc(l.especie)} · desde ${fmtData(l.data_entrada)} · ${fmtInt(l.quantidade_inicial)} peixes</small>${sobreLote(l)}</span><span class="seta">${icone('direita', 20)}</span></a></li>`;
+  function sobreLote(l) {
+    const x = resumo[l.id], ini = Number(l.quantidade_inicial) || 0;
+    if (!x || !ini || !l.ativo) return '';
+    const pct = (Math.max(0, ini - Number(x.mortos || 0)) / ini) * 100;
+    return `${progresso(pct, { fina: true, tom: pct >= 90 ? 'ok' : pct >= 75 ? 'alerta' : 'erro', rotulo: `Sobrevivência ${fmtPct(pct)}%` })}<small class="prog-leg">Sobrevivência ${fmtPct(pct)}%</small>`;
+  }
   const ativos = lotes.filter((l) => l.ativo).sort(porTanque);
   const encerrados = lotes.filter((l) => !l.ativo).sort(porTanque);
   el.innerHTML = `<h1>Relatórios</h1>
     <p class="mudo" style="margin-top:-.4rem">O que você quer saber?</p>
     <div class="hub">
-      <a class="hub-card" href="#/relatorio/racao"><span class="item-ic">${icone('lancar')}</span><span class="esq"><b>Ração fornecida</b><small>Quanto foi jogado em cada tanque, hoje ou na semana. Dá para enviar ao dono.</small></span><span class="seta">${icone('direita', 20)}</span></a>
+      <a class="hub-card" href="#/relatorio/racao"><span class="item-ic">${icone('lancar')}</span><span class="esq"><b>Ração fornecida</b><small>Quanta ração cada tanque recebeu, hoje ou na semana. Dá para enviar ao dono.</small></span><span class="seta">${icone('direita', 20)}</span></a>
       <a class="hub-card" href="#/estoque"><span class="item-ic">${icone('estoque')}</span><span class="esq"><b>Estoque de ração</b><small>Quanto resta no galpão e para quantos dias dá.</small></span><span class="seta">${icone('direita', 20)}</span></a>
       <button class="hub-card" id="b-pdf-fazenda" type="button"><span class="item-ic">${icone('relatorio')}</span><span class="esq"><b>Relatório geral da fazenda</b><small>PDF com estoque, lotes e mortalidade, para compartilhar.</small></span><span class="seta">${icone('direita', 20)}</span></button>
     </div>
     <h2>Relatório de um lote</h2>
     <p class="mudo" style="margin-top:-.4rem">Peso, mortalidade e ração de cada lote de peixes.</p>
-    ${ativos.length ? `<div class="card"><ul class="lista">${ativos.map(linhaLote).join('')}</ul></div>` : '<div class="card vazio"><p>Ainda não há lotes ativos.</p></div>'}
+    ${ativos.length ? `<div class="card"><ul class="lista lista-grade">${ativos.map(linhaLote).join('')}</ul></div>` : '<div class="card vazio"><p>Ainda não há lotes ativos.</p></div>'}
     ${encerrados.length ? `<details class="avancado"><summary>Lotes encerrados (${encerrados.length})</summary><div class="card"><ul class="lista">${encerrados.map(linhaLote).join('')}</ul></div></details>` : ''}`;
 
   const bf = el.querySelector('#b-pdf-fazenda');
@@ -147,6 +156,71 @@ export async function renderRelatorioLote(ctx, el, id) {
     <section class="bloco"><h2>${titulo} <span class="contagem">${itens.length}</span></h2>
       <div class="card">${itens.length ? `<ul class="lista registros">${itens.join('')}</ul>` : `<p class="mudo" style="margin:0">${vazio}</p>`}</div></section>`;
 
+  // ---- comparação com ciclos encerrados: na mesma idade deste lote e como terminaram ----
+  let cmpHtml = '', cmpPdf = null;
+  async function compararCiclos() {
+    const precoKg = gerir ? precoMedioKg(compras) : null;
+    const todos = await ctx.api.lotes().catch(() => []);
+    const enc = todos.filter((l) => !l.ativo && l.id !== lote.id && l.especie === lote.especie);
+    const recentes = (a, b) => String(b.data_entrada).localeCompare(String(a.data_entrada));
+    const anteriorTanque = enc.filter((l) => l.tanque_id === lote.tanque_id).sort(recentes)[0] || null;
+    const mesmaFase = enc.filter((l) => l.tipo === lote.tipo).sort(recentes).slice(0, 6);
+    if (!anteriorTanque && !mesmaFase.length) {
+      return `<div class="card"><p class="mudo" style="margin:0">Ainda não há ciclos de ${esc(lote.especie)} encerrados para comparar. Quando um lote for encerrado (Tanques &gt; lote &gt; Encerrar), este quadro mostra como este ciclo está em relação aos anteriores na mesma idade.</p></div>`;
+    }
+    const ids = [...new Set([anteriorTanque && anteriorTanque.id, ...mesmaFase.map((l) => l.id)].filter(Boolean))];
+    const dados = Object.fromEntries(await Promise.all(ids.map(async (lid) => [lid, await ctx.api.dadosLote(lid).catch(() => null)])));
+    const idade = c.diasCultivo;
+    const naIdade = (l) => { const d = dados[l.id]; return d ? calcularNaIdade(l, d.bios, d.mort, d.rac, idade, precoKg) : null; };
+    const porMil = (x, l) => (x && Number(l.quantidade_inicial) > 0 ? (x.racaoTotal / Number(l.quantidade_inicial)) * 1000 : null);
+    const ant = anteriorTanque ? naIdade(anteriorTanque) : null;
+    const fase = mesmaFase.map((l) => ({ l, x: naIdade(l) })).filter((o) => o.x);
+    const med = (k) => mediaDe(fase.map((o) => o.x), k);
+    const medPorMil = mediaDe(fase.map((o) => ({ v: porMil(o.x, o.l) })), 'v');
+    const g = (v) => (v == null ? '—' : v >= 1000 ? `${fmtNum(v / 1000, 2)} kg` : `${fmtNum(v, v < 10 ? 1 : 0)} g`);
+    // [rótulo, este lote, ciclo anterior, média, formato, maior é melhor? (null = neutro)]
+    const linhas = [
+      ['Peso médio', c.pmAtualG, ant && ant.pmAtualG, med('pmAtualG'), g, true],
+      ['Ganho diário', c.gpd, ant && ant.gpd, med('gpd'), (v) => (v == null ? '—' : `${fmtNum(v, 1)} g/dia`), true],
+      ['Conversão alimentar', c.ca, ant && ant.ca, med('ca'), (v) => (v == null ? '—' : fmtNum(v, 2)), false],
+      ['Sobrevivência', c.sobrevivencia, ant && ant.sobrevivencia, med('sobrevivencia'), (v) => (v == null ? '—' : `${fmtPct(v)}%`), true],
+      ['Ração por mil peixes', porMil(c, lote), ant && porMil(ant, anteriorTanque), medPorMil, (v) => (v == null ? '—' : `${fmtNum(v, 0)} kg`), null],
+      ...(gerir ? [['Custo da ração por kg produzido', c.custoKgProduzido, ant && ant.custoKgProduzido, med('custoKgProduzido'), (v) => (v == null ? '—' : fmtBRL(v)), false]] : []),
+    ];
+    // marca melhor/pior em relação à média da fase (ou ao ciclo anterior); só diferenças de 5% ou mais
+    const marca = (este, ref, maior) => {
+      if (maior == null || este == null || ref == null || !ref) return '';
+      const dif = (este - ref) / Math.abs(ref);
+      if (Math.abs(dif) < 0.05) return '<span class="cmp-tag igual">na média</span>';
+      const melhor = maior ? dif > 0 : dif < 0;
+      return `<span class="cmp-tag ${melhor ? 'melhor' : 'pior'}">${melhor ? 'melhor' : 'pior'} ${fmtInt(Math.abs(dif) * 100)}%</span>`;
+    };
+    const colAnt = anteriorTanque ? `<th class="n">Ciclo anterior<small>${esc(nomeTanque)} · ${fmtData(anteriorTanque.data_entrada)}</small></th>` : '';
+    const colMed = fase.length ? `<th class="n">Média da fazenda<small>${fmtInt(fase.length)} ${fase.length === 1 ? 'ciclo' : 'ciclos'} de ${esc((ROTULO_TIPO[lote.tipo] || lote.tipo).toLowerCase())}</small></th>` : '';
+    const tabela = `<div class="card"><table class="cmp">
+      <thead><tr><th>No dia ${fmtInt(idade)} do ciclo</th><th class="n">Este lote</th>${colAnt}${colMed}</tr></thead>
+      <tbody>${linhas.map(([r, e, a, m, f, maior]) => `<tr><td>${r}</td><td class="n" data-r="Este lote"><b>${f(e)}</b>${marca(e, fase.length ? m : a, maior)}</td>${anteriorTanque ? `<td class="n" data-r="Ciclo anterior">${f(a)}</td>` : ''}${fase.length ? `<td class="n" data-r="Média">${f(m)}</td>` : ''}</tr>`).join('')}</tbody></table></div>`;
+    const tagTxt = (este, ref, maior) => marca(este, ref, maior).replace(/<[^>]+>/g, '');
+    cmpPdf = {
+      idade,
+      cab: ['INDICADOR', 'ESTE LOTE', ...(anteriorTanque ? [`CICLO ANTERIOR (${fmtData(anteriorTanque.data_entrada)})`] : []), ...(fase.length ? [`MÉDIA (${fase.length} ${fase.length === 1 ? 'CICLO' : 'CICLOS'})`] : [])],
+      corpo: linhas.map(([r, e, a, m, f, maior]) => { const t = tagTxt(e, fase.length ? m : a, maior); return [r, `${f(e)}${t ? ` (${t})` : ''}`, ...(anteriorTanque ? [f(a)] : []), ...(fase.length ? [f(m)] : [])]; }),
+      fim: '',
+    };
+    let fim = '';
+    const dAnt = anteriorTanque && dados[anteriorTanque.id];
+    if (dAnt) {
+      const dataFim = fimDoLote(anteriorTanque, dAnt.bios, dAnt.mort, dAnt.rac, hoje);
+      const fz = calcularLote(anteriorTanque, dAnt.bios, dAnt.mort, dAnt.rac, dataFim, precoKg);
+      const dur = Math.max(0, Math.round((new Date(`${dataFim}T12:00:00`) - new Date(`${anteriorTanque.data_entrada}T12:00:00`)) / 864e5));
+      cmpPdf.fim = `O ciclo anterior deste tanque durou ${fmtInt(dur)} dias e terminou com ${g(fz.pmAtualG)}${fz.ca != null ? `, conversão ${fmtNum(fz.ca, 2)}` : ''} e ${fmtPct(fz.sobrevivencia)}% de sobrevivência.`;
+      fim = `<p class="cmp-fim">O ciclo anterior deste tanque durou <b>${fmtInt(dur)} dias</b> e terminou com <b>${g(fz.pmAtualG)}</b>${fz.ca != null ? `, conversão <b>${fmtNum(fz.ca, 2)}</b>` : ''} e <b>${fmtPct(fz.sobrevivencia)}%</b> de sobrevivência${gerir && fz.custoKgProduzido != null ? ` (ração a ${fmtBRL(fz.custoKgProduzido)} por kg produzido)` : ''}.</p>`;
+    }
+    return `${tabela}${fim}<p class="mudo nota">Comparação na mesma idade: os ciclos anteriores são recortados no dia ${fmtInt(idade)} depois da entrada; ciclo encerrado termina no último registro. Melhor/pior em relação à ${fase.length ? 'média da fazenda' : 'ciclo anterior'}, só com 5% ou mais de diferença.</p>`;
+  }
+  const pintarCmp = (h) => { cmpHtml = h; const box = el.querySelector('#cmp-ciclos'); if (box) box.innerHTML = `<h2>Comparação com ciclos anteriores</h2>${h}`; };
+  compararCiclos().then(pintarCmp).catch(() => pintarCmp('<div class="card"><p class="mudo" style="margin:0">Não foi possível buscar os ciclos anteriores agora.</p></div>'));
+
   const abas = [['resumo', 'Resumo'], ['peso', 'Peso'], ['racao', 'Ração'], ...(gerir ? [['registros', 'Registros']] : [])];
   let aba = 'resumo';
 
@@ -159,12 +233,14 @@ export async function renderRelatorioLote(ctx, el, id) {
     <section class="bloco"><h2>Situação do lote</h2>
       <div class="card"><ul class="lista numeros">
         ${linhaNum('Dias de cultivo', fmtInt(c.diasCultivo))}
-        ${linhaNum('Peixes vivos (estim.)', fmtInt(c.vivos), `${fmtNum(c.sobrevivencia, 1)}% de sobrevivência · ${fmtInt(c.mortos)} mortos`)}
+        ${linhaNum('Peixes vivos (estim.)', fmtInt(c.vivos), `${fmtPct(c.sobrevivencia)}% de sobrevivência · ${fmtInt(c.mortos)} mortos`)}
         ${linhaNum('Biomassa estimada', c.biomassaAtual != null ? fmtNum(c.biomassaAtual, 0) + ' kg' : '—', `na entrada: ${fmtNum(c.biomassaInicial, 0)} kg`)}
         ${gerir ? linhaNum('Custo de ração', c.custoRacao != null ? fmtBRL(c.custoRacao) : '—', c.custoRacao != null ? 'pelo preço médio pago por kg' : 'registre o valor nas compras') : ''}
+        ${gerir ? linhaNum('Custo de ração por kg produzido', c.custoKgProduzido != null ? fmtBRL(c.custoKgProduzido) : '—', c.custoKgProduzido != null ? 'ração até a última biometria ÷ peixe que ganhou peso' : 'precisa de preço nas compras e biometria com ganho') : ''}
       </ul></div>
       <p class="mudo nota">Valores estimados usam o peso médio da última biometria e a mortalidade registrada. Quanto mais biometrias, mais confiável.</p>
-    </section>`;
+    </section>
+    <section class="bloco" id="cmp-ciclos"><h2>Comparação com ciclos anteriores</h2>${cmpHtml || '<div class="card"><p class="mudo" style="margin:0">Buscando os ciclos anteriores…</p></div>'}</section>`;
 
   const painelPeso = () => {
     const ev = evolucaoPeso(lote, bios);
@@ -188,6 +264,7 @@ export async function renderRelatorioLote(ctx, el, id) {
     <div class="card destaques3">
       ${destaque('Ração fornecida', unid(fmtNum(c.racaoTotal, 0), 'kg'), `≈ ${fmtNum(c.racaoTotal / kgS, 1)} sacos` + (c.racaoMediaDia != null ? ` · média ${fmtNum(c.racaoMediaDia, 1)} kg/dia` : ''))}
       ${gerir ? destaque('Custo de ração', c.custoRacao != null ? fmtBRL(c.custoRacao) : '—', c.custoRacao != null ? 'pelo preço médio pago por kg' : 'registre o valor nas compras') : ''}
+      ${gerir && c.custoKgProduzido != null ? destaque('Custo por kg produzido', fmtBRL(c.custoKgProduzido), 'só a ração, por kg de peixe ganho') : ''}
     </div>
     <section class="bloco"><h2>Por semana</h2><div class="card">${svgSemanas(sem)}</div></section>
     <section class="bloco"><h2>Últimos lançamentos</h2>
@@ -207,7 +284,7 @@ export async function renderRelatorioLote(ctx, el, id) {
   el.innerHTML = `
     <p class="no-print"><a class="voltar" href="#/relatorio">${icone('voltar', 18)} Relatórios</a></p>
     <h1>${esc(nomeTanque)} · ${esc(lote.especie)}</h1>
-    <p class="mudo cab-lote"><span class="fase ${lote.tipo === 'alevinagem' ? 'alev' : 'eng'}"></span>${esc(ROTULO_TIPO[lote.tipo] || lote.tipo)} · entrada em ${fmtData(lote.data_entrada)} · ${lote.ativo ? 'lote ativo' : 'lote encerrado'}</p>
+    <p class="mudo cab-lote"><span class="fase ${faseCss(lote.tipo)}"></span>${esc(ROTULO_TIPO[lote.tipo] || lote.tipo)} · entrada em ${fmtData(lote.data_entrada)} · ${lote.ativo ? 'lote ativo' : 'lote encerrado'}</p>
     <div class="seg no-print" style="--n:${abas.length}" role="tablist">${abas.map(([k, r]) => `<button type="button" data-aba="${k}">${r}</button>`).join('')}</div>
     <div id="painel"></div>
     <div class="acoes no-print">
@@ -286,15 +363,15 @@ export async function renderRelatorioLote(ctx, el, id) {
       const [jsPDF, fontes] = await Promise.all([carregarGerador(), carregarFontes()]);
       const doc = gerarPdfLote(jsPDF, {
         logo: ctx.state.ref.logo || null, fazenda: (ctx.state.perfil.fazendas && ctx.state.perfil.fazendas.nome) || 'Piscicultura', lote, nomeTanque, c, bios, mort, rac,
-        evo: evolucaoPeso(lote, bios), semanas: racaoPorSemana(rac), kgSaco: kgS, gerir, geradoEm: hoje, fontes,
+        evo: evolucaoPeso(lote, bios), semanas: racaoPorSemana(rac), kgSaco: kgS, gerir, geradoEm: hoje, fontes, cmp: cmpPdf,
       });
       const blob = doc.output('blob');
-      const nome = nomeArquivo(['Relatório do lote', nomeTanque || 'Tanque', lote.especie, dataArquivo(hoje)], 'pdf');
+      const nome = nomeArquivo(['Relatório do lote', nomeTanque || 'Tanque', lote.especie, `lote de ${dataArquivo(lote.data_entrada)}`, dataArquivo(hoje)], 'pdf');
       bpdf.disabled = false; bpdf.textContent = texto;
       await abrirVisualizador({ blob, nome, titulo: `${nomeTanque} · ${lote.especie}`, toast: ctx.toast });
     } catch (e) { ctx.toast(e.message || 'Não foi possível gerar o PDF', 'erro'); bpdf.disabled = false; bpdf.textContent = texto; }
   });
-  el.querySelector('#b-csv').addEventListener('click', () => baixarCsv(nomeArquivo(['Relatório do lote', nomeTanque || 'Tanque', lote.especie, dataArquivo(hojeISO())], 'csv'), montarCsv(lote, nomeTanque, c, bios, mort, rac, quem)));
+  el.querySelector('#b-csv').addEventListener('click', () => baixarCsv(nomeArquivo(['Relatório do lote', nomeTanque || 'Tanque', lote.especie, `lote de ${dataArquivo(lote.data_entrada)}`, dataArquivo(hojeISO())], 'csv'), montarCsv(lote, nomeTanque, c, bios, mort, rac, quem)));
 }
 
 function baixarCsv(nome, texto) {
@@ -360,7 +437,7 @@ export async function renderRacaoDia(ctx, el) {
   // lote e peso estimado dos peixes de cada tanque (para "% do peso vivo")
   const infoTanque = (tid) => {
     const ls = lotesAtivos.filter((l) => l.tanque_id === tid);
-    if (!ls.length) return { lote: '', vivos: null, biomassaKg: null };
+    if (!ls.length) return { lote: '', vivos: null, biomassaKg: null, fase: null };
     const lote = ls.length > 1 ? `${ls.length} lotes` : `${ls[0].especie} · ${(ROTULO_TIPO[ls[0].tipo] || ls[0].tipo || '').toLowerCase()}`;
     let vivos = 0, bio = 0, temPeso = true;
     for (const l of ls) {
@@ -369,7 +446,7 @@ export async function renderRacaoDia(ctx, el) {
       vivos += v;
       if (r0 && r0.ultimo_peso_medio_kg != null) bio += v * Number(r0.ultimo_peso_medio_kg); else temPeso = false;
     }
-    return { lote, vivos, biomassaKg: temPeso && bio > 0 ? bio : null };
+    return { lote, vivos, biomassaKg: temPeso && bio > 0 ? bio : null, fase: ls.every((l) => l.tipo === ls[0].tipo) ? ls[0].tipo : null };
   };
   const nat = (a, b) => String(a).localeCompare(String(b), 'pt-BR', { numeric: true, sensitivity: 'base' });
   const diaSemana = (iso) => new Intl.DateTimeFormat('pt-BR', { weekday: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`)).replace(/^./, (c) => c.toUpperCase());
@@ -443,12 +520,21 @@ export async function renderRacaoDia(ctx, el) {
     <p class="no-print" style="text-align:center;margin:1.2rem 0 .4rem"><button class="link" id="b-csv" type="button">Baixar planilha (CSV)</button></p>`;
 
   let r = null;
+  // ração do período dividida por fase do lote (só quando há mais de uma fase)
+  function pizzaFase(lista) {
+    const porFase = {};
+    for (const t of lista) if (t.kg > 0 && t.fase) porFase[t.fase] = (porFase[t.fase] || 0) + t.kg;
+    const fases = ORDEM_FASE.filter((f) => porFase[f] > 0);
+    if (fases.length < 2) return '';
+    return `<div class="pz-faixa">${pizza(fases.map((f) => ({ nome: ROTULO_TIPO[f] || f, valor: porFase[f], cor: COR_FASE[f], txt: `${sacos(porFase[f])} sacos` })), { centro: sacos(Object.values(porFase).reduce((a, b) => a + b, 0)), sub: 'sacos', rotulo: 'Ração por fase' })}</div>`;
+  }
   function pintar() {
     el.querySelectorAll('[data-per]').forEach((b) => b.classList.toggle('on', b.dataset.per === per));
     r = calcular();
     const marcado = (t) => !desmarcados.has(t.id);
+    const maxKg = Math.max(1, ...r.todos.map((t) => t.kg || 0));
     const ranque = r.todos.map((t) => `
-      <li class="racao-item${marcado(t) ? '' : ' fora'}"><label class="marca no-print" title="Incluir no relatório"><input type="checkbox" data-marca="${esc(t.id)}"${marcado(t) ? ' checked' : ''}><span></span></label><span class="esq"><b>${esc(t.nome)}</b>${t.kg > 0 || t.lote ? `<small>${[t.kg > 0 ? `${kgTxt(t.kg)} kg` : '', t.lote, t.pesoVivoPct != null && t.kg > 0 ? `${fmtNum(t.pesoVivoPct, 1)}% do peso vivo` : ''].filter(Boolean).map(esc).join(' · ')}</small>` : ''}</span>
+      <li class="racao-item${marcado(t) ? '' : ' fora'}"><label class="marca no-print" title="Incluir no relatório"><input type="checkbox" data-marca="${esc(t.id)}"${marcado(t) ? ' checked' : ''}><span></span></label><span class="esq"><b>${esc(t.nome)}</b>${t.kg > 0 || t.lote ? `<small>${[t.kg > 0 ? `${kgTxt(t.kg)} kg` : '', t.lote, t.pesoVivoPct != null && t.kg > 0 ? `${fmtNum(t.pesoVivoPct, 1)}% do peso vivo` : ''].filter(Boolean).map(esc).join(' · ')}</small>` : ''}${t.kg > 0 ? progresso((t.kg / maxKg) * 100, { fina: true, rotulo: `${t.nome}: ${kgTxt(t.kg)} kg` }) : ''}</span>
       ${t.kg > 0 ? `<b class="valor">${sacos(t.kg)} <small>sacos</small></b>` : `<span class="tag ${t.ativo ? 'aviso' : ''}">${t.ativo ? 'sem lançamento' : '–'}</span>`}</li>`).join('');
     const grafico = r.um || !r.lista.length ? '' : svgDias(r.linhasDia);
     const detalhe = r.um || !r.lista.length ? '' : `
@@ -467,7 +553,7 @@ export async function renderRacaoDia(ctx, el) {
       <p class="mudo nota so-pc">Valores em kg. “–” significa que nada foi lançado naquele dia.</p>
       <p class="mudo nota so-cel">Toque num dia para ver a ração de cada tanque. A tabela completa vai no PDF.</p>`;
     const quem = r.individual ? r.lista[0].nome : r.parcial ? `${r.lista.length} de ${r.todos.length} tanques` : r.todos.length > 1 ? 'todos os tanques' : '';
-    el.querySelector('#resumo').innerHTML = !r.todos.length ? '' : `<div class="racao-total"><small>${esc(r.periodo)}${quem ? ` · ${esc(quem)}` : ''}</small><b>${sacos(r.total)} sacos</b><span>${kgTxt(r.total)} kg no total</span></div>`;
+    el.querySelector('#resumo').innerHTML = !r.todos.length ? '' : `<div class="racao-total"><small>${esc(r.periodo)}${quem ? ` · ${esc(quem)}` : ''}</small><b>${sacos(r.total)} sacos</b><span>${kgTxt(r.total)} kg no total</span>${pizzaFase(r.lista)}${(() => { const at = r.todos.filter((t) => t.ativo), com = at.filter((t) => t.kg > 0).length; return at.length > 1 ? `<div class="hero-prog">${progresso((com / at.length) * 100, { tom: com === at.length ? 'ok' : '', rotulo: `${com} de ${at.length} tanques com ração lançada` })}<p class="h-trilho-leg"><span>${fmtInt(com)} de ${fmtInt(at.length)} tanques com ração lançada</span></p></div>` : ''; })()}</div>`;
     el.querySelector('#acoes-racao').hidden = !r.todos.length;
     const bpdf = el.querySelector('#b-pdf-racao'); bpdf.disabled = !r.lista.length;
     el.querySelector('#b-csv').disabled = !r.lista.length;

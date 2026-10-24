@@ -20,7 +20,7 @@ def checa(c, m):
     print(('OK   ' if c else 'FALHA ') + m); ok = ok and c
 
 def abrir(pw, sem14=False):
-    b = pw.chromium.launch(**LANCAR); pg = b.new_page(viewport={'width': 390, 'height': 844})
+    b = pw.chromium.launch(**LANCAR); pg = b.new_page(reduced_motion='reduce', viewport={'width': 390, 'height': 844})
     est = {'rpc': [], 'insert': [], 'fora': [], 'erros': []}
     pg.on('pageerror', lambda e: est['erros'].append(str(e)))
     perfil = {'id': D, 'nome': 'Dona Ana', 'papel': 'dono', 'fazenda_id': F, 'ativo': True, 'fazendas': {'nome': 'Fazenda Sol'}}
@@ -69,7 +69,7 @@ with sync_playwright() as pw:
     checa(not pg.is_visible('#recebidos'), 'conferência: campo "quantos chegaram" só aparece se marcar que faltou')
     pg.check('#conferir'); pg.fill('#recebidos', '38')
     t = pg.inner_text('#f-compra #total')
-    checa('950,0 kg' in t and 'Faltaram 2 saco(s)' in t, 'conferência: estoque entra pelo que chegou (38 × 25 = 950 kg) e avisa que faltaram 2')
+    checa('950,0 kg' in t and 'Faltaram 2 sacos' in t, 'conferência: estoque entra pelo que chegou (38 × 25 = 950 kg) e avisa que faltaram 2')
     pg.fill('#recebidos', '41'); pg.click('#f-compra button[type=submit]')
     checa('mais sacos do que a nota' in pg.inner_text('#f-compra #erro'), 'conferência: chegou mais que a nota → explica o que fazer')
     pg.fill('#recebidos', '0'); pg.click('#f-compra button[type=submit]')
@@ -87,10 +87,10 @@ with sync_playwright() as pw:
     checa('não é uma cópia do app' in pg.inner_text('#toast') and not any(r[0] == 'importar_copia' for r in est['rpc']), 'importar: arquivo qualquer é recusado sem chamar o banco')
     pg.set_input_files('#in-copia', arq_ok); pg.wait_for_selector('.dialogo [data-ok]')
     d = pg.inner_text('.dialogo')
-    checa('20/10/2026' in d and '1 tanque(s), 1 lote(s), 2 lançamento(s)' in d, 'importar: confirmação mostra data e conteúdo da cópia')
+    checa('20/10/2026' in d and '1 tanque, 1 lote, 2 lançamentos' in d, 'importar: confirmação mostra data e conteúdo da cópia')
     pg.click('.dialogo [data-ok]'); pg.wait_for_timeout(1200)
     checa(any(r[0] == 'importar_copia' and r[1]['p_copia']['tabelas']['lotes'] == [{'id': 'l1'}] for r in est['rpc']), 'importar: envia a cópia inteira ao banco')
-    checa('4 registro(s) voltaram' in pg.inner_text('#toast'), 'importar: avisa quantos registros voltaram (4)')
+    checa('4 registros voltaram' in pg.inner_text('#toast'), 'importar: avisa quantos registros voltaram (4)')
     errs += est['erros'] + est['fora']; b.close()
 
     b, pg, est = abrir(pw, sem14=True)

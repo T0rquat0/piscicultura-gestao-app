@@ -11,9 +11,9 @@ export async function renderPlano(ctx, el) {
 
   const dias = plano.valido_ate ? diasEntre(hojeISO(), plano.valido_ate) : null;
   const TXT = {
-    teste: ['Período de teste grátis', dias != null ? (dias > 0 ? `Faltam ${dias} dia(s), até ${fmtData(plano.valido_ate)}. Durante o teste não há limite de tanques.` : 'Termina hoje.') : ''],
+    teste: ['Período de teste grátis', dias != null ? (dias > 0 ? `${dias === 1 ? 'Falta 1 dia' : `Faltam ${dias} dias`}, até ${fmtData(plano.valido_ate)}. Durante o teste não há limite de tanques.` : 'Termina hoje.') : ''],
     teste_acabou: ['Seu teste terminou', 'Escolha um pacote para voltar a abrir lotes. Seus dados continuam aqui e os lançamentos seguem funcionando.'],
-    ativo: ['Plano ativo', `Pago até ${fmtData(plano.valido_ate)}${dias != null ? ` (${dias} dia(s))` : ''}.`],
+    ativo: ['Plano ativo', `Pago até ${fmtData(plano.valido_ate)}${dias != null ? ` (${dias === 1 ? 'falta 1 dia' : `faltam ${dias} dias`})` : ''}.`],
     carencia: ['Plano vencido (carência)', `Venceu em ${fmtData(plano.valido_ate)}. Renove para continuar abrindo lotes novos.`],
     vencido: ['Plano vencido', `Venceu em ${fmtData(plano.valido_ate)}. Renove para abrir lotes novos. Os lançamentos continuam funcionando.`],
     livre: ['Sem limite de tanques', 'Sua fazenda não tem pacote contratado.'],
@@ -26,8 +26,8 @@ export async function renderPlano(ctx, el) {
     <h1>Meu plano</h1>
     <div class="card plano-estado${alerta ? ' alerta' : ''}">
       <b>${esc(TXT[0])}</b><small style="display:block">${esc(TXT[1])}</small>
-      ${lim != null && plano.estado !== 'teste_acabou' ? `<p style="margin:.8rem 0 0"><b>${plano.em_uso} de ${lim}</b> tanque(s) em uso</p>
-        <div class="barra-uso"><span style="width:${Math.min(100, Math.round((plano.em_uso / Math.max(lim, 1)) * 100))}%"></span></div>` : `<p style="margin:.8rem 0 0"><b>${plano.em_uso}</b> tanque(s) em uso</p>`}
+      ${lim != null && plano.estado !== 'teste_acabou' ? `<p style="margin:.8rem 0 0"><b>${plano.em_uso} de ${lim}</b> ${lim === 1 ? 'tanque' : 'tanques'} em uso</p>
+        <div class="barra-uso"><span style="width:${Math.min(100, Math.round((plano.em_uso / Math.max(lim, 1)) * 100))}%"></span></div>` : `<p style="margin:.8rem 0 0"><b>${plano.em_uso}</b> ${plano.em_uso === 1 ? 'tanque' : 'tanques'} em uso</p>`}
       ${plano.proximo_tanques_max ? `<small style="display:block;margin-top:.5rem">Na próxima renovação: pacote de ${plano.proximo_tanques_max} tanques.</small>` : ''}
     </div>
     <p class="mudo nota">Tanque em uso é o que tem um lote ativo. Tanque sem lote não conta.</p>

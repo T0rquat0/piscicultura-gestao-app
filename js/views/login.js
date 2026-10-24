@@ -1,4 +1,4 @@
-import { esc } from '../util.js';
+import { esc, plural } from '../util.js';
 import { icone } from '../icons.js';
 
 export function renderLogin(ctx, root, aviso) {
@@ -17,7 +17,7 @@ export function renderLogin(ctx, root, aviso) {
       </form>
       <p style="margin-top:1rem;text-align:center"><button class="link" id="b-esqueci" type="button">Esqueci minha senha</button></p>
       <p style="margin-top:1.2rem"><button class="btn" id="b-criar" type="button">Criar conta da minha fazenda</button></p>
-      ${pend ? `<p class="aviso">Há ${pend} lançamento(s) salvo(s) neste aparelho aguardando envio. Entre para enviar.</p>` : ''}
+      ${pend ? `<p class="aviso">Há ${plural(pend, 'lançamento salvo', 'lançamentos salvos')} neste aparelho aguardando envio. Entre para enviar.</p>` : ''}
       ${navigator.onLine ? '' : '<p class="aviso">Sem internet. O primeiro acesso precisa de conexão.</p>'}
     </div>
   </main>`;
