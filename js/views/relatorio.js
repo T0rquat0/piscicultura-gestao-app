@@ -128,7 +128,7 @@ export async function renderRelatorios(ctx, el) {
 export async function renderRelatorioLote(ctx, el, id) {
   el.innerHTML = '<p class="carregando">Montando relatório…</p>';
   if (!navigator.onLine) {
-    el.innerHTML = `<p><a class="voltar" href="#/relatorio">${icone('voltar', 18)} Relatórios</a></p><div class="card vazio"><p>O relatório precisa de internet.</p></div>`;
+    el.innerHTML = `<div class="card vazio"><p>O relatório precisa de internet.</p></div>`;
     return;
   }
   const gerir = ctx.podeGerir();
@@ -282,7 +282,6 @@ export async function renderRelatorioLote(ctx, el, id) {
   const paineis = { resumo: painelResumo, peso: painelPeso, racao: painelRacao, registros: painelRegistros };
 
   el.innerHTML = `
-    <p class="no-print"><a class="voltar" href="#/relatorio">${icone('voltar', 18)} Relatórios</a></p>
     <h1>${esc(nomeTanque)} · ${esc(lote.especie)}</h1>
     <p class="mudo cab-lote"><span class="fase ${faseCss(lote.tipo)}"></span>${esc(ROTULO_TIPO[lote.tipo] || lote.tipo)} · entrada em ${fmtData(lote.data_entrada)} · ${lote.ativo ? 'lote ativo' : 'lote encerrado'}</p>
     <div class="seg no-print" style="--n:${abas.length}" role="tablist">${abas.map(([k, r]) => `<button type="button" data-aba="${k}">${r}</button>`).join('')}</div>
@@ -423,7 +422,7 @@ function svgDias(linhasDia) {
 export async function renderRacaoDia(ctx, el) {
   el.innerHTML = '<p class="carregando">Montando relatório…</p>';
   if (!navigator.onLine) {
-    el.innerHTML = `<p><a class="voltar" href="#/relatorio">${icone('voltar', 18)} Relatórios</a></p><h1>Ração por dia</h1><div class="card vazio"><p>Este relatório precisa de internet.</p></div>`;
+    el.innerHTML = `<h1>Ração por dia</h1><div class="card vazio"><p>Este relatório precisa de internet.</p></div>`;
     return;
   }
   const tanques = ctx.state.ref.tanques;
@@ -508,7 +507,6 @@ export async function renderRacaoDia(ctx, el) {
   }
 
   el.innerHTML = `
-    <p class="no-print"><a class="voltar" href="#/relatorio">${icone('voltar', 18)} Relatórios</a></p>
     <h1>Ração fornecida</h1>
     <div class="seg no-print" style="--n:4" role="tablist">${[['hoje', 'Hoje'], ['ontem', 'Ontem'], ['7', '7 dias'], ['30', '30 dias']].map(([k, t]) => `<button type="button" data-per="${k}">${t}</button>`).join('')}</div>
     <label class="outro-dia no-print">Ou escolha um dia<input type="date" id="outro" max="${hoje}" value="${hoje}"></label>

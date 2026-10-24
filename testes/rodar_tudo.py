@@ -41,6 +41,9 @@ def rodar(nome, cmd, cwd):
 try:
     for f in sorted(glob.glob(os.path.join(AQUI, 'telas', 'teste_*.py'))):
         rodar('telas/' + os.path.basename(f), [sys.executable, f], AQUI)
+    if shutil.which('node'):  # contas do app com milhares de entradas aleatórias (js/calc.js, js/clima.js)
+        for f in sorted(glob.glob(os.path.join(AQUI, 'calc', 'teste_*.mjs'))):
+            rodar('calc/' + os.path.basename(f), ['node', f], RAIZ)
     sqldir = os.path.join(AQUI, 'sql')
     if shutil.which('node'):
         if not os.path.isdir(os.path.join(sqldir, 'node_modules')):

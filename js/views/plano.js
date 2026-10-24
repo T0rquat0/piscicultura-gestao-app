@@ -4,10 +4,10 @@ import { confirmar } from '../dialogo.js';
 
 export async function renderPlano(ctx, el) {
   if (ctx.state.perfil.papel !== 'dono') { el.innerHTML = '<div class="card vazio">Somente o dono vê o plano.</div>'; return; }
-  el.innerHTML = '<p><a class="voltar" href="#/mais">← Mais</a></p><h1>Meu plano</h1><p class="carregando">Carregando…</p>';
-  if (!navigator.onLine) { el.innerHTML = '<p><a class="voltar" href="#/mais">← Mais</a></p><h1>Meu plano</h1><div class="card vazio">Precisa de internet.</div>'; return; }
+  el.innerHTML = '<h1>Meu plano</h1><p class="carregando">Carregando…</p>';
+  if (!navigator.onLine) { el.innerHTML = '<h1>Meu plano</h1><div class="card vazio">Precisa de internet.</div>'; return; }
   const [plano, pacotes] = await Promise.all([ctx.api.plano(), ctx.api.pacotes()]);
-  if (!plano) { el.innerHTML = '<p><a class="voltar" href="#/mais">← Mais</a></p><h1>Meu plano</h1><div class="card vazio">Os planos ainda não foram ativados neste sistema.</div>'; return; }
+  if (!plano) { el.innerHTML = '<h1>Meu plano</h1><div class="card vazio">Os planos ainda não foram ativados neste sistema.</div>'; return; }
 
   const dias = plano.valido_ate ? diasEntre(hojeISO(), plano.valido_ate) : null;
   const TXT = {
@@ -22,7 +22,6 @@ export async function renderPlano(ctx, el) {
   const lim = plano.limite;
 
   el.innerHTML = `
-    <p><a class="voltar" href="#/mais">← Mais</a></p>
     <h1>Meu plano</h1>
     <div class="card plano-estado${alerta ? ' alerta' : ''}">
       <b>${esc(TXT[0])}</b><small style="display:block">${esc(TXT[1])}</small>

@@ -89,18 +89,35 @@ export function evolucaoPeso(lote, bios) {
   });
 }
 
-// Segunda-feira da semana (YYYY-MM-DD) de uma data ISO
+// Data ISO (YYYY-MM-DD) somada de n dias; null se a data ou o n forem inválidos (nunca quebra a tela)
+export function somarDias(iso, n) {
+  if (!dataValida(iso) || n === null || n === '' || !Number.isFinite(Number(n))) return null;
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + Number(n));
+  return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+}
+
+// data YYYY-MM-DD que existe no calendário (2026-02-30 e 2026-13-01 não)
+export function dataValida(iso) {
+  if (typeof iso !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return false;
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === iso.slice(0, 10);
+}
+
+// Segunda-feira da semana (YYYY-MM-DD) de uma data ISO; null se a data for inválida
 export function inicioSemana(iso) {
-  const d = new Date(`${iso}T00:00:00Z`);
-  const dia = (d.getUTCDay() + 6) % 7; // segunda = 0
-  d.setUTCDate(d.getUTCDate() - dia);
-  return d.toISOString().slice(0, 10);
+  if (!dataValida(iso)) return null;
+  const d = new Date(`${String(iso).slice(0, 10)}T12:00:00Z`);
+  return somarDias(String(iso).slice(0, 10), -((d.getUTCDay() + 6) % 7)); // segunda = 0
 }
 
 // Ração somada por semana, da mais antiga para a mais recente
 export function racaoPorSemana(rac) {
   const m = new Map();
-  for (const r of rac) m.set(inicioSemana(r.data), (m.get(inicioSemana(r.data)) || 0) + Number(r.quantidade_kg || 0));
+  for (const r of rac) {
+    const sem = inicioSemana(r.data); if (!sem) continue; // lançamento sem data válida fica fora do gráfico por semana
+    m.set(sem, (m.get(sem) || 0) + (Number(r.quantidade_kg) || 0));
+  }
   return [...m.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([inicio, kg]) => ({ inicio, kg }));
 }
 
@@ -112,11 +129,7 @@ export function matrizRacao(linhas, tanqueIds, dias, hoje) {
     celulas.set(k, (celulas.get(k) || 0) + Number(r.quantidade_kg || 0));
   }
   const datas = [];
-  const base = new Date(`${hoje}T00:00:00Z`);
-  for (let i = 0; i < dias; i++) {
-    const d = new Date(base); d.setUTCDate(d.getUTCDate() - i);
-    datas.push(d.toISOString().slice(0, 10));
-  }
+  for (let i = 0; i < dias; i++) { const d = somarDias(hoje, -i); if (d) datas.push(d); }
   const totalTanque = Object.fromEntries(tanqueIds.map((t) => [t, 0]));
   const rows = datas.map((data) => {
     const por = {}; let total = 0;
@@ -165,11 +178,15 @@ export function previsaoDespesca(lote, r, alvoKg, hoje) {
   if (pm != null && pm >= alvoKg) return { ...base, estado: 'pronto' };
   const dataBio = r && r.ultima_biometria;
   const dias = dataBio ? diasEntre(lote.data_entrada, dataBio) : 0;
-  if (pm == null || pmIni == null || !dataBio || dias <= 0 || pm <= pmIni) return { ...base, estado: 'sem-dado' };
+  if (pm == null || pmIni == null || !dataBio || !(dias > 0)) return { ...base, estado: 'sem-dado' };
   const gpd = (pm - pmIni) / dias; // kg/dia
+  // sem crescimento de verdade (menos de 0,1 g por dia, ou só diferença de arredondamento) não dá para prever:
+  // a conta jogaria a data para séculos depois e a data inválida quebrava a tela
+  if (!(gpd >= 0.0001)) return { ...base, estado: 'sem-dado' };
   const falta = Math.ceil((alvoKg - pm) / gpd);
-  const d = new Date(`${dataBio}T12:00:00`); d.setDate(d.getDate() + falta);
-  const data = d.toISOString().slice(0, 10);
+  if (!(falta >= 0 && falta <= 3650)) return { ...base, estado: 'sem-dado' };
+  const data = somarDias(dataBio, falta);
+  if (!data) return { ...base, estado: 'sem-dado' };
   return { ...base, estado: 'previsto', gpdG: gpd * 1000, data, dias: Math.max(0, diasEntre(hoje, data)) };
 }
 
@@ -211,9 +228,8 @@ export function alertasManejo({ lotes, resumo, racaoHoje, mediaSemana, mortes, h
     for (const fim of [0, 1]) { // sequência que termina hoje ou ontem
       let seq = 0, total = 0;
       for (let i = fim; ; i++) {
-        const dt = new Date(`${hoje}T12:00:00`); dt.setDate(dt.getDate() - i);
-        const iso = dt.toISOString().slice(0, 10);
-        if (!d[iso]) break;
+        const iso = somarDias(hoje, -i);
+        if (!iso || !d[iso]) break;
         seq++; total += d[iso];
       }
       if (seq >= cfg.morteDiasSeguidos) { repetidas.push({ tanque: t, dias: seq, total }); break; }
@@ -232,8 +248,8 @@ export function fimDoLote(lote, bios, mort, rac, hoje) {
 
 // O mesmo cálculo do lote, mas só com o que aconteceu até "dias" depois da entrada (comparar ciclos na mesma idade)
 export function calcularNaIdade(lote, bios, mort, rac, dias, precoKg = null) {
-  const d = new Date(`${lote.data_entrada}T12:00:00`); d.setDate(d.getDate() + dias);
-  const corte = d.toISOString().slice(0, 10);
+  const corte = somarDias(lote.data_entrada, dias);
+  if (!corte) return null; // sem data de entrada válida não dá para recortar na mesma idade
   const ate = (x) => x.data <= corte;
   return calcularLote(lote, bios.filter(ate), mort.filter(ate), rac.filter(ate), corte, precoKg);
 }

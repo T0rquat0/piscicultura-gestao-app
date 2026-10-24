@@ -10,7 +10,7 @@ on:
 jobs:
   testes:
     runs-on: ubuntu-24.04   # fixo: o 'latest' vai virar Ubuntu 26 e o instalador do navegador pode não suportar ainda
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 

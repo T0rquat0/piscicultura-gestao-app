@@ -4,7 +4,6 @@ import { confirmar } from '../dialogo.js';
 import { icone } from '../icons.js';
 import { esc, fmtData, fmtNum, fmtInt, fmtBRL, ROTULO_PAPEL, ROTULO_TIPO, plural } from '../util.js';
 
-const voltar = `<p><a class="voltar" href="#/mais">${icone('voltar', 18)} Mais</a></p>`;
 // ordem de importância: o item "principal" de uma operação é o de nível mais alto (tanque > lote > lançamento)
 const NIVEL = { tanques: 0, lotes: 1, racao_estoque: 2, racao_contagens: 2, biometrias: 3, mortalidade: 3, racao_consumo: 3, usuario_tanques: 4, usuarios: 4 };
 
@@ -54,10 +53,10 @@ function mudancas(h) {
 
 export async function renderHistorico(ctx, el, aba = 'lixeira') {
   if (ctx.state.perfil.papel !== 'dono') { el.innerHTML = '<div class="card vazio">Somente o dono vê o histórico.</div>'; return; }
-  el.innerHTML = `${voltar}<h1>Histórico e lixeira</h1><p class="carregando">Carregando…</p>`;
-  if (!navigator.onLine) { el.innerHTML = `${voltar}<h1>Histórico e lixeira</h1><div class="card vazio">Precisa de internet.</div>`; return; }
+  el.innerHTML = `<h1>Histórico e lixeira</h1><p class="carregando">Carregando…</p>`;
+  if (!navigator.onLine) { el.innerHTML = `<h1>Histórico e lixeira</h1><div class="card vazio">Precisa de internet.</div>`; return; }
   const [lista, nomes] = await Promise.all([ctx.api.historico(), ctx.api.nomesUsuarios().catch(() => ({}))]);
-  if (!lista) { el.innerHTML = `${voltar}<h1>Histórico e lixeira</h1><div class="card vazio">O histórico ainda não foi ativado neste sistema (falta rodar o sql/12 no Supabase).</div>`; return; }
+  if (!lista) { el.innerHTML = `<h1>Histórico e lixeira</h1><div class="card vazio">O histórico ainda não foi ativado neste sistema (falta rodar o sql/12 no Supabase).</div>`; return; }
 
   const tanquesConhecidos = Object.fromEntries((ctx.state.ref.tanques || []).map((t) => [t.id, t.nome]));
   for (const h of lista) if (h.tabela === 'tanques' && h.antes) tanquesConhecidos[h.antes.id] = tanquesConhecidos[h.antes.id] || h.antes.nome;
@@ -92,7 +91,7 @@ export async function renderHistorico(ctx, el, aba = 'lixeira') {
   };
 
   el.innerHTML = `
-    ${voltar}
+    
     <h1>Histórico e lixeira</h1>
     <div class="seg" style="--n:2" role="tablist">
       <button type="button" data-aba="lixeira" class="${aba === 'lixeira' ? 'on' : ''}">Lixeira</button>

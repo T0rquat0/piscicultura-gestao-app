@@ -117,7 +117,7 @@ export async function renderTanques(ctx, el) {
 export async function renderTanque(ctx, el, id) {
   if (!ctx.podeGerir()) return semPermissao(el);
   const tanque = ctx.state.ref.tanques.find((t) => t.id === id);
-  if (!tanque) { el.innerHTML = '<div class="card vazio">Tanque não encontrado.<br><a class="btn" href="#/tanques">Voltar</a></div>'; return; }
+  if (!tanque) { el.innerHTML = '<div class="card vazio">Tanque não encontrado.<br></div>'; return; }
 
   el.innerHTML = `<h1>${esc(tanque.nome)}</h1><p class="carregando">Carregando…</p>`;
   const [lotesTodos, resumoRows] = await Promise.all([ctx.api.lotes(), ctx.api.resumoLotes().catch(() => [])]);
@@ -139,7 +139,6 @@ export async function renderTanque(ctx, el, id) {
   const hoje = hojeISO();
 
   el.innerHTML = `
-    <p class="no-print"><a class="voltar" href="#/tanques">${icone('voltar', 18)} Todos os tanques</a></p>
     <h1>${esc(tanque.nome)}</h1>
     ${avisoOffline()}
     ${ativos.length || area ? `<div class="kpis tq-resumo">

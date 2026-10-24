@@ -1033,3 +1033,12 @@ table.cmp td b { font-weight: 600; }
 .h-tempo-av li { position: relative; padding-left: 1rem; font-size: .84rem; line-height: 1.4; color: var(--tinta); }
 .h-tempo-av li::before { content: ''; position: absolute; left: 0; top: .45em; width: 7px; height: 7px; border-radius: 50%; background: #d97706; }
 .h-tempo-av li.alerta::before { background: var(--erro); }
+
+.linha-voltar { margin: 0 0 .2rem; }
+
+/* olho para mostrar/esconder a senha */
+.senha-caixa { position: relative; display: block; }
+.senha-caixa input { width: 100%; padding-right: 3rem; }
+.senha-olho { position: absolute; top: 0; right: 0; height: 100%; min-width: 46px; display: grid; place-items: center; border: 0; background: none; color: var(--tinta-2); cursor: pointer; border-radius: 0 var(--r-campo) var(--r-campo) 0; }
+.senha-olho:hover { color: var(--tinta); }
+.senha-olho:focus-visible { outline: 2px solid var(--rio); outline-offset: -2px; }

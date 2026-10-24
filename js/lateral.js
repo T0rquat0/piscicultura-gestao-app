@@ -94,7 +94,7 @@ export async function atualizarLateral(ctx) {
   }
   const clima = await db.kvGet('climaPrev');
   const dHoje = clima && clima.dias && clima.dias.find((d) => d.data === hoje);
-  if (dHoje) blocos.push(`<a class="lat-item" href="#/"><span>Tempo hoje</span><b>${Math.round(dHoje.max)}° <small>mín. ${Math.round(dHoje.min)}°</small></b><small>${esc(descricao(dHoje.codigo))}${dHoje.chuva >= 1 ? ` · ${fmtNum(dHoje.chuva, 0)} mm` : ''}</small></a>`);
+  if (dHoje) blocos.push(`<a class="lat-item" href="#/"><span>Tempo hoje</span><b>${dHoje.max == null ? '—' : `${Math.round(dHoje.max)}°`} <small>mín. ${dHoje.min == null ? '—' : `${Math.round(dHoje.min)}°`}</small></b><small>${esc(descricao(dHoje.codigo))}${dHoje.chuva != null && dHoje.chuva >= 1 ? ` · ${fmtNum(dHoje.chuva, 0)} mm` : ''}</small></a>`);
 
   box.innerHTML = blocos.length ? `<p class="lat-rot">Hoje</p>${blocos.join('')}` : '';
 }
