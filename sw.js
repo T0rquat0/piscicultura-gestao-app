@@ -2,7 +2,7 @@
 // EstratÃ©gia: rede primeiro (sempre pega a versÃ£o nova quando hÃ¡ sinal), com limite de 4 s;
 // se a rede falhar ou demorar, usa a cÃ³pia guardada. RequisiÃ§Ãµes ao Supabase (outro domÃ­nio)
 // NÃƒO passam por aqui: os dados offline ficam no IndexedDB (js/db.js), nÃ£o neste cache.
-const CACHE = 'piscicultura-shell-v90';
+const CACHE = 'piscicultura-shell-v91';
 const SHELL = [
   './',
   'index.html',
@@ -11,7 +11,7 @@ const SHELL = [
   'vendor/supabase.js',
   'icons/icon-192.png',
   'icons/icon-512.png',
-  'fonts/inter-var.woff2', 'fonts/manrope-var.woff2', 'js/icons.js', 'js/graficos.js', 'js/clima.js', 'js/lateral.js', 'js/voltar.js', 'js/views/despesca.js', 'js/views/tanque-detalhe.js', 'js/views/tempo.js', 'js/dialogo.js', 'js/splash.js', 'js/splash3d.bundle.js', 'assets/peixe/peixe.bin', 'assets/peixe/cor.jpg', 'assets/peixe/normal.jpg',
+  'fonts/inter-var.woff2', 'fonts/manrope-var.woff2', 'js/icons.js', 'js/graficos.js', 'js/clima.js', 'js/lateral.js', 'js/voltar.js', 'js/senha.js', 'js/views/despesca.js', 'js/views/tanque-detalhe.js', 'js/views/tempo.js', 'js/dialogo.js', 'js/splash.js', 'js/splash3d.bundle.js', 'assets/peixe/peixe.bin', 'assets/peixe/cor.jpg', 'assets/peixe/normal.jpg',
   'js/app.js', 'js/config.js', 'js/dev-login.js', 'js/seg.js', 'js/util.js', 'js/calc.js', 'js/db.js', 'js/sync.js', 'js/api.js', 'js/planilha.js',
   'js/views/login.js', 'js/views/home.js', 'js/views/lancar.js', 'js/views/tanques.js',
   'js/pdf_lote.js', 'js/pdf_fazenda.js', 'js/pdf_racao.js', 'js/pdf_ui.js', 'js/views/estoque.js', 'js/views/relatorio.js', 'js/views/equipe.js', 'js/views/pendencias.js', 'js/views/mais.js', 'js/views/cadastro.js', 'js/views/plano.js', 'js/views/historico.js', 'js/views/admin.js',

@@ -91,16 +91,23 @@ export function evolucaoPeso(lote, bios) {
 
 // Data ISO (YYYY-MM-DD) somada de n dias; null se a data ou o n forem inválidos (nunca quebra a tela)
 export function somarDias(iso, n) {
-  if (typeof iso !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(iso) || !Number.isFinite(Number(n))) return null;
+  if (!dataValida(iso) || n === null || n === '' || !Number.isFinite(Number(n))) return null;
   const d = new Date(`${iso.slice(0, 10)}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + Number(n));
   return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
 }
 
+// data YYYY-MM-DD que existe no calendário (2026-02-30 e 2026-13-01 não)
+export function dataValida(iso) {
+  if (typeof iso !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return false;
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === iso.slice(0, 10);
+}
+
 // Segunda-feira da semana (YYYY-MM-DD) de uma data ISO; null se a data for inválida
 export function inicioSemana(iso) {
+  if (!dataValida(iso)) return null;
   const d = new Date(`${String(iso).slice(0, 10)}T12:00:00Z`);
-  if (Number.isNaN(d.getTime())) return null;
   return somarDias(String(iso).slice(0, 10), -((d.getUTCDay() + 6) % 7)); // segunda = 0
 }
 

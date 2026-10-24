@@ -24,19 +24,33 @@ const nomeDe = (hash) => {
 export const ehAbaPrincipal = (rota, partes) => rota === '' || rota === 'lancar' || rota === 'mais' || (rota === 'relatorio' && !partes[0]);
 
 let pilha = [];
+let voltando = false;
+export const marcarVoltando = () => { voltando = true; };
 export function registrarRota(hash, rota, partes) {
   const h = hash || '#/';
+  const foiVolta = voltando; voltando = false;
   if (ehAbaPrincipal(rota, partes)) pilha = [h];
-  else if (pilha.length >= 2 && pilha[pilha.length - 2] === h) pilha.pop(); // voltou
+  else if (foiVolta) {
+    // clicou no voltar: sai da tela atual; se o destino era o padrão (não estava no caminho), ele vira o começo
+    pilha.pop();
+    if (pilha[pilha.length - 1] !== h) pilha = [h];
+  } else if (pilha.length >= 2 && pilha[pilha.length - 2] === h) pilha.pop(); // voltou pelo botão do celular/navegador
   else if (pilha[pilha.length - 1] !== h) pilha.push(h);
   if (pilha.length > 30) pilha = pilha.slice(-30);
 }
 
-export function linhaVoltar(rota) {
+// para onde o voltar leva e com que nome (função pura, testada em testes/calc/teste_10mil.mjs)
+export function destinoVoltar(rota) {
   const anterior = pilha.length >= 2 ? pilha[pilha.length - 2] : null;
-  const [href, txt] = anterior ? [anterior, nomeDe(anterior)] : (PADRAO[rota] || ['#/', 'Início']);
+  return anterior ? [anterior, nomeDe(anterior)] : (PADRAO[rota] || ['#/', 'Início']);
+}
+export const reiniciarPilha = () => { pilha = []; };
+
+export function linhaVoltar(rota) {
+  const [href, txt] = destinoVoltar(rota);
   const p = document.createElement('p');
   p.className = 'no-print linha-voltar';
   p.innerHTML = `<a class="voltar" href="${esc(href)}">${icone('voltar', 18)} ${esc(txt)}</a>`;
+  p.querySelector('a').addEventListener('click', marcarVoltando);
   return p;
 }

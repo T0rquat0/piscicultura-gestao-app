@@ -24,6 +24,7 @@ import { renderPendencias } from './views/pendencias.js';
 import { renderMais } from './views/mais.js';
 import { htmlAtalhos, atualizarLateral, marcarAtalho, pintarAtalhos } from './lateral.js';
 import { registrarRota, linhaVoltar, ehAbaPrincipal } from './voltar.js';
+import { olhoNasSenhas } from './senha.js';
 
 const root = document.getElementById('root');
 splashDoDia();
@@ -467,6 +468,7 @@ async function iniciar() {
   await restaurarSessao();
 }
 
+olhoNasSenhas(document.body); // olho para mostrar/esconder a senha em todos os campos de senha
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }
