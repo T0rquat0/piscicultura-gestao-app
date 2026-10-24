@@ -4,7 +4,6 @@ import { confirmar, formulario } from '../dialogo.js';
 import { icone } from '../icons.js';
 import { esc, fmtData, fmtBRL, fmtInt, num, plural } from '../util.js';
 
-const voltar = `<p><a class="voltar" href="#/mais">${icone('voltar', 18)} Mais</a></p>`;
 const ESTADO = {
   teste: ['Em teste', 'ok'], teste_acabou: ['Teste acabou', 'erro'], ativo: ['Pagante', 'ok'],
   carencia: ['Em carência', 'alerta'], vencido: ['Vencido', 'erro'], livre: ['Sem limite', ''],
@@ -20,8 +19,8 @@ function situacao(f) {
 
 export async function renderAdmin(ctx, el, aba = 'fazendas', estado = { filtro: 'todas', busca: '' }) {
   if (!ctx.state.admin) { el.innerHTML = '<div class="card vazio">Somente administradores do sistema.</div>'; return; }
-  el.innerHTML = `${voltar}<h1>Administração</h1><p class="carregando">Carregando…</p>`;
-  if (!navigator.onLine) { el.innerHTML = `${voltar}<h1>Administração</h1><div class="card vazio">Precisa de internet.</div>`; return; }
+  el.innerHTML = `<h1>Administração</h1><p class="carregando">Carregando…</p>`;
+  if (!navigator.onLine) { el.innerHTML = `<h1>Administração</h1><div class="card vazio">Precisa de internet.</div>`; return; }
   const [fazendas, cobrancas, pacotes, config] = await Promise.all([
     ctx.api.adminFazendas(), ctx.api.adminCobrancas(), ctx.api.adminPacotes(), ctx.api.adminConfig(),
   ]);
@@ -86,7 +85,7 @@ export async function renderAdmin(ctx, el, aba = 'fazendas', estado = { filtro: 
     <p class="mudo nota">Pacote inativo não aparece para os donos, mas quem já tem continua com ele.</p>`;
 
   el.innerHTML = `
-    ${voltar}
+    
     <h1>Administração</h1>
     <div class="seg" style="--n:3" role="tablist">
       <button type="button" data-aba="fazendas" class="${aba === 'fazendas' ? 'on' : ''}">Fazendas</button>

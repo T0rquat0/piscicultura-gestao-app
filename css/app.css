@@ -1033,3 +1033,5 @@ table.cmp td b { font-weight: 600; }
 .h-tempo-av li { position: relative; padding-left: 1rem; font-size: .84rem; line-height: 1.4; color: var(--tinta); }
 .h-tempo-av li::before { content: ''; position: absolute; left: 0; top: .45em; width: 7px; height: 7px; border-radius: 50%; background: #d97706; }
 .h-tempo-av li.alerta::before { background: var(--erro); }
+
+.linha-voltar { margin: 0 0 .2rem; }

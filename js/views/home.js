@@ -150,18 +150,18 @@ export async function renderHome(ctx, el) {
     </div>
     <div id="avisos">${avisoContagem(ctx, paraContar, hoje)}</div>
     ${semDetalhe ? '<p class="aviso">Sem conexão: mostrando só o que está guardado no aparelho. Os totais aparecem quando houver internet.</p>' : ''}
-    ${comLote ? `<div class="h-topo">${cartaoAgora()}${painelKpis()}</div>` : ''}
-    ${gerir ? blocoAlertas() : ''}
+    ${comLote ? `<div class="h-topo">${seguro(cartaoAgora, 'Próxima tarefa')}${seguro(painelKpis, 'Indicadores')}</div>` : ''}
+    ${gerir ? seguro(blocoAlertas, 'Atenção') : ''}
     <div class="h-grade">
       <div class="h-col">
-        ${blocoRacao()}
-        ${gerir ? blocoDespescas() : ''}
-        ${gerir ? blocoMortes() : ''}
+        ${seguro(blocoRacao, 'Tanques')}
+        ${gerir ? seguro(blocoDespescas, 'Despescas e mudanças de fase') : ''}
+        ${gerir ? seguro(blocoMortes, 'Mortalidade') : ''}
       </div>
       <div class="h-col">
         <section class="h-bloco" aria-labelledby="h-tempo" id="b-tempo"><header><h2 id="h-tempo">Tempo na fazenda</h2></header><p class="h-calmo">Carregando a previsão…</p></section>
-        ${blocoEstoque()}
-        ${gerir ? blocoPeixe() : ''}
+        ${seguro(blocoEstoque, 'Estoque de ração')}
+        ${gerir ? seguro(blocoPeixe, 'Peixe na água') : ''}
       </div>
     </div>`;
   const bn = el.querySelector('#b-novo-tanque'); if (bn) bn.addEventListener('click', () => novoTanque(ctx, el));
@@ -242,6 +242,14 @@ export async function renderHome(ctx, el) {
       ks.push(`<a class="kp" href="#/estoque"><span>Estoque de ração</span><b>${fmtNum(sacos(tot), 0)}<em>sacos</em></b>${sit.dias != null ? `${progresso((sit.dias / ESTOQUE_COBERTURA_DIAS) * 100, { fina: true, tom, rotulo: `Dura ${fmtInt(Math.floor(sit.dias))} dias` })}<small>dura ~${fmtInt(Math.floor(sit.dias))} dias${usadas.length > 1 ? ' (engorda)' : ''}</small>` : '<small>sem consumo na semana para estimar</small>'}</a>`);
     }
     return `<div class="h-kpis">${ks.join('')}</div>`;
+  }
+
+  // um bloco com erro não derruba a tela: mostra um aviso pequeno no lugar dele e o resto aparece
+  function seguro(fn, nome) {
+    try { return fn(); } catch (e) {
+      console.error(`Início: erro no bloco "${nome}"`, e);
+      return `<section class="h-bloco"><p class="aviso pequeno">Não foi possível mostrar "${esc(nome)}" agora (${esc((e && e.message) || 'erro')}). O resto da tela segue normal.</p></section>`;
+    }
   }
 
   function blocoDespescas() {

@@ -56,7 +56,7 @@ export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje, meta
 export async function renderTanqueDetalhe(ctx, el, id) {
   const { state } = ctx;
   const tanque = state.ref.tanques.find((t) => t.id === id);
-  if (!tanque) { el.innerHTML = '<p><a class="voltar" href="#/">Início</a></p><div class="card vazio">Tanque não encontrado.</div>'; return; }
+  if (!tanque) { el.innerHTML = '<div class="card vazio">Tanque não encontrado.</div>'; return; }
   el.innerHTML = '<p class="carregando">Carregando…</p>';
   const resumo = {};
   let semDetalhe = !navigator.onLine;
@@ -66,8 +66,7 @@ export async function renderTanqueDetalhe(ctx, el, id) {
   const racaoHojeLocal = new Set(fila.filter((i) => i.tabela === 'racao_consumo' && i.payload.data === hoje).map((i) => i.payload.tanque_id));
   const meus = state.ref.lotes.filter((l) => l.tanque_id === id);
   const metas = (await db.kvGet('metasDespesca')) || {};
-  el.innerHTML = `<p class="no-print"><a class="voltar" href="#/">${icone('voltar', 18)} Início</a></p>
-    ${semDetalhe ? '<p class="aviso">Sem conexão: os totais aparecem quando houver internet.</p>' : ''}
+  el.innerHTML = `${semDetalhe ? '<p class="aviso">Sem conexão: os totais aparecem quando houver internet.</p>' : ''}
     ${htmlCardTanque(tanque, meus, resumo, racaoHojeLocal, hoje, metas)}
     ${meus.length ? `<a class="hub-card td-rel" href="#/relatorio/${esc(meus[0].id)}"><span class="item-ic">${icone('relatorio')}</span><span class="esq"><b>Relatório do lote</b><small>Peso, ração e mortalidade do início até hoje</small></span><span class="seta">${icone('direita', 20)}</span></a>` : ''}`;
   el.querySelectorAll('[data-meta]').forEach((b) => b.addEventListener('click', async () => {

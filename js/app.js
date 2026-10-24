@@ -23,6 +23,7 @@ import { renderAdmin } from './views/admin.js';
 import { renderPendencias } from './views/pendencias.js';
 import { renderMais } from './views/mais.js';
 import { htmlAtalhos, atualizarLateral, marcarAtalho, pintarAtalhos } from './lateral.js';
+import { registrarRota, linhaVoltar, ehAbaPrincipal } from './voltar.js';
 
 const root = document.getElementById('root');
 splashDoDia();
@@ -389,8 +390,9 @@ async function rotear() {
   });
 
   marcarAtalho(rota === 'relatorio' && partes[0] === 'racao' ? 'relatorio-racao' : rota);
+  registrarRota(location.hash, rota, partes);
   const el = document.createElement('div'); // contêiner novo por rota: renderizações atrasadas não sujam a tela atual
-  view.replaceChildren(el);
+  view.replaceChildren(...(ehAbaPrincipal(rota, partes) ? [] : [linhaVoltar(rota)]), el);
   const meu = ++tokenRota;
   window.scrollTo(0, 0);
   try {
