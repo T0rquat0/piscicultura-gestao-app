@@ -332,7 +332,7 @@ export async function renderLancar(ctx, el, params = {}) {
     const bio = sug.biomassaKg >= 1000 ? `${fmtNum(sug.biomassaKg / 1000, 1)} t` : `${fmtNum(sug.biomassaKg, 0)} kg`;
     box.hidden = false;
     box.innerHTML = `<button type="button" class="chip" id="b-sug">Sugestão: ${esc(sacosTxt(sacosSug))}</button>
-      <small>${fmtNum(sug.pct, 1)}% do peso vivo (${bio} de peixe)${sug.provisoria ? ' · taxa provisória, confirme com o técnico' : ''}</small>`;
+      <small>${fmtNum(sug.pct, 1)}% do peso vivo${ctx.podeGerir() ? ` (${bio} de peixe)` : ''}${sug.provisoria ? ' · taxa provisória, confirme com o técnico' : ''}</small>`;
     box.querySelector('#b-sug').onclick = () => { const q = f.querySelector('#qtd'); q.value = String(sacosSug); q.dispatchEvent(new Event('input')); q.focus(); };
   }
   if (tipo === 'racao') { mostrarSugestao(); selTanque.addEventListener('change', mostrarSugestao); }
