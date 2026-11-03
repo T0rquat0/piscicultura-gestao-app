@@ -165,9 +165,11 @@ export function previsaoDespesca(lote, r, alvoKg, hoje) {
   if (pm != null && pm >= alvoKg) return { ...base, estado: 'pronto' };
   const dataBio = r && r.ultima_biometria;
   const dias = dataBio ? diasEntre(lote.data_entrada, dataBio) : 0;
-  if (pm == null || pmIni == null || !dataBio || dias <= 0 || pm <= pmIni) return { ...base, estado: 'sem-dado' };
+  // ganho abaixo de 0,1 g é arredondamento (19196,10 ÷ 12465 = 1,5399999999999998), não crescimento
+  if (pm == null || pmIni == null || !dataBio || dias <= 0 || pm - pmIni < 1e-4) return { ...base, estado: 'sem-dado' };
   const gpd = (pm - pmIni) / dias; // kg/dia
   const falta = Math.ceil((alvoKg - pm) / gpd);
+  if (!(falta <= 3650)) return { ...base, estado: 'sem-dado' }; // mais de 10 anos: ritmo sem sentido, e a data estouraria
   const d = new Date(`${dataBio}T12:00:00`); d.setDate(d.getDate() + falta);
   const data = d.toISOString().slice(0, 10);
   return { ...base, estado: 'previsto', gpdG: gpd * 1000, data, dias: Math.max(0, diasEntre(hoje, data)) };
