@@ -1060,3 +1060,9 @@ table.cmp td b { font-weight: 600; }
 }
 /* a próxima tarefa vira cartão branco: o verde-claro sumia no fundo novo */
 .ag { background: var(--card); border: 1px solid var(--linha); }
+
+/* ----- Lançar: números do tanque no celular (no computador eles ficam no painel ao lado) ----- */
+.tq-info { display: grid; gap: .35rem; margin: .6rem 0 0; font-size: .9rem; line-height: 1.4; color: var(--tinta-2); }
+.tq-info b { color: var(--tinta); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tq-nums > span { white-space: nowrap; }
+.tq-ctx { padding-top: .45rem; border-top: 1px solid var(--linha-2); }
