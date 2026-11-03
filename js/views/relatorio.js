@@ -148,6 +148,7 @@ export async function renderRelatorioLote(ctx, el, id) {
   const nomeTanque = lote.tanques ? lote.tanques.nome : ((ctx.state.ref.tanques.find((t) => t.id === lote.tanque_id) || {}).nome || '');
 
   const unid = (v, u) => `${v}<em>${u}</em>`;
+  const pesoUnid = (g) => (g >= 1000 ? unid(fmtNum(g / 1000, 2), 'kg') : unid(fmtNum(g, 0), 'g')); // 2,30 kg, não 2.300 g
   const destaque = (rotulo, valor, sub) => `<div class="destaque"><span>${rotulo}</span><b>${valor}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
   const linhaNum = (rotulo, valor, sub) => `<li><div class="esq"><b>${rotulo}</b>${sub ? `<small>${sub}</small>` : ''}</div><span class="valor">${valor}</span></li>`;
   const excluir = (tab, rid) => (gerir ? `<span class="acoes-reg no-print"><button class="btn mini no-print" data-edit="${tab}:${esc(rid)}" type="button">Editar</button><button class="btn mini perigo no-print" data-del="${tab}:${esc(rid)}" type="button">Excluir</button></span>` : '');
@@ -226,7 +227,7 @@ export async function renderRelatorioLote(ctx, el, id) {
 
   const painelResumo = () => `
     <div class="card destaques3">
-      ${destaque('Peso médio atual', c.pmAtualG != null ? unid(fmtNum(c.pmAtualG, 0), 'g') : '—', c.pmAtualG != null ? `em ${fmtData(c.dataUltimaBio)}` : 'sem biometria ainda')}
+      ${destaque('Peso médio atual', c.pmAtualG != null ? pesoUnid(c.pmAtualG) : '—', c.pmAtualG != null ? `em ${fmtData(c.dataUltimaBio)}` : 'sem biometria ainda')}
       ${destaque('Ração fornecida', unid(fmtNum(c.racaoTotal, 0), 'kg'), `≈ ${fmtNum(c.racaoTotal / kgS, 1)} sacos` + (c.racaoMediaDia != null ? ` · média ${fmtNum(c.racaoMediaDia, 1)} kg/dia` : ''))}
       ${destaque('Conversão alimentar', c.ca != null ? fmtNum(c.ca, 2) : '—', c.ca != null ? 'kg de ração por kg ganho' : c.dataUltimaBio ? 'aparece quando houver ração lançada até a última biometria' : 'precisa de biometria com ganho')}
     </div>
@@ -246,7 +247,7 @@ export async function renderRelatorioLote(ctx, el, id) {
     const ev = evolucaoPeso(lote, bios);
     return `
     <div class="card destaques3">
-      ${destaque('Peso médio atual', c.pmAtualG != null ? unid(fmtNum(c.pmAtualG, 0), 'g') : '—', `na entrada: ${fmtNum(c.pmInicialG, 1)} g`)}
+      ${destaque('Peso médio atual', c.pmAtualG != null ? pesoUnid(c.pmAtualG) : '—', `na entrada: ${c.pmInicialG >= 1000 ? fmtNum(c.pmInicialG / 1000, 2) + ' kg' : fmtNum(c.pmInicialG, 1) + ' g'}`)}
       ${destaque('Ganho diário', c.gpd != null ? unid(fmtNum(c.gpd, 2), 'g/dia') : '—', 'por peixe, desde a entrada')}
     </div>
     <section class="bloco"><h2>Evolução do peso médio</h2><div class="card">${svgPeso(pontosPeso(lote, bios))}</div></section>

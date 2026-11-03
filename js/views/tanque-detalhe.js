@@ -13,7 +13,9 @@ export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje, meta
         const r = resumo[l.id];
         const dias = diasEntre(l.data_entrada, hoje);
         const vivos = r ? Math.max(0, l.quantidade_inicial - Number(r.mortos)) : null;
-        const pm = r && r.ultimo_peso_medio_kg != null ? fmtNum(r.ultimo_peso_medio_kg * 1000, 0) + '<em>g</em>' : '—';
+        // abaixo de 1 kg em gramas; acima, em kg como no resto do app (2,30 kg, não 2.300 g)
+        const kg = r && r.ultimo_peso_medio_kg != null ? Number(r.ultimo_peso_medio_kg) : null;
+        const pm = kg == null ? '—' : kg < 1 ? fmtNum(kg * 1000, 0) + '<em>g</em>' : fmtNum(kg, 2) + '<em>kg</em>';
         return `
         <section class="td-lote">
           ${lotes.length > 1 ? `<p class="lote-nome"><span class="fase ${faseCss(l.tipo)}"></span>${esc(nomeLote(l))}</p>` : ''}
