@@ -1,13 +1,18 @@
-/* Gestão de Piscicultura — "folha emoldurada": uma moldura cor da água segura o app; o trabalho fica numa folha branca.
-   Cor só no dado, no estado e na ação principal. Sem sombras em repouso, sem degradês, sem faixas laterais.
+/* Gestão de Piscicultura — "cabeçalho verde": barra de cima, abas e lateral no verde escuro da marca;
+   o trabalho em cartões brancos sobre um fundo verde-acinzentado claro.
+   Cor no dado, no estado e na ação principal. Sem sombras em repouso, sem degradês, sem faixas laterais.
    Legível ao sol e para quem não tem pressa de aprender. */
 @font-face { font-family: "Inter"; src: url("../fonts/inter-var.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
 @font-face { font-family: "Manrope"; src: url("../fonts/manrope-var.woff2") format("woff2"); font-weight: 200 800; font-style: normal; font-display: swap; }
 
 :root {
   /* superfícies */
-  --moldura: #e7efea;      /* cromo: barra de cima, abas, lateral */
-  --bg: #ffffff;           /* a folha */
+  --cromo: #12352d;        /* barra de cima, abas e lateral: o verde escuro da marca */
+  --cromo-tinta: #ffffff;
+  --cromo-mudo: #a9c9bd;   /* texto secundário sobre o cromo */
+  --cromo-luz: #6ee7a8;    /* ativo e "online" sobre o cromo */
+  --moldura: #e7efea;      /* tom claro do verde: telas de entrada, trilho das barras */
+  --bg: #f0f4f1;           /* o fundo, atrás dos cartões brancos */
   --card: #ffffff;
   --campo-bg: #f2f5f3;     /* um degrau de tom: blocos de destaque, itens feitos */
   --ativo: #d9e4dd;        /* item ativo da lateral */
@@ -1033,3 +1038,25 @@ table.cmp td b { font-weight: 600; }
 .h-tempo-av li { position: relative; padding-left: 1rem; font-size: .84rem; line-height: 1.4; color: var(--tinta); }
 .h-tempo-av li::before { content: ''; position: absolute; left: 0; top: .45em; width: 7px; height: 7px; border-radius: 50%; background: #d97706; }
 .h-tempo-av li.alerta::before { background: var(--erro); }
+
+/* ----- cabeçalho verde: barra de cima, abas e lateral no cromo escuro ----- */
+/* dentro do cromo, os tokens de texto viram claros; o resto do CSS continua igual */
+.topo, .abas, .lateral {
+  --tinta: var(--cromo-tinta); --tinta-2: var(--cromo-mudo); --rio: var(--cromo-luz); --ok: var(--cromo-luz);
+  --ativo: rgba(255, 255, 255, .13); --moldura: rgba(255, 255, 255, .16);
+  background: var(--cromo); color: var(--tinta);
+}
+.abas a.on span { color: var(--cromo-tinta); }
+#b-sug { background: var(--rio); color: #fff; }
+@media (min-width: 900px) {
+  body { background: var(--cromo); }
+  .view { border-color: transparent; }
+  .lateral-pe .avatar { background: rgba(255, 255, 255, .14); color: var(--cromo-tinta); }
+  .lat-item { background: rgba(255, 255, 255, .07); }
+}
+@media (min-width: 900px) and (hover: hover) {
+  .lat-item:hover { background: rgba(255, 255, 255, .12); }
+  .lat-atalhos a:not(.on):hover, .lateral nav a:not(.on):hover { color: var(--cromo-tinta); background: rgba(255, 255, 255, .08); }
+}
+/* a próxima tarefa vira cartão branco: o verde-claro sumia no fundo novo */
+.ag { background: var(--card); border: 1px solid var(--linha); }
