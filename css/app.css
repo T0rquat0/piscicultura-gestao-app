@@ -1060,6 +1060,7 @@ table.cmp td b { font-weight: 600; }
 }
 /* a próxima tarefa vira cartão branco: o verde-claro sumia no fundo novo */
 .ag { background: var(--card); border: 1px solid var(--linha); }
+.ag-trilho { stroke: #dcebe4; } /* o trilho era branco sobre o verde-claro; no cartão branco ele sumia */
 
 /* ----- Lançar: números do tanque no celular (no computador eles ficam no painel ao lado) ----- */
 .tq-info { display: grid; gap: .35rem; margin: .6rem 0 0; font-size: .9rem; line-height: 1.4; color: var(--tinta-2); }
