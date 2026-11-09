@@ -1082,3 +1082,7 @@ table.cmp td b { font-weight: 600; }
   .card > .pizza .pz-leg li { grid-template-columns: 12px minmax(0, 1fr); row-gap: .05rem; }
   .card > .pizza .pz-leg b { grid-column: 2; text-align: left; }
 }
+
+/* despesca: Parcial e Total lado a lado; botão do PDF afastado da lista */
+#desp-tipo { grid-template-columns: 1fr 1fr; }
+[data-pdf-desp] { margin-top: .75rem; }

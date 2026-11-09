@@ -1,18 +1,18 @@
 // Tela de um tanque (todos os papéis): números de cada lote, sobrevivência, previsão de despesca e atalhos para lançar.
 import { esc, fmtInt, fmtNum, fmtData, hojeISO, diasEntre, num, ROTULO_TIPO, faseCss, progresso, fmtPct } from '../util.js';
 import * as db from '../db.js';
-import { previsaoDespesca } from '../calc.js';
+import { previsaoDespesca, vivosDoLote } from '../calc.js';
 import { icone } from '../icons.js';
 import { pedirTexto } from '../dialogo.js';
 import { metaDe, htmlPrevisao, PROXIMA_FASE } from './despesca.js';
 
-export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje, metas = {}) {
+export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje, metas = {}, podeGerir = false) {
   const nomeLote = (l) => `${ROTULO_TIPO[l.tipo] || l.tipo} · ${l.especie}`;
   const blocos = lotes.length
     ? lotes.map((l) => {
         const r = resumo[l.id];
         const dias = diasEntre(l.data_entrada, hoje);
-        const vivos = r ? Math.max(0, l.quantidade_inicial - Number(r.mortos)) : null;
+        const vivos = r ? vivosDoLote(l, r) : null;
         // abaixo de 1 kg em gramas; acima, em kg como no resto do app (2,30 kg, não 2.300 g)
         const kg = r && r.ultimo_peso_medio_kg != null ? Number(r.ultimo_peso_medio_kg) : null;
         const pm = kg == null ? '—' : kg < 1 ? fmtNum(kg * 1000, 0) + '<em>g</em>' : fmtNum(kg, 2) + '<em>kg</em>';
@@ -49,6 +49,7 @@ export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje, meta
       <div class="td-duo">
         <a class="btn" href="#/lancar?tipo=biometria&tanque=${esc(tanque.id)}">Biometria</a>
         <a class="btn" href="#/lancar?tipo=mortalidade&tanque=${esc(tanque.id)}">Mortalidade</a>
+        ${podeGerir ? `<a class="btn" href="#/lancar?tipo=despesca&tanque=${esc(tanque.id)}">Despesca</a>` : ''}
       </div>
     </div>` : ''}
   </section>`;
@@ -69,7 +70,7 @@ export async function renderTanqueDetalhe(ctx, el, id) {
   const meus = state.ref.lotes.filter((l) => l.tanque_id === id);
   const metas = (await db.kvGet('metasDespesca')) || {};
   el.innerHTML = `${semDetalhe ? '<p class="aviso">Sem conexão: os totais aparecem quando houver internet.</p>' : ''}
-    ${htmlCardTanque(tanque, meus, resumo, racaoHojeLocal, hoje, metas)}
+    ${htmlCardTanque(tanque, meus, resumo, racaoHojeLocal, hoje, metas, ctx.podeGerir())}
     ${meus.length ? `<a class="hub-card td-rel" href="#/relatorio/${esc(meus[0].id)}"><span class="item-ic">${icone('relatorio')}</span><span class="esq"><b>Relatório do lote</b><small>Peso, ração e mortalidade do início até hoje</small></span><span class="seta">${icone('direita', 20)}</span></a>` : ''}`;
   el.querySelectorAll('[data-meta]').forEach((b) => b.addEventListener('click', async () => {
     const l = meus.find((x) => x.id === b.dataset.meta); if (!l) return;

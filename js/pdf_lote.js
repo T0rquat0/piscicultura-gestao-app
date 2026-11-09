@@ -149,6 +149,7 @@ export function gerarPdfLote(jsPDF, d) {
     ? `Peso médio de ${n(c.pmInicialG, 1)} g na entrada para ${n(c.pmAtualG, 0)} g em ${fmtData(c.dataUltimaBio)}${c.gpd != null ? ` (${n(c.gpd, 1)} g por dia por peixe)` : ''}.`
     : 'Sem biometria registrada. Pese uma amostra para calcular peso médio, biomassa e conversão alimentar.']);
   obs.push(['Sobrevivência', `${plural(c.mortos, 'morte', 'mortes')} em ${fmtInt(lote.quantidade_inicial)} peixes (${fmtPct(100 - (c.sobrevivencia ?? 100))}%). Restam cerca de ${fmtInt(c.vivos)}.`]);
+  if (c.despescados) obs.push(['Despesca', `${plural(c.despescados, 'peixe retirado', 'peixes retirados')}, ${n(c.pesoDespescado, 0)} kg de peso bruto.`]);
   obs.push(['Ração', `${n(c.racaoTotal, 0)} kg fornecidos (${n(c.racaoTotal / kgSaco, 1)} sacos de ${n(kgSaco, 0)} kg)${c.racaoMediaDia != null ? `, média de ${n(c.racaoMediaDia, 1)} kg por dia` : ''}.`]);
   if (c.ca != null) obs.push(['Conversão', `${n(c.ca, 2)} kg de ração por kg de peixe ganho até a última biometria. Referência usual: 1,2 a 2,0, conforme espécie e fase.`]);
   if (gerir && c.custoRacao != null) obs.push(['Custo', `${fmtBRL(c.custoRacao)} em ração, calculado pelo preço médio das compras com valor informado.`]);

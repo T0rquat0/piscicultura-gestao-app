@@ -21,6 +21,7 @@ function descrever(h, nomeTanque, nomePessoa) {
     case 'racao_consumo': return `Ração: ${fmtNum(a.quantidade_kg, 1)} kg em ${fmtData(a.data)} no ${nomeTanque(a.tanque_id)}`;
     case 'biometrias': return `Biometria de ${fmtData(a.data)}: ${fmtInt(a.quantidade_amostrada)} peixes, ${fmtNum(a.peso_amostra_kg, 3)} kg`;
     case 'mortalidade': return `Mortalidade: ${fmtInt(a.quantidade)} peixes em ${fmtData(a.data)}${a.causa ? ` (${a.causa})` : ''}`;
+    case 'despescas': return `Despesca ${a.tipo === 'total' ? 'total' : 'parcial'} de ${fmtData(a.data)}: ${fmtInt(a.quantidade)} peixes, ${fmtNum(a.peso_bruto_kg, 0)} kg bruto`;
     case 'racao_estoque': return `Compra de ração: ${fmtNum(a.quantidade_kg, 0)} kg em ${fmtData(a.data_compra)}${a.fornecedor ? ` (${a.fornecedor})` : ''}`;
     case 'racao_contagens': return `Contagem de estoque de ${fmtData(a.data)}: ${fmtNum(a.contado_kg, 0)} kg`;
     case 'usuario_tanques': return `Acesso de ${nomePessoa(a.usuario_id)} ao ${nomeTanque(a.tanque_id)}`;
@@ -32,6 +33,7 @@ function descrever(h, nomeTanque, nomePessoa) {
 // o que mudou numa alteração: "campo: antes → depois"
 const ROTULO_CAMPO = {
   data: 'Data', data_compra: 'Data', data_entrada: 'Entrada', quantidade_kg: 'Quantidade (kg)', quantidade: 'Quantidade', causa: 'Causa',
+  peso_bruto_kg: 'Peso bruto (kg)', peso_liquido_kg: 'Peso líquido (kg)',
   quantidade_amostrada: 'Peixes pesados', peso_amostra_kg: 'Peso da amostra (kg)', custo_total: 'Valor pago', fornecedor: 'Fornecedor',
   especie: 'Espécie', tipo: 'Fase', quantidade_inicial: 'Peixes', peso_inicial_kg: 'Peso total (kg)', ativo: 'Ativo', nome: 'Nome', papel: 'Papel',
 };

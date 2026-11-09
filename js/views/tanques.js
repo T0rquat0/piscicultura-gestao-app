@@ -4,6 +4,7 @@ import { icone } from '../icons.js';
 import { ESPECIES } from '../config.js';
 import { esc, fmtData, fmtInt, fmtNum, hojeISO, num, ROTULO_TIPO, FASES, areaHa, progresso, fmtPct, plural } from '../util.js';
 import { lerPlanilha } from '../planilha.js';
+import { vivosDoLote } from '../calc.js';
 
 
 // 2,3 kg / 500 g; 5,5 ha
@@ -129,7 +130,7 @@ export async function renderTanque(ctx, el, id) {
   for (const l of ativos) {
     iniciais += Number(l.quantidade_inicial) || 0;
     const r = resumo[l.id];
-    const v = Math.max(0, Number(l.quantidade_inicial) - Number((r && r.mortos) || 0));
+    const v = vivosDoLote(l, r);
     const pm = r && r.ultimo_peso_medio_kg != null ? Number(r.ultimo_peso_medio_kg) : Number(l.peso_inicial_kg) / Math.max(1, Number(l.quantidade_inicial));
     vivos += v; biomassa += v * (pm || 0);
   }
