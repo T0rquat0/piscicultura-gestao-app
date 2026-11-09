@@ -68,14 +68,16 @@ export async function renderTanqueDetalhe(ctx, el, id) {
   if (!tanque) { el.innerHTML = '<div class="card vazio">Tanque não encontrado.</div>'; return; }
   el.innerHTML = '<p class="carregando">Carregando…</p>';
   const resumo = {};
-  let semDetalhe = !navigator.onLine;
-  if (navigator.onLine) { try { for (const r of await ctx.api.resumoLotes()) resumo[r.lote_id] = r; } catch { semDetalhe = true; } }
+  const linhasResumo = await (navigator.onLine ? ctx.api.resumoLotes() : ctx.api.resumoGuardado()).catch(() => null);
+  if (linhasResumo) for (const r of linhasResumo) resumo[r.lote_id] = r;
+  const semDetalhe = !linhasResumo;
+  const numerosGuardados = !semDetalhe && (!navigator.onLine || !!ctx.state.semRede);
   const hoje = hojeISO();
   const fila = await db.filaList();
   const racaoHojeLocal = new Set(fila.filter((i) => i.tabela === 'racao_consumo' && i.payload.data === hoje).map((i) => i.payload.tanque_id));
   const meus = state.ref.lotes.filter((l) => l.tanque_id === id);
   const metas = (await db.kvGet('metasDespesca')) || {};
-  el.innerHTML = `${semDetalhe ? '<p class="aviso">Sem conexão: os totais aparecem quando houver internet.</p>' : ''}
+  el.innerHTML = `${semDetalhe ? '<p class="aviso">Sem conexão: os totais aparecem quando houver internet.</p>' : numerosGuardados ? '<p class="aviso">Sem conexão: números da última atualização.</p>' : ''}
     ${htmlCardTanque(tanque, meus, resumo, racaoHojeLocal, hoje, metas, ctx.podeGerir())}
     ${meus.length ? `<a class="hub-card td-rel" href="#/relatorio/${esc(meus[0].id)}"><span class="item-ic">${icone('relatorio')}</span><span class="esq"><b>Relatório do lote</b><small>Peso, ração e mortalidade do início até hoje</small></span><span class="seta">${icone('direita', 20)}</span></a>` : ''}`;
   el.querySelectorAll('[data-meta]').forEach((b) => b.addEventListener('click', async () => {
