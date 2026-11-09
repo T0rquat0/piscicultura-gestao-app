@@ -63,7 +63,11 @@ export async function renderHome(ctx, el) {
     ]);
     if (rs) for (const r of rs) resumo[r.lote_id] = r; else semDetalhe = true;
     saldos = sd; racao = rc; mortes = mt;
-  } else { semDetalhe = true; }
+  } else {
+    const g = await ctx.api.resumoGuardado().catch(() => null);
+    if (g) for (const r of g) resumo[r.lote_id] = r; else semDetalhe = true;
+  }
+  const numerosGuardados = !semDetalhe && (!navigator.onLine || !!ctx.state.semRede);
   // a ração de alevino só aparece na Início quando a fazenda usa (tem saldo, compra ou consumo)
   const usadas = saldos ? saldos.linhas.filter((s, i) => i === 0 || ['total_comprado_kg', 'total_consumido_kg', 'saldo_kg'].some((k) => Number(s[k]))) : [];
   // lembrete de contagem: a ração em uso há mais tempo sem contar
@@ -150,7 +154,7 @@ export async function renderHome(ctx, el) {
         <p class="h-achado">${esc(dataLonga.charAt(0).toUpperCase() + dataLonga.slice(1))} · ${achado}</p></div>
     </div>
     <div id="avisos">${avisoContagem(ctx, paraContar, hoje)}</div>
-    ${semDetalhe ? '<p class="aviso">Sem conexão: mostrando só o que está guardado no aparelho. Os totais aparecem quando houver internet.</p>' : ''}
+    ${semDetalhe ? '<p class="aviso">Sem conexão: mostrando só o que está guardado no aparelho. Os totais aparecem quando houver internet.</p>' : numerosGuardados ? '<p class="aviso">Sem conexão: números da última atualização, sem os lançamentos ainda não enviados.</p>' : ''}
     ${comLote ? `<div class="h-topo">${seguro(cartaoAgora, 'Próxima tarefa')}${seguro(painelKpis, 'Indicadores')}</div>` : ''}
     ${gerir ? seguro(blocoAlertas, 'Atenção') : ''}
     <div class="h-grade">

@@ -1,5 +1,6 @@
 // Camada de acesso ao Supabase. Todas as funções lançam ErroApi (mensagem já em português).
-import { uuid, traduzErro, hojeISO } from './util.js';
+import * as db from './db.js';
+import { uuid, traduzErro, hojeISO, ehErroDeRede } from './util.js';
 
 export class ErroApi extends Error {
   constructor(original) {
@@ -95,9 +96,19 @@ export function criarApi(client) {
     async lote(id) {
       return ok(await client.from('lotes').select('id,tanque_id,tipo,especie,data_entrada,quantidade_inicial,peso_inicial_kg,ativo,tanques(nome)').eq('id', id).maybeSingle());
     },
+    // guarda o último resumo no aparelho: sem rede, as telas mostram os números da última atualização
     async resumoLotes() {
-      return ok(await client.rpc('resumo_lotes'));
+      try {
+        const linhas = ok(await client.rpc('resumo_lotes')) || [];
+        db.kvSet('resumo', linhas).catch(() => {});
+        return linhas;
+      } catch (e) {
+        const guardado = ehErroDeRede(e && e.original) ? await db.kvGet('resumo') : null;
+        if (guardado) return guardado;
+        throw e;
+      }
     },
+    resumoGuardado: () => db.kvGet('resumo'),
 
     // ----- tanques e lotes (dono/gerente) -----
     async criarTanque(fazendaId, nome, area = null) {

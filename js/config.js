@@ -32,7 +32,10 @@ export const CONTAGEM_LEMBRETE_DIAS = 7;
 export const PLANO_AVISO_DIAS = 7;
 
 // Tempo máximo (ms) esperando o servidor antes de considerar "sem conexão".
-export const TIMEOUT_REDE_MS = 15000;
+export const TIMEOUT_REDE_MS = 15000; // envio de lançamentos e login
+export const TIMEOUT_LEITURA_MS = 8000; // leitura de dados
+export const LIMITE_ABERTURA_MS = 3000; // ao abrir, com dados guardados no aparelho, não espera a rede mais que isso
+export const JANELA_SEM_REDE_MS = 30000; // depois de uma falha de rede, as telas não esperam pela rede nesse tempo (um teste de sinal à parte reabre tudo)
 
 // Dias de teste grátis para fazendas novas (o valor que vale é o do banco; este é só o texto da tela).
 export const TESTE_DIAS = 30;
