@@ -1,13 +1,18 @@
-/* Gestão de Piscicultura — "folha emoldurada": uma moldura cor da água segura o app; o trabalho fica numa folha branca.
-   Cor só no dado, no estado e na ação principal. Sem sombras em repouso, sem degradês, sem faixas laterais.
+/* Gestão de Piscicultura — "cabeçalho verde": barra de cima, abas e lateral no verde escuro da marca;
+   o trabalho em cartões brancos sobre um fundo verde-acinzentado claro.
+   Cor no dado, no estado e na ação principal. Sem sombras em repouso, sem degradês, sem faixas laterais.
    Legível ao sol e para quem não tem pressa de aprender. */
 @font-face { font-family: "Inter"; src: url("../fonts/inter-var.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
 @font-face { font-family: "Manrope"; src: url("../fonts/manrope-var.woff2") format("woff2"); font-weight: 200 800; font-style: normal; font-display: swap; }
 
 :root {
   /* superfícies */
-  --moldura: #e7efea;      /* cromo: barra de cima, abas, lateral */
-  --bg: #ffffff;           /* a folha */
+  --cromo: #12352d;        /* barra de cima, abas e lateral: o verde escuro da marca */
+  --cromo-tinta: #ffffff;
+  --cromo-mudo: #a9c9bd;   /* texto secundário sobre o cromo */
+  --cromo-luz: #6ee7a8;    /* ativo e "online" sobre o cromo */
+  --moldura: #e7efea;      /* tom claro do verde: telas de entrada, trilho das barras */
+  --bg: #f0f4f1;           /* o fundo, atrás dos cartões brancos */
   --card: #ffffff;
   --campo-bg: #f2f5f3;     /* um degrau de tom: blocos de destaque, itens feitos */
   --ativo: #d9e4dd;        /* item ativo da lateral */
@@ -1042,3 +1047,38 @@ table.cmp td b { font-weight: 600; }
 .senha-olho { position: absolute; top: 0; right: 0; height: 100%; min-width: 46px; display: grid; place-items: center; border: 0; background: none; color: var(--tinta-2); cursor: pointer; border-radius: 0 var(--r-campo) var(--r-campo) 0; }
 .senha-olho:hover { color: var(--tinta); }
 .senha-olho:focus-visible { outline: 2px solid var(--rio); outline-offset: -2px; }
+
+/* ----- cabeçalho verde: barra de cima, abas e lateral no cromo escuro ----- */
+/* dentro do cromo, os tokens de texto viram claros; o resto do CSS continua igual */
+.topo, .abas, .lateral {
+  --tinta: var(--cromo-tinta); --tinta-2: var(--cromo-mudo); --rio: var(--cromo-luz); --ok: var(--cromo-luz);
+  --ativo: rgba(255, 255, 255, .13); --moldura: rgba(255, 255, 255, .16);
+  background: var(--cromo); color: var(--tinta);
+}
+.abas a.on span { color: var(--cromo-tinta); }
+#b-sug { background: var(--rio); color: #fff; }
+@media (min-width: 900px) {
+  body { background: var(--cromo); }
+  .view { border-color: transparent; }
+  .lateral-pe .avatar { background: rgba(255, 255, 255, .14); color: var(--cromo-tinta); }
+  .lat-item { background: rgba(255, 255, 255, .07); }
+}
+@media (min-width: 900px) and (hover: hover) {
+  .lat-item:hover { background: rgba(255, 255, 255, .12); }
+  .lat-atalhos a:not(.on):hover, .lateral nav a:not(.on):hover { color: var(--cromo-tinta); background: rgba(255, 255, 255, .08); }
+}
+/* a próxima tarefa vira cartão branco: o verde-claro sumia no fundo novo */
+.ag { background: var(--card); border: 1px solid var(--linha); }
+.ag-trilho { stroke: #dcebe4; } /* o trilho era branco sobre o verde-claro; no cartão branco ele sumia */
+
+/* ----- Lançar: números do tanque no celular (no computador eles ficam no painel ao lado) ----- */
+.tq-info { display: grid; gap: .35rem; margin: .6rem 0 0; font-size: .9rem; line-height: 1.4; color: var(--tinta-2); }
+.tq-info b { color: var(--tinta); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tq-nums > span { white-space: nowrap; }
+.tq-ctx { padding-top: .45rem; border-top: 1px solid var(--linha-2); }
+
+/* rosca do Estoque no celular: o nome em cima e os sacos embaixo; numa linha só, o nome ficava "En…" */
+@media (max-width: 520px) {
+  .card > .pizza .pz-leg li { grid-template-columns: 12px minmax(0, 1fr); row-gap: .05rem; }
+  .card > .pizza .pz-leg b { grid-column: 2; text-align: left; }
+}

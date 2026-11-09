@@ -114,12 +114,13 @@ export async function renderHome(ctx, el) {
       const pm = r && r.ultimo_peso_medio_kg != null ? Number(r.ultimo_peso_medio_kg) : Number(l.peso_inicial_kg) / Math.max(1, Number(l.quantidade_inicial));
       bio += v * (pm || 0);
     }
-    const bioTxt = bio >= 1000 ? `${fmtNum(bio / 1000, 1)} t` : `${fmtNum(bio, 0)} kg`;
-    if (ls.length > 1) return `<span class="tq-dado"><span>${bioTxt}</span></span>`;
+    // toneladas só para dono e gerente (o funcionário vê só o peso médio)
+    const bioTxt = !gerir ? '' : `<span>${bio >= 1000 ? `${fmtNum(bio / 1000, 1)} t` : `${fmtNum(bio, 0)} kg`}</span>`;
+    if (ls.length > 1) return bioTxt ? `<span class="tq-dado">${bioTxt}</span>` : '';
     const l = ls[0], r = resumo[l.id];
     const pm = r && r.ultimo_peso_medio_kg != null ? Number(r.ultimo_peso_medio_kg) : Number(l.peso_inicial_kg) / Math.max(1, Number(l.quantidade_inicial));
     const meta = metaDe(l, metas);
-    return `<span class="tq-dado"><span>${bioTxt}</span><strong>${pesoTxt(pm)}<span> / ${pesoTxt(meta)}</span></strong></span>${progresso((pm / meta) * 100, { fina: true, tom: pm >= meta ? 'ok' : '', rotulo: `Peso médio ${pesoTxt(pm)} de ${pesoTxt(meta)}` })}`;
+    return `<span class="tq-dado">${bioTxt}<strong>${pesoTxt(pm)}<span> / ${pesoTxt(meta)}</span></strong></span>${progresso((pm / meta) * 100, { fina: true, tom: pm >= meta ? 'ok' : '', rotulo: `Peso médio ${pesoTxt(pm)} de ${pesoTxt(meta)}` })}`;
   };
   // sugestão do dia (só quando o tanque ainda não tem média de ração na semana)
   const sugDe = (t) => (semDetalhe ? null : sugestaoRacao(lotes.filter((l) => l.tanque_id === t.id), resumo, TAXA_RACAO));

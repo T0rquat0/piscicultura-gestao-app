@@ -91,6 +91,7 @@ export async function renderLancar(ctx, el, params = {}) {
           <select id="tanque" hidden>${tanques.map((t) => `<option value="${esc(t.id)}"${t.id === tanqueInicial ? ' selected' : ''}>${esc(t.nome)}</option>`).join('')}</select>
         </div>
         <p id="lote-linha" class="lote-linha" hidden></p>
+        <div id="tq-info" class="tq-info" aria-live="polite" hidden></div>
         <label id="lote-wrap">Qual lote? <select id="lote"></select></label>
         <p id="aviso-lotes" class="aviso" hidden></p>
       </section>
@@ -172,28 +173,41 @@ export async function renderLancar(ctx, el, params = {}) {
 
   // painel ao lado (computador): ração dos últimos 7 dias, hoje × média e sobrevivência do tanque escolhido
   const painel = el.querySelector('#painel-tq');
-  let dadosPainel = null;
+  let dadosPainel = null, lendo = null;
+  // ração dos últimos 7 dias e resumo dos lotes (só com internet), lidos uma vez para o painel e para a linha do celular;
+  // se o resumo falhar, não guarda nada e tenta de novo na próxima troca de tanque
+  function carregarDados() {
+    if (dadosPainel || !navigator.onLine) return Promise.resolve(dadosPainel);
+    if (!lendo) {
+      const d7 = new Date(`${hoje}T12:00:00`); d7.setDate(d7.getDate() - 6);
+      const desde = d7.toISOString().slice(0, 10);
+      lendo = Promise.all([ctx.api.racaoPeriodo(desde).catch(() => []), ctx.api.resumoLotes()])
+        .then(([rac, res]) => (dadosPainel = { rac, res: Object.fromEntries((res || []).map((x) => [x.lote_id, x])), desde }))
+        .catch(() => null)
+        .finally(() => { lendo = null; });
+    }
+    return lendo;
+  }
+  // ração do tanque dia a dia (inclui o que ainda está na fila do celular), média dos dias anteriores com ração e a de hoje
+  async function racaoSemana(tid) {
+    const d = await carregarDados();
+    const fila = (await db.filaList()).filter((i) => i.tabela === 'racao_consumo' && i.payload.tanque_id === tid);
+    const dias = Array.from({ length: 7 }, (_, i) => { const x = new Date(`${hoje}T12:00:00`); x.setDate(x.getDate() - (6 - i)); return x.toISOString().slice(0, 10); });
+    const porDia = Object.fromEntries(dias.map((x) => [x, 0]));
+    for (const r of (d && d.rac) || []) if (r.tanque_id === tid && r.data in porDia) porDia[r.data] += Number(r.quantidade_kg) || 0;
+    for (const i of fila) if (i.payload.data in porDia) porDia[i.payload.data] += Number(i.payload.quantidade_kg) || 0;
+    const ant = dias.slice(0, 6).map((x) => porDia[x]).filter((v) => v > 0);
+    return { dias, porDia, media: ant.length ? ant.reduce((a, b) => a + b, 0) / ant.length : 0, hojeKg: porDia[hoje] };
+  }
+  const sc = (kg) => fmtNum(kg / kgSaco, kg / kgSaco < 10 && kg % kgSaco ? 1 : 0);
+  const pesoTxt = (pm) => (pm < 1 ? fmtNum(pm * 1000, 0) + ' g' : fmtNum(pm, pm < 10 ? 2 : 1) + ' kg');
   async function pintarPainel() {
     if (!painel || getComputedStyle(painel).display === 'none') return;
     const t = tanques.find((x) => x.id === selTanque.value);
     if (!t) { painel.innerHTML = ''; return; }
     const doTanque = lotes.filter((l) => l.tanque_id === t.id);
-    if (!dadosPainel && navigator.onLine) {
-      const d7 = new Date(`${hoje}T12:00:00`); d7.setDate(d7.getDate() - 6);
-      const desde = d7.toISOString().slice(0, 10);
-      dadosPainel = await Promise.all([ctx.api.racaoPeriodo(desde).catch(() => []), ctx.api.resumoLotes().catch(() => [])])
-        .then(([rac, res]) => ({ rac, res: Object.fromEntries(res.map((x) => [x.lote_id, x])), desde }));
-    }
-    const fila = (await db.filaList()).filter((i) => i.tabela === 'racao_consumo' && i.payload.tanque_id === t.id);
-    const dias = Array.from({ length: 7 }, (_, i) => { const d = new Date(`${hoje}T12:00:00`); d.setDate(d.getDate() - (6 - i)); return d.toISOString().slice(0, 10); });
-    const porDia = Object.fromEntries(dias.map((d) => [d, 0]));
-    for (const r of (dadosPainel && dadosPainel.rac) || []) if (r.tanque_id === t.id && r.data in porDia) porDia[r.data] += Number(r.quantidade_kg) || 0;
-    for (const i of fila) if (i.payload.data in porDia) porDia[i.payload.data] += Number(i.payload.quantidade_kg) || 0;
-    const ant = dias.slice(0, 6).map((d) => porDia[d]).filter((v) => v > 0);
-    const media = ant.length ? ant.reduce((a, b) => a + b, 0) / ant.length : 0;
-    const hojeKg = porDia[hoje];
+    const { dias, porDia, media, hojeKg } = await racaoSemana(t.id);
     const maxD = Math.max(1, ...Object.values(porDia));
-    const sc = (kg) => fmtNum(kg / kgSaco, kg / kgSaco < 10 && kg % kgSaco ? 1 : 0);
     let vivos = 0, ini = 0, pm = null;
     for (const l of doTanque) {
       const r = dadosPainel && dadosPainel.res[l.id];
@@ -220,6 +234,52 @@ export async function renderLancar(ctx, el, params = {}) {
   }
   selTanque.addEventListener('change', pintarPainel);
   pintarPainel();
+
+  // celular (sem o painel ao lado): os números do tanque e o que importa para este lançamento, numa linha
+  const info = f.querySelector('#tq-info');
+  let mortes7 = null;
+  async function pintarInfo() {
+    if (matchMedia('(min-width: 1100px)').matches) { info.hidden = true; return; }
+    const tid = selTanque.value;
+    const doTanque = lotes.filter((l) => l.tanque_id === tid);
+    const d = await carregarDados();
+    if (!doTanque.length || !d || selTanque.value !== tid) { if (selTanque.value === tid) info.hidden = true; return; }
+    let vivos = 0, kg = 0, pm = null, bio = null;
+    for (const l of doTanque) {
+      const r = d.res[l.id], qi = Number(l.quantidade_inicial) || 0;
+      const v = Math.max(0, qi - Number((r && r.mortos) || 0));
+      const p = r && r.ultimo_peso_medio_kg != null ? Number(r.ultimo_peso_medio_kg) : qi > 0 ? Number(l.peso_inicial_kg) / qi : null;
+      vivos += v;
+      if (p != null) kg += v * p;
+      if (doTanque.length === 1) pm = p;
+      if (r && r.ultima_biometria && (!bio || r.ultima_biometria > bio.data)) bio = { data: r.ultima_biometria, pm: Number(r.ultimo_peso_medio_kg) };
+    }
+    const nums = [`<b>${fmtInt(vivos)}</b> peixes`];
+    if (pm != null) nums.push(`<b>${pesoTxt(pm)}</b> peso médio`);
+    // o peso total de peixe fica só para quem gere a fazenda
+    if (ctx.podeGerir() && kg > 0) nums.push(kg >= 1000 ? `<b>${fmtNum(kg / 1000, 1)} t</b> na água` : `<b>${fmtNum(kg, 0)} kg</b> na água`);
+    let extra = '';
+    if (tipo === 'racao') {
+      const { media, hojeKg } = await racaoSemana(tid);
+      extra = media ? `Hoje: <b>${sc(hojeKg)}</b> de ~${sc(media)} sacos (média dos últimos dias)`
+        : hojeKg ? `Hoje: <b>${sc(hojeKg)}</b> ${hojeKg / kgSaco === 1 ? 'saco lançado' : 'sacos lançados'}` : 'Hoje: nenhum saco lançado ainda';
+    } else if (tipo === 'biometria') {
+      extra = bio ? `Última pesagem: <b>${fmtData(bio.data).slice(0, 5)}</b> · ${pesoTxt(bio.pm)} por peixe` : 'Ainda sem pesagem neste tanque';
+    } else if (tipo === 'mortalidade') {
+      if (!mortes7) {
+        const d7 = new Date(`${hoje}T12:00:00`); d7.setDate(d7.getDate() - 6);
+        mortes7 = await ctx.api.mortalidadePeriodo(d7.toISOString().slice(0, 10)).catch(() => []);
+      }
+      const ids = new Set(doTanque.map((l) => l.id));
+      const n = mortes7.filter((m) => ids.has(m.lote_id)).reduce((a, m) => a + (Number(m.quantidade) || 0), 0);
+      extra = `Mortes nos últimos 7 dias: <b>${fmtInt(n)}</b>`;
+    }
+    if (selTanque.value !== tid) return;
+    info.innerHTML = `<span class="tq-nums">${nums.map((x) => `<span>${x}</span>`).join(' · ')}</span>${extra ? `<span class="tq-ctx">${extra}</span>` : ''}`;
+    info.hidden = false;
+  }
+  selTanque.addEventListener('change', pintarInfo);
+  pintarInfo();
 
   if (tipo === 'biometria') {
     // mortos por lote (só com internet): permite estimar os peixes vivos e a biomassa na hora
@@ -272,7 +332,7 @@ export async function renderLancar(ctx, el, params = {}) {
     const bio = sug.biomassaKg >= 1000 ? `${fmtNum(sug.biomassaKg / 1000, 1)} t` : `${fmtNum(sug.biomassaKg, 0)} kg`;
     box.hidden = false;
     box.innerHTML = `<button type="button" class="chip" id="b-sug">Sugestão: ${esc(sacosTxt(sacosSug))}</button>
-      <small>${fmtNum(sug.pct, 1)}% do peso vivo (${bio} de peixe)${sug.provisoria ? ' · taxa provisória, confirme com o técnico' : ''}</small>`;
+      <small>${fmtNum(sug.pct, 1)}% do peso vivo${ctx.podeGerir() ? ` (${bio} de peixe)` : ''}${sug.provisoria ? ' · taxa provisória, confirme com o técnico' : ''}</small>`;
     box.querySelector('#b-sug').onclick = () => { const q = f.querySelector('#qtd'); q.value = String(sacosSug); q.dispatchEvent(new Event('input')); q.focus(); };
   }
   if (tipo === 'racao') { mostrarSugestao(); selTanque.addEventListener('change', mostrarSugestao); }

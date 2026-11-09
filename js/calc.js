@@ -178,7 +178,8 @@ export function previsaoDespesca(lote, r, alvoKg, hoje) {
   if (pm != null && pm >= alvoKg) return { ...base, estado: 'pronto' };
   const dataBio = r && r.ultima_biometria;
   const dias = dataBio ? diasEntre(lote.data_entrada, dataBio) : 0;
-  if (pm == null || pmIni == null || !dataBio || !(dias > 0)) return { ...base, estado: 'sem-dado' };
+  // ganho abaixo de 0,1 g é arredondamento (19196,10 ÷ 12465 = 1,5399999999999998), não crescimento
+  if (pm == null || pmIni == null || !dataBio || !(dias > 0) || pm - pmIni < 1e-4) return { ...base, estado: 'sem-dado' };
   const gpd = (pm - pmIni) / dias; // kg/dia
   // sem crescimento de verdade (menos de 0,1 g por dia, ou só diferença de arredondamento) não dá para prever:
   // a conta jogaria a data para séculos depois e a data inválida quebrava a tela
