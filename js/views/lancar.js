@@ -192,8 +192,12 @@ export async function renderLancar(ctx, el, params = {}) {
   let dadosPainel = null, lendo = null;
   // ração dos últimos 7 dias e resumo dos lotes (só com internet), lidos uma vez para o painel e para a linha do celular;
   // se o resumo falhar, não guarda nada e tenta de novo na próxima troca de tanque
+  const dadosGuardados = () => ctx.api.resumoGuardado().then((l) => (l ? { rac: [], res: Object.fromEntries(l.map((x) => [x.lote_id, x])), desde: '' } : null)).catch(() => null);
+  // ao salvar, a conferência nunca segura o lançamento: sem resposta em 2,5 s, usa o que está guardado
+  const dadosRapidos = async () => (await Promise.race([carregarDados(), new Promise((r) => setTimeout(() => r(null), 2500))])) || dadosGuardados();
   function carregarDados() {
-    if (dadosPainel || !navigator.onLine) return Promise.resolve(dadosPainel);
+    if (dadosPainel) return Promise.resolve(dadosPainel);
+    if (!navigator.onLine) return dadosGuardados();
     if (!lendo) {
       const d7 = new Date(`${hoje}T12:00:00`); d7.setDate(d7.getDate() - 6);
       const desde = d7.toISOString().slice(0, 10);
@@ -444,10 +448,9 @@ export async function renderLancar(ctx, el, params = {}) {
   }
 
   // pergunta antes de gravar um peso médio muito fora do esperado (kg no lugar de g, ponto de milhar); nunca bloqueia
-  async function pesoConferido(loteId, quantidade, pesoTotalKg, data) {
+  async function pesoConferido(loteId, quantidade, pesoTotalKg, data, dados) {
     const lote = lotes.find((l) => l.id === loteId);
     if (!lote) return true;
-    const dados = await carregarDados();
     const texto = avisoPesoMedio({ quantidade, pesoTotalKg, lote, r: dados && dados.res[lote.id], data });
     return !texto || confirmar({ titulo: 'Confira o peso', texto, ok: 'Está certo', cancelar: 'Corrigir' });
   }
@@ -474,7 +477,7 @@ export async function renderLancar(ctx, el, params = {}) {
       if (!(p > 0)) return mostrarErro('Informe o peso total da amostra em kg.');
       if (!(q >= 1) || !Number.isInteger(q)) return mostrarErro('Informe quantos peixes foram pesados (número inteiro).');
       payload = { ...base, peso_amostra_kg: p, quantidade_amostrada: q };
-      if (!(await pesoConferido(lote_id, q, p, data))) return;
+      if (!(await pesoConferido(lote_id, q, p, data, await dadosRapidos()))) return;
     } else if (tipo === 'despesca') {
       const brutoTxt = f.querySelector('#desp-bruto').value, q = num(f.querySelector('#desp-qtd').value), b = numDecimal(brutoTxt);
       const lqTxt = f.querySelector('#desp-liquido').value.trim(), lq = lqTxt ? numDecimal(lqTxt) : null;
@@ -485,11 +488,14 @@ export async function renderLancar(ctx, el, params = {}) {
       if (lq != null && lq > b) return mostrarErro('O peso líquido não pode ser maior que o bruto.');
       const lote = lotes.find((l) => l.id === lote_id);
       if (lote && data < lote.data_entrada) return mostrarErro(`A data não pode ser antes da entrada do lote (${fmtData(lote.data_entrada)}).`);
-      if (navigator.onLine && !(await ctx.api.despescaAtiva().catch(() => true))) return mostrarErro('A despesca ainda não foi ativada neste sistema (falta rodar o sql/20 no Supabase).');
+      const [despescaLigada, dados] = await Promise.all([
+        navigator.onLine ? Promise.race([ctx.api.despescaAtiva().catch(() => true), new Promise((r) => setTimeout(() => r(true), 2500))]) : true,
+        dadosRapidos(),
+      ]);
+      if (!despescaLigada) return mostrarErro('A despesca ainda não foi ativada neste sistema (falta rodar o sql/20 no Supabase).');
       payload = { ...base, tipo: despTipo, quantidade: q, peso_bruto_kg: b, peso_liquido_kg: lq };
-      if (!(await pesoConferido(lote_id, q, b, data))) return;
+      if (!(await pesoConferido(lote_id, q, b, data, dados))) return;
       // confere com o que o app estimava (só com internet); nunca bloqueia, porque a contagem da despesca é a real
-      const dados = await carregarDados();
       const vivos = dados && lote ? vivosDoLote(lote, dados.res[lote.id]) : null;
       const excede = vivos != null && q > vivos;
       if (despTipo === 'total' || excede) {
@@ -522,6 +528,10 @@ export async function renderLancar(ctx, el, params = {}) {
     } catch (e) {
       btn.disabled = false;
       return mostrarErro('Não foi possível salvar no aparelho: ' + (e && e.message ? e.message : 'armazenamento indisponível'));
+    }
+    if (tipo === 'despesca' && payload.tipo === 'total') { // o lote já some daqui, mesmo antes de enviar
+      state.ref.lotes = state.ref.lotes.filter((l) => l.id !== lote_id);
+      try { await db.kvSet('ref', state.ref); } catch { /* opcional */ }
     }
     if (tipo === 'racao') {
       try { const m = (await db.kvGet('ultimaRacao')) || {}; m[selTanque.value] = payload.quantidade_kg; await db.kvSet('ultimaRacao', m); } catch { /* opcional */ }

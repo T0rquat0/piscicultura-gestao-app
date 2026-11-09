@@ -1,5 +1,5 @@
 // Ponto de entrada: sessão, perfil, roteamento, sincronização offline.
-import { SUPABASE_URL, SUPABASE_ANON_KEY, TIMEOUT_REDE_MS, TERMOS_VERSAO } from './config.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, TIMEOUT_REDE_MS, TIMEOUT_LEITURA_MS, LIMITE_ABERTURA_MS, JANELA_SEM_REDE_MS, TERMOS_VERSAO } from './config.js';
 import { iniciarSeg } from './seg.js';
 import { DEV_LOGIN, loginAutomaticoAtivo } from './dev-login.js';
 import { esc, parseHash, ROTULO_PAPEL, traduzErro, ehErroDeRede, plural } from './util.js';
@@ -109,6 +109,7 @@ function atualizarMarca() {
 async function sincronizarAgora() {
   if (!client || !state.user || !state.perfil) return null;
   if (!navigator.onLine) return { semRede: true, enviados: 0, falhas: 0 };
+  if (Date.now() < redeMortaAte && !(await testarRede())) return { semRede: true, enviados: 0, falhas: 0 };
   const r = await sincronizar(client, state.perfil.id);
   if (r.ocupado) return r;
   state.semRede = !!r.semRede;
@@ -257,17 +258,24 @@ async function entrar(email, senha) {
   await abrirApp(data.session.user);
 }
 
+// sinal morto: o celular diz que tem internet, mas a resposta não chega. Com dados guardados, não fica esperando.
+const comLimite = (promessa, ms) => Promise.race([promessa, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout de rede')), ms))]);
+
 async function abrirApp(user) {
   state.user = user;
+  ctx.api = api;
   let perfil = null;
   let daRede = false;
+  const guardado = await db.kvGet('perfil');
+  const temGuardado = !!(guardado && guardado.id === user.id);
+  if (guardado && !temGuardado) await db.kvDel('resumo'); // outra conta neste aparelho
   try {
-    perfil = await api.perfil(user.id);
+    perfil = await (temGuardado ? comLimite(api.perfil(user.id), LIMITE_ABERTURA_MS) : api.perfil(user.id));
     daRede = true;
     if (perfil) await db.kvSet('perfil', perfil);
   } catch (e) {
-    const cache = await db.kvGet('perfil');
-    if (cache && cache.id === user.id) perfil = cache; // sem rede: usa o perfil guardado
+    const cache = guardado;
+    if (temGuardado) { perfil = cache; state.semRede = true; redeMortaAte = Date.now() + JANELA_SEM_REDE_MS; } // sem rede: usa o perfil guardado
     else { mostrarMensagem('Não foi possível carregar seu perfil', e.message || 'Tente novamente.'); return; }
   }
   // termos novos: quem ainda não aceitou esta versão aceita antes de entrar (só com internet, para não travar o campo)
@@ -285,8 +293,11 @@ async function abrirApp(user) {
     return;
   }
   // administrador do sistema (sql/15): guardado no aparelho para o menu aparecer também sem internet
-  if (daRede) { state.admin = await api.souAdmin(); await db.kvSet('admin', { id: user.id, admin: state.admin }); }
-  else { const a = await db.kvGet('admin'); state.admin = !!(a && a.id === user.id && a.admin); }
+  const adminGuardado = async () => { const a = await db.kvGet('admin'); return !!(a && a.id === user.id && a.admin); };
+  if (daRede) {
+    try { state.admin = await comLimite(api.souAdmin(), LIMITE_ABERTURA_MS); await db.kvSet('admin', { id: user.id, admin: state.admin }); }
+    catch { state.admin = await adminGuardado(); }
+  } else state.admin = await adminGuardado();
 
   state.perfil = perfil;
   await carregarRefLocal();
@@ -301,6 +312,7 @@ async function abrirApp(user) {
 // Sem sessão válida e sem internet: abre com o perfil guardado, só para lançar offline.
 async function abrirOffline(perfil) {
   state.user = null;
+  ctx.api = apiSemSessao(); // sem sessão, qualquer chamada ficaria presa tentando renovar o login
   state.perfil = perfil;
   await carregarRefLocal();
   await atualizarPendentes();
@@ -309,17 +321,45 @@ async function abrirOffline(perfil) {
 }
 
 async function restaurarSessao() {
-  let session = null;
-  try { ({ data: { session } } = await client.auth.getSession()); } catch { /* sem rede */ }
+  let session = null, semConexao = false;
+  const perfilGuardado = await db.kvGet('perfil');
+  try {
+    // sessão vencida com sinal morto: renovar demoraria quase um minuto e acabava na tela de login
+    const r = await (perfilGuardado ? comLimite(client.auth.getSession(), LIMITE_ABERTURA_MS) : client.auth.getSession());
+    session = r.data.session;
+    if (r.error && (r.error.name === 'AuthRetryableFetchError' || ehErroDeRede(r.error))) semConexao = true;
+  } catch { semConexao = true; }
   if (session) return abrirApp(session.user);
+  if (perfilGuardado && (!navigator.onLine || semConexao)) {
+    state.semRede = semConexao;
+    if (semConexao) redeMortaAte = Date.now() + JANELA_SEM_REDE_MS;
+    return abrirOffline(perfilGuardado);
+  }
   // só em teste (PRs do Vercel / localhost): entra sozinho, a menos que a pessoa tenha clicado em Sair
   let saiu = false; try { saiu = sessionStorage.getItem('sem-auto-login') === '1'; } catch { /* ignora */ }
   if (!saiu && navigator.onLine && loginAutomaticoAtivo()) {
     try { return await entrar(DEV_LOGIN.email, DEV_LOGIN.senha); } catch (e) { console.warn('login automático falhou:', e.message); }
   }
-  const perfil = await db.kvGet('perfil');
-  if (perfil && !navigator.onLine) return abrirOffline(perfil);
   mostrarLogin();
+}
+
+// Abriu sem sessão por falta de rede e o sinal voltou: recupera a sessão sem redesenhar a tela (não apaga o que está sendo digitado).
+let retomando = false;
+async function retomarSessao() {
+  if (retomando || state.user || !state.perfil || !document.getElementById('view')) return;
+  retomando = true;
+  try {
+    if (Date.now() < redeMortaAte && !(await testarRede())) return;
+    const { data: { session }, error } = await comLimite(client.auth.getSession(), TIMEOUT_LEITURA_MS);
+    if (session) {
+      state.user = session.user;
+      ctx.api = api;
+      state.semRede = false;
+      atualizarPill();
+      await sincronizarAgora();
+      await atualizarRef();
+    } else if (!error) mostrarLogin('Sua sessão expirou. Entre novamente para enviar os lançamentos pendentes.');
+  } catch { /* continua sem rede: tenta de novo depois */ } finally { retomando = false; }
 }
 
 async function sair(forcar = false) {
@@ -332,6 +372,7 @@ async function sair(forcar = false) {
   try { Object.keys(localStorage).filter((k) => k.startsWith('sb-')).forEach((k) => localStorage.removeItem(k)); } catch { /* ignora */ }
   await db.kvDel('perfil');
   await db.kvDel('ref');
+  await db.kvDel('resumo');
   state.user = null; state.perfil = null; state.ref = { tanques: [], lotes: [] };
   saindo = false;
   mostrarLogin();
@@ -375,7 +416,7 @@ function renderErro(el, e) {
   const rede = e && (/conex|internet/i.test(e.message || ''));
   el.innerHTML = `<div class="card vazio"><p>${esc((e && e.message) || 'Erro inesperado')}</p>
     ${rede ? '<p class="mudo">Esta tela precisa de internet.</p>' : ''}<button class="btn" id="b-retry" type="button">Tentar de novo</button></div>`;
-  el.querySelector('#b-retry').addEventListener('click', rotear);
+  el.querySelector('#b-retry').addEventListener('click', async () => { if (Date.now() < redeMortaAte) await testarRede(); rotear(); });
 }
 
 async function rotear() {
@@ -419,12 +460,37 @@ async function rotear() {
 }
 
 // ---------- inicialização ----------
+// Depois de uma falha de rede, as telas não esperam pela resposta. Um teste de sinal à parte, leve, reabre tudo quando responder.
+let redeMortaAte = 0, testando = null;
+// com o nome AbortError o cliente do banco não repete a chamada (repetiria 3 vezes e prenderia a tela por 7 s)
+const semRedeErro = () => Object.assign(new Error('Failed to fetch (sem rede)'), { name: 'AbortError' });
+function testarRede() {
+  if (!navigator.onLine) return Promise.resolve(false);
+  if (testando) return testando;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 6000);
+  testando = fetch(`${SUPABASE_URL}/auth/v1/health`, { headers: { apikey: SUPABASE_ANON_KEY }, signal: ctrl.signal, cache: 'no-store' }).then(
+    () => { redeMortaAte = 0; state.semRede = false; atualizarPill(); return true; }, // qualquer resposta prova que há sinal
+    () => { redeMortaAte = Date.now() + JANELA_SEM_REDE_MS; state.semRede = true; atualizarPill(); return false; },
+  ).finally(() => { clearTimeout(timer); testando = null; });
+  return testando;
+}
+function apiSemSessao() {
+  const falha = () => Promise.reject(Object.assign(new Error('Sem conexão com a internet'), { original: { message: 'Failed to fetch' } }));
+  return new Proxy(api, { get: (t, k) => (k === 'resumoGuardado' ? t[k] : k === 'resumoLotes' ? t.resumoGuardado : typeof t[k] === 'function' ? falha : t[k]) });
+}
 function criarCliente() {
+  const LEITURA = /\/rest\/v1\/rpc\/(resumo_lotes|saldo_racao|consumo_diario|plano_atual|eh_admin|nomes_equipe)|grant_type=refresh_token/;
   const fetchComTimeout = (url, opts = {}) => {
+    if (Date.now() < redeMortaAte) return Promise.reject(semRedeErro());
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), TIMEOUT_REDE_MS);
+    const leitura = (opts.method || 'GET') === 'GET' || LEITURA.test(String(url));
+    const timer = setTimeout(() => ctrl.abort(), leitura ? TIMEOUT_LEITURA_MS : TIMEOUT_REDE_MS);
     if (opts.signal) opts.signal.addEventListener('abort', () => ctrl.abort());
-    return fetch(url, { ...opts, signal: ctrl.signal }).finally(() => clearTimeout(timer));
+    return fetch(url, { ...opts, signal: ctrl.signal }).then(
+      (r) => { redeMortaAte = 0; if (state.semRede) { state.semRede = false; atualizarPill(); } return r; },
+      (e) => { redeMortaAte = Date.now() + JANELA_SEM_REDE_MS; state.semRede = true; atualizarPill(); throw semRedeErro(); },
+    ).finally(() => clearTimeout(timer));
   };
   return window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
@@ -450,10 +516,11 @@ async function iniciar() {
   window.addEventListener('offline', atualizarPill);
   window.addEventListener('online', async () => {
     state.semRede = false;
+    redeMortaAte = 0;
     atualizarPill();
     if (!state.perfil) return;
     // estava em modo offline sem sessão (app aberto, sem tela de login): tenta recuperar a sessão
-    if (!state.user) { if (document.getElementById('view')) await restaurarSessao(); return; }
+    if (!state.user) { await retomarSessao(); return; }
     await sincronizarAgora();
     await atualizarRef();
   });
@@ -461,7 +528,14 @@ async function iniciar() {
     if (document.visibilityState === 'visible' && state.user && navigator.onLine) sincronizarAgora();
   });
   // rede pode voltar sem disparar o evento "online" (ex.: antena de satélite): tenta de tempos em tempos
-  setInterval(() => { if (state.user && state.pendentes && navigator.onLine) sincronizarAgora(); }, 20000);
+  setInterval(async () => {
+    if (!navigator.onLine) return;
+    const estavaSemRede = state.semRede || Date.now() < redeMortaAte;
+    if (estavaSemRede && !(await testarRede())) return;
+    if (!state.user) { retomarSessao(); return; }
+    if (state.pendentes) await sincronizarAgora();
+    if (estavaSemRede) await atualizarRef();
+  }, 20000);
 
   capturarConvite();
   if (await tratarLinkDeEmail()) return;
