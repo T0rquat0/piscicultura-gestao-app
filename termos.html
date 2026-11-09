@@ -68,10 +68,6 @@
   <h2>12. Contato</h2>
   <p><b>[E-MAIL / WHATSAPP DE ATENDIMENTO]</b></p>
 </main>
-<script type="module">
-  import { TERMOS_VERSAO } from './js/config.js';
-  if (!TERMOS_VERSAO) document.getElementById('minuta').hidden = false;
-  else document.querySelectorAll('[data-versao]').forEach((e) => { const [a, m, d] = TERMOS_VERSAO.split('-'); e.textContent = `${d}/${m}/${a}`; });
-</script>
+<script type="module" src="js/pagina_legal.js"></script>
 </body>
 </html>
