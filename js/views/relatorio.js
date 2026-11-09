@@ -7,9 +7,9 @@ import { gerarPdfRacao } from '../pdf_racao.js';
 import { gerarPdfDespesca } from '../pdf_despesca.js';
 import { confirmar, formulario } from '../dialogo.js';
 import { icone } from '../icons.js';
-import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num, ROTULO_TIPO, faseCss, nomeArquivo, dataArquivo, progresso, fmtPct } from '../util.js';
+import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num, ROTULO_TIPO, faseCss, nomeArquivo, dataArquivo, progresso, fmtPct, numDecimal, pesoMedioTxt } from '../util.js';
 import { pizza, COR_FASE, ORDEM_FASE } from '../graficos.js';
-import { calcularNaIdade, fimDoLote, mediaDe, vivosDoLote, indicadoresDespesca } from '../calc.js';
+import { calcularNaIdade, fimDoLote, mediaDe, vivosDoLote, indicadoresDespesca, avisoPesoMedio } from '../calc.js';
 import { calcularLote, precoMedioKg, pontosPeso, pesoMedioKg, evolucaoPeso, racaoPorSemana, matrizRacao, situacaoEstoque } from '../calc.js';
 
 export function svgPeso(pts) {
@@ -292,8 +292,8 @@ export async function renderRelatorioLote(ctx, el, id) {
           ${linhaNum('Peso total bruto', kg(d.peso_bruto_kg))}
           ${linhaNum('Peso total líquido', d.peso_liquido_kg != null ? kg(d.peso_liquido_kg) : '—')}
           ${i.difKg != null ? linhaNum('Diferença bruto − líquido', kg(i.difKg), `${fmtNum(i.difPct, 1)}% do peso bruto`) : ''}
-          ${linhaNum('Peso médio por peixe (bruto)', kg(i.medioBrutoKg, 2))}
-          ${i.medioLiquidoKg != null ? linhaNum('Peso médio por peixe (líquido)', kg(i.medioLiquidoKg, 2)) : ''}
+          ${linhaNum('Peso médio por peixe (bruto)', pesoMedioTxt(i.medioBrutoKg))}
+          ${i.medioLiquidoKg != null ? linhaNum('Peso médio por peixe (líquido)', pesoMedioTxt(i.medioLiquidoKg)) : ''}
           ${i.peixesHa != null ? linhaNum('Peixes por hectare', `${fmtInt(i.peixesHa)} peixes/ha`) : ''}
         </ul>
         <button class="btn no-print" type="button" data-pdf-desp="${esc(d.id)}">Gerar PDF desta despesca</button></div></section>`;
@@ -352,6 +352,8 @@ export async function renderRelatorioLote(ctx, el, id) {
         if (!campos) return;
         const v = await formulario({ titulo: 'Corrigir lançamento', texto: 'Os totais do relatório serão recalculados.', campos: campos.lista, validar: campos.validar });
         if (!v) return;
+        const aviso = campos.conferir && campos.conferir(v);
+        if (aviso && !(await confirmar({ titulo: 'Confira o peso', texto: aviso, ok: 'Está certo', cancelar: 'Corrigir' }))) return;
         try { await ctx.api.atualizar(tab, rid, campos.montar(v)); ctx.toast('Lançamento corrigido', 'ok'); renderRelatorioLote(ctx, el, id); }
         catch (e) { ctx.toast(e.message, 'erro'); }
       }));
@@ -360,6 +362,12 @@ export async function renderRelatorioLote(ctx, el, id) {
   // campos da janela de correção de cada tipo de lançamento
   function camposEdicao(tab, rid) {
     const dataCampo = (valor) => ({ nome: 'data', rotulo: 'Data', tipo: 'date', valor, min: lote.data_entrada, max: hoje });
+    const pesoOk = (t) => (String(t ?? '').includes('.') && String(t ?? '').includes(',') ? 'Digite o peso sem ponto de milhar. Ex.: 9547,5' : null);
+    // compara com a pesagem mais recente, sem contar o próprio registro que está sendo corrigido
+    const conferirPeso = (quantidade, pesoTotalKg, data, semId) => {
+      const u = bios.filter((b) => b.id !== semId && b.data <= data).pop();
+      return avisoPesoMedio({ quantidade, pesoTotalKg, lote, data, r: u ? { ultimo_peso_medio_kg: pesoMedioKg(u), ultima_biometria: u.data } : null });
+    };
     const dataOk = (d) => (!d ? 'Informe a data.' : d > hoje ? 'A data não pode ser no futuro.' : d < lote.data_entrada ? `A data não pode ser antes da entrada do lote (${fmtData(lote.data_entrada)}).` : null);
     if (tab === 'racao_consumo') {
       const r = rac.find((x) => x.id === rid); if (!r) return null;
@@ -374,9 +382,10 @@ export async function renderRelatorioLote(ctx, el, id) {
       return {
         lista: [dataCampo(b.data),
           { nome: 'qtd', rotulo: 'Peixes pesados', tipo: 'number', valor: b.quantidade_amostrada, step: '1', min: '1', inputmode: 'numeric' },
-          { nome: 'peso', rotulo: 'Peso total da amostra (kg)', tipo: 'number', valor: b.peso_amostra_kg, step: '0.001', min: '0.001', inputmode: 'decimal' }],
-        validar: (v) => dataOk(v.data) || (Number.isInteger(num(v.qtd)) && num(v.qtd) >= 1 ? null : 'Informe quantos peixes foram pesados (número inteiro).') || (num(v.peso) > 0 ? null : 'Informe o peso da amostra em kg.'),
-        montar: (v) => ({ data: v.data, quantidade_amostrada: num(v.qtd), peso_amostra_kg: num(v.peso) }),
+          { nome: 'peso', rotulo: 'Peso total da amostra (kg)', tipo: 'text', valor: b.peso_amostra_kg, inputmode: 'decimal' }],
+        validar: (v) => dataOk(v.data) || (Number.isInteger(num(v.qtd)) && num(v.qtd) >= 1 ? null : 'Informe quantos peixes foram pesados (número inteiro).') || pesoOk(v.peso) || (numDecimal(v.peso) > 0 ? null : 'Informe o peso da amostra em kg.'),
+        conferir: (v) => conferirPeso(num(v.qtd), numDecimal(v.peso), v.data, b.id),
+        montar: (v) => ({ data: v.data, quantidade_amostrada: num(v.qtd), peso_amostra_kg: numDecimal(v.peso) }),
       };
     }
     if (tab === 'despescas') {
@@ -384,11 +393,12 @@ export async function renderRelatorioLote(ctx, el, id) {
       return {
         lista: [dataCampo(d.data),
           { nome: 'qtd', rotulo: 'Peixes retirados', tipo: 'number', valor: d.quantidade, step: '1', min: '1', inputmode: 'numeric' },
-          { nome: 'bruto', rotulo: 'Peso total bruto (kg)', tipo: 'number', valor: d.peso_bruto_kg, step: '0.001', min: '0.001', inputmode: 'decimal' },
-          { nome: 'liquido', rotulo: 'Peso total líquido (kg, opcional)', tipo: 'number', valor: d.peso_liquido_kg ?? '', step: '0.001', min: '0.001', inputmode: 'decimal' }],
-        validar: (v) => dataOk(v.data) || (Number.isInteger(num(v.qtd)) && num(v.qtd) >= 1 ? null : 'Informe quantos peixes saíram (número inteiro).') || (num(v.bruto) > 0 ? null : 'Informe o peso bruto em kg.')
-          || (String(v.liquido ?? '').trim() === '' || (num(v.liquido) > 0 && num(v.liquido) <= num(v.bruto)) ? null : 'O peso líquido deve ser maior que zero e até o peso bruto.'),
-        montar: (v) => ({ data: v.data, quantidade: num(v.qtd), peso_bruto_kg: num(v.bruto), peso_liquido_kg: String(v.liquido ?? '').trim() === '' ? null : num(v.liquido) }),
+          { nome: 'bruto', rotulo: 'Peso total bruto (kg)', tipo: 'text', valor: d.peso_bruto_kg, inputmode: 'decimal' },
+          { nome: 'liquido', rotulo: 'Peso total líquido (kg, opcional)', tipo: 'text', valor: d.peso_liquido_kg ?? '', inputmode: 'decimal' }],
+        validar: (v) => dataOk(v.data) || (Number.isInteger(num(v.qtd)) && num(v.qtd) >= 1 ? null : 'Informe quantos peixes saíram (número inteiro).') || pesoOk(v.bruto) || pesoOk(v.liquido) || (numDecimal(v.bruto) > 0 ? null : 'Informe o peso bruto em kg.')
+          || (String(v.liquido ?? '').trim() === '' || (numDecimal(v.liquido) > 0 && numDecimal(v.liquido) <= numDecimal(v.bruto)) ? null : 'O peso líquido deve ser maior que zero e até o peso bruto.'),
+        conferir: (v) => conferirPeso(num(v.qtd), numDecimal(v.bruto), v.data, null),
+        montar: (v) => ({ data: v.data, quantidade: num(v.qtd), peso_bruto_kg: numDecimal(v.bruto), peso_liquido_kg: String(v.liquido ?? '').trim() === '' ? null : numDecimal(v.liquido) }),
       };
     }
     if (tab === 'mortalidade') {

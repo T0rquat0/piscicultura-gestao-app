@@ -1,5 +1,5 @@
 // Relatório de despesca (uma despesca, parcial ou total): dados, indicadores e observações.
-import { fmtNum, fmtInt, fmtData, ROTULO_TIPO } from './util.js';
+import { fmtNum, fmtInt, fmtData, ROTULO_TIPO, pesoMedioTxt } from './util.js';
 import { COR, M, LARG, ferramentas, rodape, logoPdf, tabela } from './pdf_lote.js';
 import { indicadoresDespesca } from './calc.js';
 
@@ -38,8 +38,8 @@ export function gerarPdfDespesca(jsPDF, d) {
   ]);
   bloco('Indicadores', [
     ...(i.difKg != null ? [['Diferença bruto - líquido', `${kg(i.difKg)} (${fmtNum(i.difPct, 1)}% do peso bruto)`]] : []),
-    ['Peso médio por peixe (bruto)', kg(i.medioBrutoKg, 2)],
-    ...(i.medioLiquidoKg != null ? [['Peso médio por peixe (líquido)', kg(i.medioLiquidoKg, 2)]] : []),
+    ['Peso médio por peixe (bruto)', pesoMedioTxt(i.medioBrutoKg)],
+    ...(i.medioLiquidoKg != null ? [['Peso médio por peixe (líquido)', pesoMedioTxt(i.medioLiquidoKg)]] : []),
     ...(i.peixesHa != null ? [['Peixes por hectare', `${fmtInt(i.peixesHa)} peixes/ha`]] : []),
   ]);
 

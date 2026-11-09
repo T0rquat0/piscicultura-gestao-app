@@ -1,7 +1,8 @@
 // Contas da despesca, conferidas com o relatório real da Fazenda São Carlos (Tanque Piranha, 05/11/2026).
 // Rodar: node testes/calc/teste_despesca.mjs
 import assert from 'node:assert/strict';
-import { indicadoresDespesca, calcularLote, vivosDoLote, fimDoLote, previsaoDespesca } from '../../js/calc.js';
+import { indicadoresDespesca, calcularLote, vivosDoLote, fimDoLote, previsaoDespesca, avisoPesoMedio } from '../../js/calc.js';
+import { numDecimal, pesoMedioTxt } from '../../js/util.js';
 
 const perto = (a, b, m, d = 0.005) => assert.ok(Math.abs(a - b) <= d, `${m}: ${a} ≠ ${b}`);
 
@@ -64,5 +65,21 @@ assert.equal(vivosDoLote(lote, { mortos: 900, despescados: 300 }), 0);
 assert.equal(vivosDoLote(lote, { mortos: 100 }), 900);
 assert.equal(vivosDoLote(lote, undefined), 1000);
 assert.equal(previsaoDespesca(lote, { ultimo_peso_medio_kg: 2, ultima_biometria: '2026-06-01', mortos: 100, despescados: 300 }, 3, D).biomassaKg, 1800);
+
+// 6) peso digitado na escala errada
+assert.ok(Number.isNaN(numDecimal('9.547,5'))); assert.equal(numDecimal('9547,5'), 9547.5); assert.equal(numDecimal('9547'), 9547); assert.equal(numDecimal('9547.000'), 9547);
+assert.equal(pesoMedioTxt(0.004219), '4,2 g'); assert.equal(pesoMedioTxt(0.2), '200 g'); assert.equal(pesoMedioTxt(4.2187), '4,22 kg');
+const l20 = { data_entrada: '2026-10-01', quantidade_inicial: 50000, peso_inicial_kg: 1000 }; // 20 g por peixe
+// o caso do Torquato: 1000 no campo de kg, 50 peixes, lote de 20 g
+assert.match(avisoPesoMedio({ quantidade: 50, pesoTotalKg: 1000, lote: l20, r: null, data: '2026-10-02' }), /20,00 kg por peixe.*20 g/);
+assert.equal(avisoPesoMedio({ quantidade: 50, pesoTotalKg: 1, lote: l20, r: null, data: '2026-10-02' }), null, '1 kg em 50 peixes é o peso certo');
+// ponto de milhar: 9.547 lido como 9,547 kg
+const r42 = { ultimo_peso_medio_kg: 4, ultima_biometria: '2026-10-25' };
+assert.match(avisoPesoMedio({ quantidade: 2263, pesoTotalKg: 9.547, lote: l20, r: r42, data: '2026-11-05' }), /9,547 kg dá 4,2 g/);
+assert.equal(avisoPesoMedio({ quantidade: 2263, pesoTotalKg: 9547, lote: l20, r: r42, data: '2026-11-05' }), null);
+// crescimento forte de verdade (alevino de 5 g a 150 g em 60 dias) não incomoda; 40 dias sem pesar também não
+const alev = { data_entrada: '2026-01-01', quantidade_inicial: 1000, peso_inicial_kg: 5 };
+assert.equal(avisoPesoMedio({ quantidade: 30, pesoTotalKg: 4.5, lote: alev, r: null, data: '2026-03-02' }), null);
+assert.equal(avisoPesoMedio({ quantidade: 1, pesoTotalKg: 0, lote: alev, r: null, data: '2026-03-02' }), null, 'sem peso não pergunta');
 
 console.log('RESULTADO: TUDO OK (despesca)');

@@ -1,5 +1,5 @@
 // Cálculos do relatório de um lote (puros, testáveis em Node)
-import { diasEntre } from './util.js';
+import { diasEntre, fmtInt, fmtNum, pesoMedioTxt } from './util.js';
 
 const soma = (arr, k) => arr.reduce((s, x) => s + Number(x[k] || 0), 0);
 
@@ -16,6 +16,21 @@ export function indicadoresDespesca(d, areaHa) {
     difPct: l != null && b > 0 ? ((b - l) / b) * 100 : null,
     peixesHa: Number(areaHa) > 0 && q > 0 ? q / Number(areaHa) : null,
   };
+}
+
+// Confere o peso médio de uma pesagem com a última do lote (r: linha do resumo; sem biometria, vale o peso da entrada).
+// Destoa quando cai a menos de 1/3 ou passa de 3× o anterior mais 20 g por dia, folga maior que o crescimento real.
+// Pega kg no lugar de g e ponto de milhar lido como decimal. Devolve o texto da pergunta, ou null se está normal.
+export function avisoPesoMedio({ quantidade, pesoTotalKg, lote, r, data }) {
+  const qi = Number(lote.quantidade_inicial) || 0;
+  const temBio = !!(r && r.ultimo_peso_medio_kg != null);
+  const ref = temBio ? Number(r.ultimo_peso_medio_kg) : qi > 0 ? Number(lote.peso_inicial_kg) / qi : null;
+  const pm = quantidade > 0 ? pesoTotalKg / quantidade : null;
+  if (!(ref > 0) || !(pm > 0)) return null;
+  const dias = Math.max(0, diasEntre((temBio && r.ultima_biometria) || lote.data_entrada, data)) || 0;
+  if (pm >= ref / 3 && pm <= ref * 3 + 0.02 * dias) return null;
+  const total = fmtNum(pesoTotalKg, Number.isInteger(pesoTotalKg) ? 0 : 3);
+  return `${fmtInt(quantidade)} ${quantidade === 1 ? 'peixe' : 'peixes'} em ${total} kg dá ${pesoMedioTxt(pm)} por peixe. ${temBio ? 'A última pesagem foi' : 'Na entrada eram'} ${pesoMedioTxt(ref)} por peixe. Está certo?`;
 }
 
 export function pesoMedioKg(b) {

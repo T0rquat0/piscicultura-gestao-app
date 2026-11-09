@@ -85,6 +85,7 @@ def abrir(b):
     return pg
 
 def lancar(pg):
+    pg.goto(BASE + '#/mais'); pg.wait_for_timeout(300) # mesmo endereço não redesenha: sai antes, para o formulário vir limpo
     pg.goto(BASE + f'#/lancar?tipo=despesca&tanque={T}'); pg.wait_for_selector('#desp-qtd', timeout=15000); pg.wait_for_timeout(500)
 
 with sync_playwright() as pw:
@@ -123,6 +124,29 @@ with sync_playwright() as pw:
     checa('maior que o bruto' in pg.inner_text('#erro'), 'bloqueia líquido maior que bruto')
     checa(not est['posts'], 'nada enviado nas validações')
 
+    # peso na escala errada
+    lancar(pg)
+    pg.fill('#desp-qtd', '2263'); pg.fill('#desp-bruto', '9.547,5'); pg.click('button[type=submit]'); pg.wait_for_timeout(300)
+    checa('sem ponto de milhar' in pg.inner_text('#erro'), 'recusa 9.547,5')
+    pg.fill('#desp-bruto', '9.547'); pg.wait_for_timeout(150)
+    checa('4,2 g' in pg.inner_text('#desp-calc'), f'peso pequeno aparece em gramas: {pg.inner_text("#desp-calc")!r}')
+    pg.click('button[type=submit]'); pg.wait_for_selector('.dialogo', timeout=5000)
+    t = pg.inner_text('.dialogo')
+    checa('Confira o peso' in t and '9,547 kg' in t and '4,2 g' in t and '100 g' in t, f'9.547 pede confirmação: {t!r}')
+    pg.locator('.dialogo button', has_text='Corrigir').click(); pg.wait_for_timeout(400)
+    checa(not [1 for t, x in est['posts'] if t == 'despescas'], 'Corrigir não grava')
+
+    # o caso do Torquato na biometria: 1000 no campo de kg, 50 peixes, lote de 100 g
+    pg.goto(BASE + f'#/lancar?tipo=biometria&tanque={T}'); pg.wait_for_selector('#peso', timeout=15000); pg.wait_for_timeout(400)
+    pg.fill('#peso', '1000'); pg.fill('#amostra', '50'); pg.wait_for_timeout(150)
+    checa('20,00 kg por peixe' in pg.inner_text('#pm'), f'biometria mostra em kg: {pg.inner_text("#pm")!r}')
+    pg.click('button[type=submit]'); pg.wait_for_selector('.dialogo', timeout=5000)
+    checa('Confira o peso' in pg.inner_text('.dialogo'), 'biometria de 20 kg num lote de 100 g pede confirmação')
+    pg.locator('.dialogo button', has_text='Corrigir').click(); pg.wait_for_timeout(400)
+    checa(not [1 for t, x in est['posts'] if t == 'biometrias'], 'biometria: Corrigir não grava')
+    pg.fill('#peso', '1.000,5'); pg.click('button[type=submit]'); pg.wait_for_timeout(300)
+    checa('sem ponto de milhar' in pg.inner_text('#erro'), 'biometria recusa 1.000,5')
+
     # parcial com contas do relatório real
     lancar(pg)
     pg.fill('#desp-qtd', '500'); pg.fill('#desp-bruto', '2100'); pg.fill('#desp-liquido', '2058'); pg.wait_for_timeout(200)
@@ -142,7 +166,7 @@ with sync_playwright() as pw:
 
     # quantidade acima do estimado: pede confirmação; "Voltar" não salva
     lancar(pg)
-    pg.fill('#desp-qtd', '9000'); pg.fill('#desp-bruto', '100'); pg.click('button[type=submit]'); pg.wait_for_selector('.dialogo', timeout=5000)
+    pg.fill('#desp-qtd', '9000'); pg.fill('#desp-bruto', '36000'); pg.click('button[type=submit]'); pg.wait_for_selector('.dialogo', timeout=5000)
     checa('2.400' in pg.inner_text('.dialogo'), 'acima do estimado: mostra a estimativa de 2.400')
     pg.locator('.dialogo button', has_text='Voltar').click(); pg.wait_for_timeout(400)
     checa(len([1 for t, x in est['posts'] if t == 'despescas']) == 1, 'Voltar não registra')
@@ -186,6 +210,8 @@ with sync_playwright() as pw:
     pg.click(f'[data-edit="despescas:{d2}"]'); pg.wait_for_selector('.dialogo form')
     pg.fill('.dialogo [name=liquido]', '99999'); pg.click('.dialogo button[type=submit]'); pg.wait_for_timeout(200)
     checa('até o peso bruto' in pg.inner_text('.dialogo [data-erro]'), 'corrigir: barra líquido maior que bruto')
+    pg.fill('.dialogo [name=liquido]', '9.356,5'); pg.click('.dialogo button[type=submit]'); pg.wait_for_timeout(200)
+    checa('sem ponto de milhar' in pg.inner_text('.dialogo [data-erro]'), 'corrigir: recusa 9.356,5')
     pg.fill('.dialogo [name=liquido]', ''); pg.fill('.dialogo [name=qtd]', '2260'); pg.click('.dialogo button[type=submit]'); pg.wait_for_timeout(800)
     checa(any(t == 'despescas' and x['quantidade'] == 2260 and x['peso_liquido_kg'] is None for t, _, x in est['patches']), 'corrigir: grava a nova quantidade e líquido vazio')
 

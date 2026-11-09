@@ -52,6 +52,14 @@ export function diasEntre(a, b) {
 }
 
 // aceita "12,5" ou "12.5"
+// Peso digitado: 9547 ou 9547,5. Recusa ponto e vírgula juntos (9.547,5), que viraria 9,5 kg sem ninguém notar.
+export function numDecimal(v) {
+  const s = String(v ?? '');
+  return s.includes('.') && s.includes(',') ? NaN : num(s);
+}
+// Peso médio de um peixe: em gramas abaixo de 1 kg, para nunca aparecer "0,00 kg"
+export const pesoMedioTxt = (kg) => (kg < 1 ? `${fmtNum(kg * 1000, kg < 0.01 ? 1 : 0)} g` : `${fmtNum(kg, 2)} kg`);
+
 export function num(v) {
   if (typeof v === 'number') return v;
   const s = String(v ?? '').trim().replace(',', '.');

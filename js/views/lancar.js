@@ -1,12 +1,12 @@
 // Lançamento de ração, biometria, mortalidade e despesca. Funciona sem internet:
 // o item é gravado na fila local (IndexedDB) e enviado quando houver conexão.
 import { icone } from '../icons.js';
-import { esc, hojeISO, fmtData, fmtNum, fmtInt, num, uuid, ROTULO_TIPO, progresso, fmtPct, plural } from '../util.js';
+import { esc, hojeISO, fmtData, fmtNum, fmtInt, num, uuid, ROTULO_TIPO, progresso, fmtPct, plural, numDecimal, pesoMedioTxt } from '../util.js';
 import * as db from '../db.js';
 import { confirmar } from '../dialogo.js';
 import { ordemNatural } from './home.js';
 import { PESO_SACO_PADRAO_KG, CAUSAS_MORTE, TAXA_RACAO } from '../config.js';
-import { sugestaoRacao, vivosDoLote, indicadoresDespesca } from '../calc.js';
+import { sugestaoRacao, vivosDoLote, indicadoresDespesca, avisoPesoMedio } from '../calc.js';
 
 const TIPOS = {
   racao: { rotulo: 'Ração', tabela: 'racao_consumo' },
@@ -45,7 +45,7 @@ function camposDoTipo(tipo, kgSaco) {
         <li>Anote o peso total e quantos peixes foram pesados.</li>
       </ol></details>
       <label>Peso total dos peixes (kg)
-        <input id="peso" type="number" inputmode="decimal" step="0.001" min="0" placeholder="Ex.: 2,4" required></label>
+        <input id="peso" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 2,4" required></label>
       <label>Quantos peixes foram pesados?
         <input id="amostra" type="number" inputmode="numeric" step="1" min="1" placeholder="Ex.: 10" required></label>
       <div class="calc resultado" id="pm">Peso médio: —</div>
@@ -60,9 +60,9 @@ function camposDoTipo(tipo, kgSaco) {
       <label>Quantos peixes saíram?
         <input id="desp-qtd" class="grande" type="number" inputmode="numeric" step="1" min="1" placeholder="0" required></label>
       <label>Peso total bruto (kg)
-        <input id="desp-bruto" type="number" inputmode="decimal" step="0.001" min="0" placeholder="Ex.: 9547" required></label>
+        <input id="desp-bruto" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 9547" required></label>
       <label>Peso total líquido (kg) <small class="mudo">(opcional)</small>
-        <input id="desp-liquido" type="number" inputmode="decimal" step="0.001" min="0" placeholder="Ex.: 9356"></label>
+        <input id="desp-liquido" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 9356"></label>
       <div class="calc resultado" id="desp-calc" hidden></div>`;
   }
   return `<label>Quantos peixes morreram?
@@ -301,11 +301,11 @@ export async function renderLancar(ctx, el, params = {}) {
     // mortos por lote (só com internet): permite estimar os peixes vivos e a biomassa na hora
     let mortos = null;
     const atualizaPm = () => {
-      const p = num(f.querySelector('#peso').value), q = num(f.querySelector('#amostra').value);
+      const p = numDecimal(f.querySelector('#peso').value), q = num(f.querySelector('#amostra').value);
       const pm = f.querySelector('#pm'), aviso = f.querySelector('#aviso-amostra');
       if (!(p > 0 && q > 0)) { pm.textContent = 'Peso médio: —'; aviso.hidden = true; return; }
       const medioG = (p / q) * 1000;
-      let txt = `Peso médio: ${fmtNum(medioG, 0)} g por peixe`;
+      let txt = `Peso médio: ${pesoMedioTxt(medioG / 1000)} por peixe`;
       const lote = lotes.find((l) => l.id === selLote.value);
       if (lote && mortos) {
         const vivos = Math.max(0, Number(lote.quantidade_inicial) - (mortos[lote.id] || 0));
@@ -330,13 +330,13 @@ export async function renderLancar(ctx, el, params = {}) {
     const pintarDica = () => { dica.textContent = despTipo === 'total' ? 'Tira todos os peixes que restam e encerra o lote.' : 'Tira parte dos peixes. O lote continua ativo com os que ficaram.'; };
     const contas = () => {
       const box = f.querySelector('#desp-calc');
-      const q = num(f.querySelector('#desp-qtd').value), b = num(f.querySelector('#desp-bruto').value);
+      const q = num(f.querySelector('#desp-qtd').value), b = numDecimal(f.querySelector('#desp-bruto').value);
       const lq = f.querySelector('#desp-liquido').value.trim();
       if (!(q > 0 && b > 0)) { box.hidden = true; return; }
       const area = (tanques.find((t) => t.id === selTanque.value) || {}).area_ha;
-      const i = indicadoresDespesca({ quantidade: q, peso_bruto_kg: b, peso_liquido_kg: lq ? num(lq) : null }, area);
-      const L = [`Peso médio bruto: ${fmtNum(i.medioBrutoKg, 2)} kg por peixe`];
-      if (i.medioLiquidoKg != null) L.push(`Peso médio líquido: ${fmtNum(i.medioLiquidoKg, 2)} kg por peixe`, `Diferença: ${fmtNum(i.difKg, 0)} kg (${fmtNum(i.difPct, 1)}% do bruto)`);
+      const i = indicadoresDespesca({ quantidade: q, peso_bruto_kg: b, peso_liquido_kg: lq ? numDecimal(lq) : null }, area);
+      const L = [`Peso médio bruto: ${pesoMedioTxt(i.medioBrutoKg)} por peixe`];
+      if (i.medioLiquidoKg != null) L.push(`Peso médio líquido: ${pesoMedioTxt(i.medioLiquidoKg)} por peixe`, `Diferença: ${fmtNum(i.difKg, 0)} kg (${fmtNum(i.difPct, 1)}% do bruto)`);
       if (i.peixesHa != null) L.push(`${fmtInt(i.peixesHa)} peixes por hectare`);
       box.textContent = L.join('\n'); box.hidden = false;
     };
@@ -443,6 +443,15 @@ export async function renderLancar(ctx, el, params = {}) {
     return t ? `Outros: ${t}` : 'Outros';
   }
 
+  // pergunta antes de gravar um peso médio muito fora do esperado (kg no lugar de g, ponto de milhar); nunca bloqueia
+  async function pesoConferido(loteId, quantidade, pesoTotalKg, data) {
+    const lote = lotes.find((l) => l.id === loteId);
+    if (!lote) return true;
+    const dados = await carregarDados();
+    const texto = avisoPesoMedio({ quantidade, pesoTotalKg, lote, r: dados && dados.res[lote.id], data });
+    return !texto || confirmar({ titulo: 'Confira o peso', texto, ok: 'Está certo', cancelar: 'Corrigir' });
+  }
+
   f.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     erro.hidden = true;
@@ -460,14 +469,17 @@ export async function renderLancar(ctx, el, params = {}) {
       if (q * kgSaco > 2000) return mostrarErro('Quantidade muito alta. Confira o número de sacos.');
       payload = { ...base, tanque_id: selTanque.value, quantidade_kg: Math.round(q * kgSaco * 100) / 100 };
     } else if (tipo === 'biometria') {
-      const p = num(f.querySelector('#peso').value), q = num(f.querySelector('#amostra').value);
+      const pesoTxt = f.querySelector('#peso').value, p = numDecimal(pesoTxt), q = num(f.querySelector('#amostra').value);
+      if (pesoTxt.includes('.') && pesoTxt.includes(',')) return mostrarErro('Digite o peso sem ponto de milhar. Ex.: 1250,5');
       if (!(p > 0)) return mostrarErro('Informe o peso total da amostra em kg.');
       if (!(q >= 1) || !Number.isInteger(q)) return mostrarErro('Informe quantos peixes foram pesados (número inteiro).');
       payload = { ...base, peso_amostra_kg: p, quantidade_amostrada: q };
+      if (!(await pesoConferido(lote_id, q, p, data))) return;
     } else if (tipo === 'despesca') {
-      const q = num(f.querySelector('#desp-qtd').value), b = num(f.querySelector('#desp-bruto').value);
-      const lqTxt = f.querySelector('#desp-liquido').value.trim(), lq = lqTxt ? num(lqTxt) : null;
+      const brutoTxt = f.querySelector('#desp-bruto').value, q = num(f.querySelector('#desp-qtd').value), b = numDecimal(brutoTxt);
+      const lqTxt = f.querySelector('#desp-liquido').value.trim(), lq = lqTxt ? numDecimal(lqTxt) : null;
       if (!(q >= 1) || !Number.isInteger(q)) return mostrarErro('Informe quantos peixes saíram (número inteiro).');
+      if ((brutoTxt.includes('.') && brutoTxt.includes(',')) || (lqTxt.includes('.') && lqTxt.includes(','))) return mostrarErro('Digite o peso sem ponto de milhar. Ex.: 9547,5');
       if (!(b > 0)) return mostrarErro('Informe o peso total bruto em kg.');
       if (lqTxt && !(lq > 0)) return mostrarErro('Confira o peso líquido em kg, ou deixe em branco.');
       if (lq != null && lq > b) return mostrarErro('O peso líquido não pode ser maior que o bruto.');
@@ -475,6 +487,7 @@ export async function renderLancar(ctx, el, params = {}) {
       if (lote && data < lote.data_entrada) return mostrarErro(`A data não pode ser antes da entrada do lote (${fmtData(lote.data_entrada)}).`);
       if (navigator.onLine && !(await ctx.api.despescaAtiva().catch(() => true))) return mostrarErro('A despesca ainda não foi ativada neste sistema (falta rodar o sql/20 no Supabase).');
       payload = { ...base, tipo: despTipo, quantidade: q, peso_bruto_kg: b, peso_liquido_kg: lq };
+      if (!(await pesoConferido(lote_id, q, b, data))) return;
       // confere com o que o app estimava (só com internet); nunca bloqueia, porque a contagem da despesca é a real
       const dados = await carregarDados();
       const vivos = dados && lote ? vivosDoLote(lote, dados.res[lote.id]) : null;
@@ -517,7 +530,7 @@ export async function renderLancar(ctx, el, params = {}) {
     ctx.sincronizarAgora(); // em segundo plano; não trava a tela
     const nomeTanque = (tanques.find((t) => t.id === selTanque.value) || {}).nome || '';
     const resumo = tipo === 'racao' ? `${sacosTxt(num(f.querySelector('#qtd').value))} de ração (${kgTxt(payload.quantidade_kg)} kg)`
-      : tipo === 'biometria' ? `${fmtNum((payload.peso_amostra_kg / payload.quantidade_amostrada) * 1000, 0)} g de peso médio (${fmtInt(payload.quantidade_amostrada)} peixes pesados)`
+      : tipo === 'biometria' ? `${pesoMedioTxt(payload.peso_amostra_kg / payload.quantidade_amostrada)} de peso médio (${fmtInt(payload.quantidade_amostrada)} peixes pesados)`
       : tipo === 'despesca' ? `despesca ${payload.tipo}: ${plural(payload.quantidade, 'peixe', 'peixes')}, ${fmtNum(payload.peso_bruto_kg, 0)} kg bruto`
       : `${plural(payload.quantidade, 'peixe morto', 'peixes mortos')}`;
     ctx.toast(navigator.onLine ? 'Salvo. Enviando…' : 'Salvo no celular. Será enviado quando houver internet.', 'ok');
