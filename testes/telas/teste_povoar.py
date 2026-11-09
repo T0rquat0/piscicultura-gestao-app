@@ -107,4 +107,4 @@ with sync_playwright() as pw:
 
 checa(not externos, f'nenhuma requisição para fora ({externos[:2]})')
 checa(not erros_js, f'sem erro de JavaScript ({erros_js[:2]})')
-print('\nTUDO OK' if ok else '\nHOUVE FALHAS'); raise SystemExit(0 if ok else 1)
+print('\nRESULTADO: TUDO OK' if ok else '\nRESULTADO: HOUVE FALHAS'); raise SystemExit(0 if ok else 1)
