@@ -1086,3 +1086,11 @@ table.cmp td b { font-weight: 600; }
 /* despesca: Parcial e Total lado a lado; botão do PDF afastado da lista */
 #desp-tipo { grid-template-columns: 1fr 1fr; }
 [data-pdf-desp] { margin-top: .75rem; }
+
+/* Lançar com 5 abas: rolam de lado se não couberem, em vez de cortar o nome */
+.seg[style*="--n:5"] { display: flex; gap: 1rem; overflow-x: auto; scrollbar-width: none; }
+.seg[style*="--n:5"]::-webkit-scrollbar { display: none; }
+.seg[style*="--n:5"] > button { flex: 1 0 auto; font-size: .86rem; padding-inline: .1rem; }
+/* manejo: na ração ou na água lado a lado; dose e unidade na mesma linha */
+#man-via { grid-template-columns: 1fr 1fr; }
+.man-dose { display: grid; grid-template-columns: 1fr 6.5rem; gap: .6rem; }

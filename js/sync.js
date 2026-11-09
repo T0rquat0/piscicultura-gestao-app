@@ -7,7 +7,7 @@
 import { filaList, filaPut, filaRemove } from './db.js';
 import { ehErroDeRede, ehErroDeSessao, traduzErro } from './util.js';
 
-const TABELAS = new Set(['biometrias', 'mortalidade', 'racao_consumo', 'despescas']);
+const TABELAS = new Set(['biometrias', 'mortalidade', 'racao_consumo', 'despescas', 'manejos']);
 let rodando = false;
 
 export async function sincronizar(client, userId) {
