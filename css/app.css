@@ -114,6 +114,14 @@ b, strong { font-weight: 600; }
 .card { background: var(--card); border: 1px solid var(--linha); border-radius: var(--r-card); padding: 1.1rem; margin-bottom: 1rem; }
 .card.vazio { text-align: center; color: var(--tinta-2); padding: 1.8rem 1.2rem; }
 .card.vazio .btn { margin-top: .6rem; }
+/* tanque vazio na tela do tanque: escolher a fase que vai entrar */
+.card.povoar { padding: 1.2rem; }
+.povoar-tit { margin: 0 0 .8rem; font-weight: 600; font-size: 1.05rem; color: var(--tinta); }
+.povoar-fases { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+.btn.povoar-fase { justify-content: flex-start; gap: .55rem; min-height: 56px; font-size: 1rem; font-weight: 600; }
+.povoar-fase .fase { width: 12px; height: 12px; }
+.card.povoar .mudo { margin: .8rem 0 0; }
+#f-lote { scroll-margin-top: 84px; } /* não some atrás da barra de cima ao rolar até ele */
 .grade { display: grid; gap: 1rem; }
 @media (min-width: 640px) { .grade { grid-template-columns: 1fr 1fr; } }
 .card header { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .9rem; }

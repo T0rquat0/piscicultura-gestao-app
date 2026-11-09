@@ -115,7 +115,7 @@ export async function renderTanques(ctx, el) {
   });
 }
 
-export async function renderTanque(ctx, el, id) {
+export async function renderTanque(ctx, el, id, params = {}) {
   if (!ctx.podeGerir()) return semPermissao(el);
   const tanque = ctx.state.ref.tanques.find((t) => t.id === id);
   if (!tanque) { el.innerHTML = '<div class="card vazio">Tanque não encontrado.<br></div>'; return; }
@@ -138,6 +138,9 @@ export async function renderTanque(ctx, el, id) {
   const temArea = 'area_ha' in tanque; // banco com o sql/17
   const dono = ctx.state.perfil.papel === 'dono';
   const hoje = hojeISO();
+  // veio do tanque vazio na Início ("Que fase vai entrar?"): fase já escolhida e formulário em foco
+  const doInicio = FASES.some(([v]) => v === params.fase);
+  const faseIni = doInicio ? params.fase : 'engorda';
 
   el.innerHTML = `
     <h1>${esc(tanque.nome)}</h1>
@@ -170,7 +173,7 @@ export async function renderTanque(ctx, el, id) {
       <h3>Novo lote de peixes</h3>
       <div class="duas">
         <label>Fase
-          <select id="tipo">${FASES.map(([v, r]) => `<option value="${v}"${v === 'engorda' ? ' selected' : ''}>${r}</option>`).join('')}</select></label>
+          <select id="tipo">${FASES.map(([v, r]) => `<option value="${v}"${v === faseIni ? ' selected' : ''}>${r}</option>`).join('')}</select></label>
         <label>Espécie
           <select id="especie">${ESPECIES.map((e) => `<option value="${esc(e)}">${esc(e)}</option>`).join('')}<option value="__outra">Outra…</option></select></label>
       </div>
@@ -216,6 +219,10 @@ export async function renderTanque(ctx, el, id) {
 
   // peso médio por peixe → peso total do lote (o banco guarda o total)
   const f = el.querySelector('#f-lote');
+  if (doInicio) {
+    f.querySelector('h3').textContent = `Povoar com ${ROTULO_TIPO[faseIni]}`;
+    requestAnimationFrame(() => f.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+  }
   const pmKg = (inp, un) => { const v = num(f.querySelector(inp).value); return v > 0 ? (f.querySelector(un).value === 'g' ? v / 1000 : v) : null; };
   const atualizaPm = () => {
     const q = num(f.querySelector('#qtd').value), pm = pmKg('#pm-in', '#pm-un');
@@ -254,6 +261,7 @@ export async function renderTanque(ctx, el, id) {
       if (pmHoje) await ctx.api.biometriaInicial(loteId, pmHoje, ctx.state.perfil.id, hoje);
       await ctx.atualizarRef();
       ctx.toast('Lote cadastrado', 'ok');
+      if (doInicio) { location.hash = `#/t/${id}`; return; } // volta para a tela do tanque, já com o lote e os botões de lançar
       renderTanque(ctx, el, id);
     } catch (e) { falha(e.message); btn.disabled = false; }
   });
