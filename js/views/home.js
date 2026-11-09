@@ -1,6 +1,6 @@
 import { esc, fmtInt, fmtNum, fmtData, hojeISO, diasEntre, num, ROTULO_TIPO, progresso, fmtPct } from '../util.js';
 import * as db from '../db.js';
-import { situacaoEstoque, previsaoDespesca, alertasManejo, sugestaoRacao } from '../calc.js';
+import { situacaoEstoque, previsaoDespesca, alertasManejo, sugestaoRacao, vivosDoLote } from '../calc.js';
 import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, ESTOQUE_COBERTURA_DIAS, PESO_SACO_PADRAO_KG, CONTAGEM_LEMBRETE_DIAS, PLANO_AVISO_DIAS, ALERTAS, TAXA_RACAO } from '../config.js';
 import { icone } from '../icons.js';
 import { pedirTexto } from '../dialogo.js';
@@ -110,7 +110,7 @@ export async function renderHome(ctx, el) {
     let bio = 0;
     for (const l of ls) {
       const r = resumo[l.id];
-      const v = Math.max(0, Number(l.quantidade_inicial) - Number((r && r.mortos) || 0));
+      const v = vivosDoLote(l, r);
       const pm = r && r.ultimo_peso_medio_kg != null ? Number(r.ultimo_peso_medio_kg) : Number(l.peso_inicial_kg) / Math.max(1, Number(l.quantidade_inicial));
       bio += v * (pm || 0);
     }
@@ -151,18 +151,18 @@ export async function renderHome(ctx, el) {
     </div>
     <div id="avisos">${avisoContagem(ctx, paraContar, hoje)}</div>
     ${semDetalhe ? '<p class="aviso">Sem conexão: mostrando só o que está guardado no aparelho. Os totais aparecem quando houver internet.</p>' : ''}
-    ${comLote ? `<div class="h-topo">${cartaoAgora()}${painelKpis()}</div>` : ''}
-    ${gerir ? blocoAlertas() : ''}
+    ${comLote ? `<div class="h-topo">${seguro(cartaoAgora, 'Próxima tarefa')}${seguro(painelKpis, 'Indicadores')}</div>` : ''}
+    ${gerir ? seguro(blocoAlertas, 'Atenção') : ''}
     <div class="h-grade">
       <div class="h-col">
-        ${blocoRacao()}
-        ${gerir ? blocoDespescas() : ''}
-        ${gerir ? blocoMortes() : ''}
+        ${seguro(blocoRacao, 'Tanques')}
+        ${gerir ? seguro(blocoDespescas, 'Despescas e mudanças de fase') : ''}
+        ${gerir ? seguro(blocoMortes, 'Mortalidade') : ''}
       </div>
       <div class="h-col">
         <section class="h-bloco" aria-labelledby="h-tempo" id="b-tempo"><header><h2 id="h-tempo">Tempo na fazenda</h2></header><p class="h-calmo">Carregando a previsão…</p></section>
-        ${blocoEstoque()}
-        ${gerir ? blocoPeixe() : ''}
+        ${seguro(blocoEstoque, 'Estoque de ração')}
+        ${gerir ? seguro(blocoPeixe, 'Peixe na água') : ''}
       </div>
     </div>`;
   const bn = el.querySelector('#b-novo-tanque'); if (bn) bn.addEventListener('click', () => novoTanque(ctx, el));
@@ -213,7 +213,7 @@ export async function renderHome(ctx, el) {
     }
     const t = faltam[0], m = mediaKg(t.id);
     const ls = lotes.filter((l) => l.tanque_id === t.id);
-    const peixes = ls.reduce((a, l) => a + Math.max(0, Number(l.quantidade_inicial) - Number((resumo[l.id] && resumo[l.id].mortos) || 0)), 0);
+    const peixes = ls.reduce((a, l) => a + vivosDoLote(l, resumo[l.id]), 0);
     const sg = m ? null : sugDe(t);
     const det = [fase(t), peixes ? `${fmtInt(peixes)} peixes` : '', m ? `média de ${nSacos(sacos(m))}` : sg ? `sugestão de ~${nSacos(sacos(sg.kg))} (${fmtNum(sg.pct, 1)}% do peso vivo${sg.provisoria ? ', provisória' : ''})` : 'sem média ainda: conte os sacos dados'].filter(Boolean).join(' · ');
     return `<section class="ag">${anel}<div class="ag-txt"><span class="ag-rot">Próxima tarefa</span><h2>Ração no ${esc(t.nome)}</h2><p>${esc(det)}${dado}</p>
@@ -226,7 +226,7 @@ export async function renderHome(ctx, el) {
       let peixes = 0, kg = 0, ini = 0;
       for (const l of lotes) {
         const r = resumo[l.id];
-        const v = Math.max(0, Number(l.quantidade_inicial) - Number((r && r.mortos) || 0));
+        const v = vivosDoLote(l, r);
         const pm = r && r.ultimo_peso_medio_kg != null ? Number(r.ultimo_peso_medio_kg) : Number(l.peso_inicial_kg) / Math.max(1, Number(l.quantidade_inicial));
         peixes += v; kg += v * (pm || 0); ini += Number(l.quantidade_inicial) || 0;
       }
@@ -243,6 +243,14 @@ export async function renderHome(ctx, el) {
       ks.push(`<a class="kp" href="#/estoque"><span>Estoque de ração</span><b>${fmtNum(sacos(tot), 0)}<em>sacos</em></b>${sit.dias != null ? `${progresso((sit.dias / ESTOQUE_COBERTURA_DIAS) * 100, { fina: true, tom, rotulo: `Dura ${fmtInt(Math.floor(sit.dias))} dias` })}<small>dura ~${fmtInt(Math.floor(sit.dias))} dias${usadas.length > 1 ? ' (engorda)' : ''}</small>` : '<small>sem consumo na semana para estimar</small>'}</a>`);
     }
     return `<div class="h-kpis">${ks.join('')}</div>`;
+  }
+
+  // um bloco com erro não derruba a tela: mostra um aviso pequeno no lugar dele e o resto aparece
+  function seguro(fn, nome) {
+    try { return fn(); } catch (e) {
+      console.error(`Início: erro no bloco "${nome}"`, e);
+      return `<section class="h-bloco"><p class="aviso pequeno">Não foi possível mostrar "${esc(nome)}" agora (${esc((e && e.message) || 'erro')}). O resto da tela segue normal.</p></section>`;
+    }
   }
 
   function blocoDespescas() {
@@ -280,7 +288,7 @@ export async function renderHome(ctx, el) {
     let peixes = 0, kg = 0; const porT = {}, porFase = {};
     for (const l of lotes) {
       const r = resumo[l.id];
-      const vivos = Math.max(0, Number(l.quantidade_inicial) - Number((r && r.mortos) || 0));
+      const vivos = vivosDoLote(l, r);
       const pm = r && r.ultimo_peso_medio_kg != null ? Number(r.ultimo_peso_medio_kg) : Number(l.peso_inicial_kg) / Math.max(1, Number(l.quantidade_inicial));
       const b = vivos * (pm || 0);
       peixes += vivos; kg += b; porT[l.tanque_id] = (porT[l.tanque_id] || 0) + b;
@@ -363,7 +371,7 @@ export async function renderHome(ctx, el) {
       if (m.causa) (causas[tq] ||= {})[m.causa] = ((causas[tq] || {})[m.causa] || 0) + q;
     }
     let vivos = 0;
-    for (const l of lotes) vivos += Math.max(0, Number(l.quantidade_inicial) - Number((resumo[l.id] && resumo[l.id].mortos) || 0));
+    for (const l of lotes) vivos += vivosDoLote(l, resumo[l.id]);
     const ids = Object.keys(porT).sort((a, b) => porT[b] - porT[a]);
     const pior = ids[0];
     const outros = Math.max(1, comLote - 1);

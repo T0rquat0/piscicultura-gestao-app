@@ -4,7 +4,6 @@ import { confirmar } from '../dialogo.js';
 import { icone } from '../icons.js';
 import { esc, fmtData, fmtNum, fmtInt, fmtBRL, ROTULO_PAPEL, ROTULO_TIPO, plural } from '../util.js';
 
-const voltar = `<p><a class="voltar" href="#/mais">${icone('voltar', 18)} Mais</a></p>`;
 // ordem de importância: o item "principal" de uma operação é o de nível mais alto (tanque > lote > lançamento)
 const NIVEL = { tanques: 0, lotes: 1, racao_estoque: 2, racao_contagens: 2, biometrias: 3, mortalidade: 3, racao_consumo: 3, usuario_tanques: 4, usuarios: 4 };
 
@@ -22,6 +21,7 @@ function descrever(h, nomeTanque, nomePessoa) {
     case 'racao_consumo': return `Ração: ${fmtNum(a.quantidade_kg, 1)} kg em ${fmtData(a.data)} no ${nomeTanque(a.tanque_id)}`;
     case 'biometrias': return `Biometria de ${fmtData(a.data)}: ${fmtInt(a.quantidade_amostrada)} peixes, ${fmtNum(a.peso_amostra_kg, 3)} kg`;
     case 'mortalidade': return `Mortalidade: ${fmtInt(a.quantidade)} peixes em ${fmtData(a.data)}${a.causa ? ` (${a.causa})` : ''}`;
+    case 'despescas': return `Despesca ${a.tipo === 'total' ? 'total' : 'parcial'} de ${fmtData(a.data)}: ${fmtInt(a.quantidade)} peixes, ${fmtNum(a.peso_bruto_kg, 0)} kg bruto`;
     case 'racao_estoque': return `Compra de ração: ${fmtNum(a.quantidade_kg, 0)} kg em ${fmtData(a.data_compra)}${a.fornecedor ? ` (${a.fornecedor})` : ''}`;
     case 'racao_contagens': return `Contagem de estoque de ${fmtData(a.data)}: ${fmtNum(a.contado_kg, 0)} kg`;
     case 'usuario_tanques': return `Acesso de ${nomePessoa(a.usuario_id)} ao ${nomeTanque(a.tanque_id)}`;
@@ -33,6 +33,7 @@ function descrever(h, nomeTanque, nomePessoa) {
 // o que mudou numa alteração: "campo: antes → depois"
 const ROTULO_CAMPO = {
   data: 'Data', data_compra: 'Data', data_entrada: 'Entrada', quantidade_kg: 'Quantidade (kg)', quantidade: 'Quantidade', causa: 'Causa',
+  peso_bruto_kg: 'Peso bruto (kg)', peso_liquido_kg: 'Peso líquido (kg)',
   quantidade_amostrada: 'Peixes pesados', peso_amostra_kg: 'Peso da amostra (kg)', custo_total: 'Valor pago', fornecedor: 'Fornecedor',
   especie: 'Espécie', tipo: 'Fase', quantidade_inicial: 'Peixes', peso_inicial_kg: 'Peso total (kg)', ativo: 'Ativo', nome: 'Nome', papel: 'Papel',
 };
@@ -54,10 +55,10 @@ function mudancas(h) {
 
 export async function renderHistorico(ctx, el, aba = 'lixeira') {
   if (ctx.state.perfil.papel !== 'dono') { el.innerHTML = '<div class="card vazio">Somente o dono vê o histórico.</div>'; return; }
-  el.innerHTML = `${voltar}<h1>Histórico e lixeira</h1><p class="carregando">Carregando…</p>`;
-  if (!navigator.onLine) { el.innerHTML = `${voltar}<h1>Histórico e lixeira</h1><div class="card vazio">Precisa de internet.</div>`; return; }
+  el.innerHTML = `<h1>Histórico e lixeira</h1><p class="carregando">Carregando…</p>`;
+  if (!navigator.onLine) { el.innerHTML = `<h1>Histórico e lixeira</h1><div class="card vazio">Precisa de internet.</div>`; return; }
   const [lista, nomes] = await Promise.all([ctx.api.historico(), ctx.api.nomesUsuarios().catch(() => ({}))]);
-  if (!lista) { el.innerHTML = `${voltar}<h1>Histórico e lixeira</h1><div class="card vazio">O histórico ainda não foi ativado neste sistema (falta rodar o sql/12 no Supabase).</div>`; return; }
+  if (!lista) { el.innerHTML = `<h1>Histórico e lixeira</h1><div class="card vazio">O histórico ainda não foi ativado neste sistema (falta rodar o sql/12 no Supabase).</div>`; return; }
 
   const tanquesConhecidos = Object.fromEntries((ctx.state.ref.tanques || []).map((t) => [t.id, t.nome]));
   for (const h of lista) if (h.tabela === 'tanques' && h.antes) tanquesConhecidos[h.antes.id] = tanquesConhecidos[h.antes.id] || h.antes.nome;
@@ -92,7 +93,7 @@ export async function renderHistorico(ctx, el, aba = 'lixeira') {
   };
 
   el.innerHTML = `
-    ${voltar}
+    
     <h1>Histórico e lixeira</h1>
     <div class="seg" style="--n:2" role="tablist">
       <button type="button" data-aba="lixeira" class="${aba === 'lixeira' ? 'on' : ''}">Lixeira</button>

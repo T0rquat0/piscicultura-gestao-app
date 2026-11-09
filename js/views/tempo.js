@@ -19,6 +19,6 @@ export async function pintarTempo(box, ctx, hoje) {
   const av = avisosClima(dias);
   const nomeDia = (d, i) => (i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : new Date(`${d}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', ''));
   box.innerHTML = `${cab}
-    <ul class="h-tempo">${dias.map((d, i) => `<li${i === 0 ? ' class="hoje"' : ''}><span>${esc(nomeDia(d.data, i))}</span><b>${Math.round(d.max)}°</b><small>mín. ${Math.round(d.min)}°</small><em>${esc(descricao(d.codigo))}${d.chuva >= 1 ? ` · ${fmtNum(d.chuva, 0)} mm` : ''}</em></li>`).join('')}</ul>
+    <ul class="h-tempo">${dias.map((d, i) => `<li${i === 0 ? ' class="hoje"' : ''}><span>${esc(nomeDia(d.data, i))}</span><b>${d.max == null ? '—' : `${Math.round(d.max)}°`}</b><small>mín. ${d.min == null ? '—' : `${Math.round(d.min)}°`}</small><em>${esc(descricao(d.codigo))}${d.chuva != null && d.chuva >= 1 ? ` · ${fmtNum(d.chuva, 0)} mm` : ''}</em></li>`).join('')}</ul>
     ${av.length ? `<ul class="h-tempo-av">${av.map((a) => `<li class="${a.nivel}">${esc(a.txt)}</li>`).join('')}</ul>` : '<p class="h-calmo">Sem aviso de manejo para hoje e amanhã.</p>'}`;
 }

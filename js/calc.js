@@ -1,7 +1,37 @@
 // Cálculos do relatório de um lote (puros, testáveis em Node)
-import { diasEntre } from './util.js';
+import { diasEntre, fmtInt, fmtNum, pesoMedioTxt } from './util.js';
 
 const soma = (arr, k) => arr.reduce((s, x) => s + Number(x[k] || 0), 0);
+
+// Peixes que continuam no tanque: entrada − mortos − retirados nas despescas (linha do resumo_lotes)
+export const vivosDoLote = (l, r) => Math.max(0, (Number(l.quantidade_inicial) || 0) - Number((r && r.mortos) || 0) - Number((r && r.despescados) || 0));
+
+// Números de uma despesca. Sem peso líquido, os campos dele ficam null.
+export function indicadoresDespesca(d, areaHa) {
+  const q = Number(d.quantidade), b = Number(d.peso_bruto_kg), l = d.peso_liquido_kg == null ? null : Number(d.peso_liquido_kg);
+  return {
+    medioBrutoKg: q > 0 ? b / q : null,
+    medioLiquidoKg: q > 0 && l != null ? l / q : null,
+    difKg: l != null ? b - l : null,
+    difPct: l != null && b > 0 ? ((b - l) / b) * 100 : null,
+    peixesHa: Number(areaHa) > 0 && q > 0 ? q / Number(areaHa) : null,
+  };
+}
+
+// Confere o peso médio de uma pesagem com a última do lote (r: linha do resumo; sem biometria, vale o peso da entrada).
+// Destoa quando cai a menos de 1/3 ou passa de 3× o anterior mais 20 g por dia, folga maior que o crescimento real.
+// Pega kg no lugar de g e ponto de milhar lido como decimal. Devolve o texto da pergunta, ou null se está normal.
+export function avisoPesoMedio({ quantidade, pesoTotalKg, lote, r, data }) {
+  const qi = Number(lote.quantidade_inicial) || 0;
+  const temBio = !!(r && r.ultimo_peso_medio_kg != null);
+  const ref = temBio ? Number(r.ultimo_peso_medio_kg) : qi > 0 ? Number(lote.peso_inicial_kg) / qi : null;
+  const pm = quantidade > 0 ? pesoTotalKg / quantidade : null;
+  if (!(ref > 0) || !(pm > 0)) return null;
+  const dias = Math.max(0, diasEntre((temBio && r.ultima_biometria) || lote.data_entrada, data)) || 0;
+  if (pm >= ref / 3 && pm <= ref * 3 + 0.02 * dias) return null;
+  const total = fmtNum(pesoTotalKg, Number.isInteger(pesoTotalKg) ? 0 : 3);
+  return `${fmtInt(quantidade)} ${quantidade === 1 ? 'peixe' : 'peixes'} em ${total} kg dá ${pesoMedioTxt(pm)} por peixe. ${temBio ? 'A última pesagem foi' : 'Na entrada eram'} ${pesoMedioTxt(ref)} por peixe. Está certo?`;
+}
 
 export function pesoMedioKg(b) {
   const q = Number(b.quantidade_amostrada);
@@ -12,26 +42,32 @@ export function pesoMedioKg(b) {
  * lote: {data_entrada, quantidade_inicial, peso_inicial_kg}
  * bios: biometrias ordenadas por data; mort: mortalidade; rac: consumo de ração
  * precoKg: preço médio do kg de ração (R$) ou null
+ * desp: despescas do lote (parciais e total)
  *
  * Convenções (mostradas no relatório como "estimado"):
  *  - peso_inicial_kg é o peso TOTAL do lote na entrada
  *  - biomassa atual = peixes vivos estimados × peso médio da última biometria
  *  - conversão alimentar = ração fornecida até a última biometria ÷ ganho de biomassa
+ *  - peixe despescado sai dos vivos, mas o peso bruto dele conta como ganho
+ *  - lote encerrado por despesca total: números reais (peso retirado e toda a ração), sem estimativa
  */
-export function calcularLote(lote, bios, mort, rac, hoje, precoKg = null) {
+export function calcularLote(lote, bios, mort, rac, hoje, precoKg = null, desp = []) {
   const qtdInicial = Number(lote.quantidade_inicial);
   const mortos = soma(mort, 'quantidade');
-  const vivos = Math.max(0, qtdInicial - mortos);
+  const despescados = soma(desp, 'quantidade');
+  const pesoDespescado = soma(desp, 'peso_bruto_kg');
+  const fechado = !lote.ativo && desp.some((d) => d.tipo === 'total'); // a despesca total contou os peixes de verdade
+  const vivos = fechado ? 0 : Math.max(0, qtdInicial - mortos - despescados);
   const racaoTotal = soma(rac, 'quantidade_kg');
   const biomassaInicial = Number(lote.peso_inicial_kg);
   const pmInicial = qtdInicial > 0 ? biomassaInicial / qtdInicial : null; // kg
 
   const ultima = bios.length ? bios[bios.length - 1] : null;
   const pmAtual = ultima ? pesoMedioKg(ultima) : null; // kg
-  const biomassaAtual = pmAtual != null ? vivos * pmAtual : null;
-  const ganhoBiomassa = biomassaAtual != null ? biomassaAtual - biomassaInicial : null;
+  const biomassaAtual = fechado ? 0 : pmAtual != null ? vivos * pmAtual : null;
+  const ganhoBiomassa = biomassaAtual != null ? biomassaAtual + pesoDespescado - biomassaInicial : null;
 
-  const racaoAteBio = ultima ? soma(rac.filter((r) => r.data <= ultima.data), 'quantidade_kg') : null;
+  const racaoAteBio = fechado ? racaoTotal : ultima ? soma(rac.filter((r) => r.data <= ultima.data), 'quantidade_kg') : null;
   // sem ração lançada até a última biometria não há conversão para calcular (mostrar 0,00 enganava)
   const ca = ganhoBiomassa != null && ganhoBiomassa > 0 && racaoAteBio > 0 ? racaoAteBio / ganhoBiomassa : null;
 
@@ -42,7 +78,10 @@ export function calcularLote(lote, bios, mort, rac, hoje, precoKg = null) {
   return {
     mortos,
     vivos,
-    sobrevivencia: qtdInicial > 0 ? (vivos / qtdInicial) * 100 : null,
+    despescados,
+    pesoDespescado,
+    // retirado também sobreviveu; na despesca total vale a contagem real (no máximo 100%)
+    sobrevivencia: qtdInicial > 0 ? Math.min(100, ((fechado ? despescados : Math.max(0, qtdInicial - mortos)) / qtdInicial) * 100) : null,
     racaoTotal,
     racaoMediaDia: diasCultivo > 0 ? racaoTotal / diasCultivo : null,
     diasCultivo,
@@ -89,18 +128,35 @@ export function evolucaoPeso(lote, bios) {
   });
 }
 
-// Segunda-feira da semana (YYYY-MM-DD) de uma data ISO
+// Data ISO (YYYY-MM-DD) somada de n dias; null se a data ou o n forem inválidos (nunca quebra a tela)
+export function somarDias(iso, n) {
+  if (!dataValida(iso) || n === null || n === '' || !Number.isFinite(Number(n))) return null;
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + Number(n));
+  return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+}
+
+// data YYYY-MM-DD que existe no calendário (2026-02-30 e 2026-13-01 não)
+export function dataValida(iso) {
+  if (typeof iso !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return false;
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === iso.slice(0, 10);
+}
+
+// Segunda-feira da semana (YYYY-MM-DD) de uma data ISO; null se a data for inválida
 export function inicioSemana(iso) {
-  const d = new Date(`${iso}T00:00:00Z`);
-  const dia = (d.getUTCDay() + 6) % 7; // segunda = 0
-  d.setUTCDate(d.getUTCDate() - dia);
-  return d.toISOString().slice(0, 10);
+  if (!dataValida(iso)) return null;
+  const d = new Date(`${String(iso).slice(0, 10)}T12:00:00Z`);
+  return somarDias(String(iso).slice(0, 10), -((d.getUTCDay() + 6) % 7)); // segunda = 0
 }
 
 // Ração somada por semana, da mais antiga para a mais recente
 export function racaoPorSemana(rac) {
   const m = new Map();
-  for (const r of rac) m.set(inicioSemana(r.data), (m.get(inicioSemana(r.data)) || 0) + Number(r.quantidade_kg || 0));
+  for (const r of rac) {
+    const sem = inicioSemana(r.data); if (!sem) continue; // lançamento sem data válida fica fora do gráfico por semana
+    m.set(sem, (m.get(sem) || 0) + (Number(r.quantidade_kg) || 0));
+  }
   return [...m.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([inicio, kg]) => ({ inicio, kg }));
 }
 
@@ -112,11 +168,7 @@ export function matrizRacao(linhas, tanqueIds, dias, hoje) {
     celulas.set(k, (celulas.get(k) || 0) + Number(r.quantidade_kg || 0));
   }
   const datas = [];
-  const base = new Date(`${hoje}T00:00:00Z`);
-  for (let i = 0; i < dias; i++) {
-    const d = new Date(base); d.setUTCDate(d.getUTCDate() - i);
-    datas.push(d.toISOString().slice(0, 10));
-  }
+  for (let i = 0; i < dias; i++) { const d = somarDias(hoje, -i); if (d) datas.push(d); }
   const totalTanque = Object.fromEntries(tanqueIds.map((t) => [t, 0]));
   const rows = datas.map((data) => {
     const por = {}; let total = 0;
@@ -160,18 +212,21 @@ export function previsaoDespesca(lote, r, alvoKg, hoje) {
   const qi = Number(lote.quantidade_inicial) || 0;
   const pmIni = qi > 0 ? Number(lote.peso_inicial_kg) / qi : null;
   const pm = r && r.ultimo_peso_medio_kg != null ? Number(r.ultimo_peso_medio_kg) : pmIni;
-  const vivos = Math.max(0, qi - Number((r && r.mortos) || 0));
+  const vivos = vivosDoLote(lote, r);
   const base = { pmKg: pm, alvoKg, pct: pm != null && alvoKg > 0 ? Math.min(100, (pm / alvoKg) * 100) : null, biomassaKg: alvoKg * vivos };
   if (pm != null && pm >= alvoKg) return { ...base, estado: 'pronto' };
   const dataBio = r && r.ultima_biometria;
   const dias = dataBio ? diasEntre(lote.data_entrada, dataBio) : 0;
   // ganho abaixo de 0,1 g é arredondamento (19196,10 ÷ 12465 = 1,5399999999999998), não crescimento
-  if (pm == null || pmIni == null || !dataBio || dias <= 0 || pm - pmIni < 1e-4) return { ...base, estado: 'sem-dado' };
+  if (pm == null || pmIni == null || !dataBio || !(dias > 0) || pm - pmIni < 1e-4) return { ...base, estado: 'sem-dado' };
   const gpd = (pm - pmIni) / dias; // kg/dia
+  // sem crescimento de verdade (menos de 0,1 g por dia, ou só diferença de arredondamento) não dá para prever:
+  // a conta jogaria a data para séculos depois e a data inválida quebrava a tela
+  if (!(gpd >= 0.0001)) return { ...base, estado: 'sem-dado' };
   const falta = Math.ceil((alvoKg - pm) / gpd);
-  if (!(falta <= 3650)) return { ...base, estado: 'sem-dado' }; // mais de 10 anos: ritmo sem sentido, e a data estouraria
-  const d = new Date(`${dataBio}T12:00:00`); d.setDate(d.getDate() + falta);
-  const data = d.toISOString().slice(0, 10);
+  if (!(falta >= 0 && falta <= 3650)) return { ...base, estado: 'sem-dado' };
+  const data = somarDias(dataBio, falta);
+  if (!data) return { ...base, estado: 'sem-dado' };
   return { ...base, estado: 'previsto', gpdG: gpd * 1000, data, dias: Math.max(0, diasEntre(hoje, data)) };
 }
 
@@ -213,9 +268,8 @@ export function alertasManejo({ lotes, resumo, racaoHoje, mediaSemana, mortes, h
     for (const fim of [0, 1]) { // sequência que termina hoje ou ontem
       let seq = 0, total = 0;
       for (let i = fim; ; i++) {
-        const dt = new Date(`${hoje}T12:00:00`); dt.setDate(dt.getDate() - i);
-        const iso = dt.toISOString().slice(0, 10);
-        if (!d[iso]) break;
+        const iso = somarDias(hoje, -i);
+        if (!iso || !d[iso]) break;
         seq++; total += d[iso];
       }
       if (seq >= cfg.morteDiasSeguidos) { repetidas.push({ tanque: t, dias: seq, total }); break; }
@@ -225,19 +279,21 @@ export function alertasManejo({ lotes, resumo, racaoHoje, mediaSemana, mortes, h
   return out;
 }
 
-// Data de fim de um lote encerrado: o último registro (o banco não guarda a data de encerramento)
-export function fimDoLote(lote, bios, mort, rac, hoje) {
+// Data de fim de um lote encerrado: a despesca total ou, sem ela, o último registro
+export function fimDoLote(lote, bios, mort, rac, hoje, desp = []) {
   if (lote.ativo) return hoje;
-  const ds = [...bios, ...mort, ...rac].map((x) => x.data).sort();
+  const totais = desp.filter((d) => d.tipo === 'total').map((d) => d.data).sort();
+  if (totais.length) return totais[totais.length - 1]; // a despesca total é o fim de verdade
+  const ds = [...bios, ...mort, ...rac, ...desp].map((x) => x.data).sort();
   return ds.length ? ds[ds.length - 1] : lote.data_entrada;
 }
 
 // O mesmo cálculo do lote, mas só com o que aconteceu até "dias" depois da entrada (comparar ciclos na mesma idade)
-export function calcularNaIdade(lote, bios, mort, rac, dias, precoKg = null) {
-  const d = new Date(`${lote.data_entrada}T12:00:00`); d.setDate(d.getDate() + dias);
-  const corte = d.toISOString().slice(0, 10);
+export function calcularNaIdade(lote, bios, mort, rac, dias, precoKg = null, desp = []) {
+  const corte = somarDias(lote.data_entrada, dias);
+  if (!corte) return null; // sem data de entrada válida não dá para recortar na mesma idade
   const ate = (x) => x.data <= corte;
-  return calcularLote(lote, bios.filter(ate), mort.filter(ate), rac.filter(ate), corte, precoKg);
+  return calcularLote(lote, bios.filter(ate), mort.filter(ate), rac.filter(ate), corte, precoKg, desp.filter(ate));
 }
 
 // média de um campo numérico, ignorando vazios
@@ -252,7 +308,7 @@ export function sugestaoRacao(lotes, resumo, tabela) {
     const qi = Number(l.quantidade_inicial) || 0;
     const pm = r && r.ultimo_peso_medio_kg != null ? Number(r.ultimo_peso_medio_kg) : qi > 0 ? Number(l.peso_inicial_kg) / qi : null;
     if (!(pm > 0)) continue;
-    const vivos = Math.max(0, qi - Number((r && r.mortos) || 0));
+    const vivos = vivosDoLote(l, r);
     const faixa = tabela.find((f) => pm <= f.ateKg) || tabela[tabela.length - 1];
     const b = vivos * pm;
     bio += b; kg += (b * faixa.pct) / 100; taxas.add(faixa.pct);

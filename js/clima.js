@@ -50,13 +50,16 @@ export function descricao(c) {
 export function avisosClima(dias, c = CLIMA) {
   const av = [];
   const [hoje, amanha] = dias;
+  // o serviço às vezes manda um dia sem valor (null): sem número, sem aviso (null viraria 0 °C e daria "friagem" falsa)
+  const n = (v) => (v == null || v === '' ? null : Number.isFinite(Number(v)) ? Number(v) : null);
   for (const [d, quando] of [[hoje, 'hoje'], [amanha, 'amanhã']]) {
     if (!d) continue;
-    if (d.min < c.friagemMinC) av.push({ nivel: 'alerta', txt: `Friagem ${quando} (mínima de ${Math.round(d.min)} °C): o peixe come menos com água fria. Reduza a ração e observe a sobra.` });
-    if (d.chuva >= c.chuvaForteMm) av.push({ nivel: 'alerta', txt: `Chuva forte ${quando} (${Math.round(d.chuva)} mm): o oxigênio da água pode cair. Reduza a ração e deixe os aeradores prontos.` });
-    if (d.max >= c.calorMaxC) av.push({ nivel: 'atencao', txt: `Calor forte ${quando} (máxima de ${Math.round(d.max)} °C): água quente segura menos oxigênio. Prefira tratar nas horas mais frescas.` });
+    const min = n(d.min), max = n(d.max), chuva = n(d.chuva);
+    if (min != null && min < c.friagemMinC) av.push({ nivel: 'alerta', txt: `Friagem ${quando} (mínima de ${Math.round(min)} °C): o peixe come menos com água fria. Reduza a ração e observe a sobra.` });
+    if (chuva != null && chuva >= c.chuvaForteMm) av.push({ nivel: 'alerta', txt: `Chuva forte ${quando} (${Math.round(chuva)} mm): o oxigênio da água pode cair. Reduza a ração e deixe os aeradores prontos.` });
+    if (max != null && max >= c.calorMaxC) av.push({ nivel: 'atencao', txt: `Calor forte ${quando} (máxima de ${Math.round(max)} °C): água quente segura menos oxigênio. Prefira tratar nas horas mais frescas.` });
   }
-  if (hoje && amanha && hoje.min - amanha.min >= c.quedaC) av.push({ nivel: 'alerta', txt: `A temperatura cai amanhã (mínima de ${Math.round(hoje.min)} para ${Math.round(amanha.min)} °C). Mudança brusca deixa o peixe sem apetite: reduza a ração.` });
+  if (hoje && amanha && n(hoje.min) != null && n(amanha.min) != null && n(hoje.min) - n(amanha.min) >= c.quedaC) av.push({ nivel: 'alerta', txt: `A temperatura cai amanhã (mínima de ${Math.round(hoje.min)} para ${Math.round(amanha.min)} °C). Mudança brusca deixa o peixe sem apetite: reduza a ração.` });
   // um aviso por tipo é suficiente: hoje tem prioridade sobre amanhã
   const vistos = new Set();
   return av.filter((a) => { const k = a.txt.split(' ')[0]; if (vistos.has(k)) return false; vistos.add(k); return true; });

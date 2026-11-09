@@ -9,8 +9,8 @@ export class ErroApi extends Error {
   }
 }
 
-const TABELAS_EXCLUIVEIS = new Set(['biometrias', 'mortalidade', 'racao_consumo', 'racao_estoque', 'racao_contagens']);
-const TABELAS_EDITAVEIS = new Set(['biometrias', 'mortalidade', 'racao_consumo', 'racao_estoque', 'lotes']);
+const TABELAS_EXCLUIVEIS = new Set(['biometrias', 'mortalidade', 'despescas', 'racao_consumo', 'racao_estoque', 'racao_contagens']);
+const TABELAS_EDITAVEIS = new Set(['biometrias', 'mortalidade', 'despescas', 'racao_consumo', 'racao_estoque', 'lotes']);
 
 export function criarApi(client) {
   const ok = (res) => {
@@ -134,6 +134,11 @@ export function criarApi(client) {
       const d = ok(await client.from('tanques').delete().eq('id', id).select('id'));
       if (!d || !d.length) throw new Error('Não foi possível excluir. Só o dono pode excluir tanques.');
     },
+    // o banco já tem a tabela de despescas (sql/20)? Só responde false quando ela comprovadamente não existe.
+    async despescaAtiva() {
+      const { error } = await client.from('despescas').select('id').limit(1);
+      return !(error && (error.code === '42P01' || error.code === 'PGRST205'));
+    },
     async encerrarLote(id) {
       ok(await client.from('lotes').update({ ativo: false }).eq('id', id));
     },
@@ -141,8 +146,8 @@ export function criarApi(client) {
     // lançamentos já gravados no mesmo dia (para avisar de duplicidade ao lançar)
     async registrosDoDia(tipo, pl) {
       if (tipo === 'racao') return ok(await client.from('racao_consumo').select('quantidade_kg,criado_em').eq('tanque_id', pl.tanque_id).eq('data', pl.data)) || [];
-      const tab = tipo === 'mortalidade' ? 'mortalidade' : 'biometrias';
-      return ok(await client.from(tab).select(tipo === 'mortalidade' ? 'quantidade,criado_em' : 'criado_em').eq('lote_id', pl.lote_id).eq('data', pl.data)) || [];
+      const tab = tipo === 'mortalidade' ? 'mortalidade' : tipo === 'despesca' ? 'despescas' : 'biometrias';
+      return ok(await client.from(tab).select(tipo === 'biometria' ? 'criado_em' : 'quantidade,criado_em').eq('lote_id', pl.lote_id).eq('data', pl.data)) || [];
     },
 
     // ----- ração: estoque -----
@@ -227,13 +232,15 @@ export function criarApi(client) {
 
     // ----- relatório de um lote -----
     async dadosLote(loteId) {
-      const [bios, mort, rac] = await Promise.all([
+      const [bios, mort, rac, desp] = await Promise.all([
         todos(() => client.from('biometrias').select('id,data,peso_amostra_kg,quantidade_amostrada,registrado_por').eq('lote_id', loteId).order('data').order('id')),
         todos(() => client.from('mortalidade').select('id,data,quantidade,causa,registrado_por').eq('lote_id', loteId).order('data').order('id'))
           .catch(() => todos(() => client.from('mortalidade').select('id,data,quantidade,registrado_por').eq('lote_id', loteId).order('data').order('id'))),
         todos(() => client.from('racao_consumo').select('id,data,quantidade_kg,registrado_por').eq('lote_id', loteId).order('data').order('id')),
+        // sem o sql/20 a tabela não existe: o relatório segue sem despescas
+        todos(() => client.from('despescas').select('id,data,tipo,quantidade,peso_bruto_kg,peso_liquido_kg,registrado_por').eq('lote_id', loteId).order('data').order('id')).catch(() => []),
       ]);
-      return { bios, mort, rac };
+      return { bios, mort, rac, desp };
     },
     // ração de todos os tanques visíveis ao usuário a partir de uma data (para a tabela dia × tanque)
     async racaoPeriodo(desde) {
@@ -298,7 +305,7 @@ export function criarApi(client) {
 
     // ----- cópia de segurança (dono): tudo o que a fazenda tem, tabela por tabela -----
     async exportarTudo() {
-      const tabelas = ['fazendas', 'usuarios', 'tanques', 'usuario_tanques', 'lotes', 'biometrias', 'mortalidade', 'racao_consumo', 'racao_estoque', 'racao_contagens'];
+      const tabelas = ['fazendas', 'usuarios', 'tanques', 'usuario_tanques', 'lotes', 'biometrias', 'mortalidade', 'despescas', 'racao_consumo', 'racao_estoque', 'racao_contagens'];
       const out = { gerado_em: new Date().toISOString(), versao: 1, tabelas: {}, sem_acesso: [] };
       for (const t of tabelas) {
         try {

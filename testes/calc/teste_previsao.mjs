@@ -20,4 +20,4 @@ assert.equal(p.data, '2026-10-28');
 const lento = { data_entrada: '2025-01-01', quantidade_inicial: 1, peso_inicial_kg: 1 };
 assert.equal(previsaoDespesca(lento, { ultimo_peso_medio_kg: 1.000001, ultima_biometria: '2026-01-01', mortos: 0 }, 30, '2026-01-02').estado, 'sem-dado');
 
-console.log('ok: previsão de despesca');
+console.log('RESULTADO: TUDO OK (previsão de despesca)');

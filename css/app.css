@@ -1039,6 +1039,15 @@ table.cmp td b { font-weight: 600; }
 .h-tempo-av li::before { content: ''; position: absolute; left: 0; top: .45em; width: 7px; height: 7px; border-radius: 50%; background: #d97706; }
 .h-tempo-av li.alerta::before { background: var(--erro); }
 
+.linha-voltar { margin: 0 0 .2rem; }
+
+/* olho para mostrar/esconder a senha */
+.senha-caixa { position: relative; display: block; }
+.senha-caixa input { width: 100%; padding-right: 3rem; }
+.senha-olho { position: absolute; top: 0; right: 0; height: 100%; min-width: 46px; display: grid; place-items: center; border: 0; background: none; color: var(--tinta-2); cursor: pointer; border-radius: 0 var(--r-campo) var(--r-campo) 0; }
+.senha-olho:hover { color: var(--tinta); }
+.senha-olho:focus-visible { outline: 2px solid var(--rio); outline-offset: -2px; }
+
 /* ----- cabeçalho verde: barra de cima, abas e lateral no cromo escuro ----- */
 /* dentro do cromo, os tokens de texto viram claros; o resto do CSS continua igual */
 .topo, .abas, .lateral {
@@ -1073,3 +1082,7 @@ table.cmp td b { font-weight: 600; }
   .card > .pizza .pz-leg li { grid-template-columns: 12px minmax(0, 1fr); row-gap: .05rem; }
   .card > .pizza .pz-leg b { grid-column: 2; text-align: left; }
 }
+
+/* despesca: Parcial e Total lado a lado; botão do PDF afastado da lista */
+#desp-tipo { grid-template-columns: 1fr 1fr; }
+[data-pdf-desp] { margin-top: .75rem; }

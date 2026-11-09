@@ -4,6 +4,7 @@ import { icone } from '../icons.js';
 import { ESPECIES } from '../config.js';
 import { esc, fmtData, fmtInt, fmtNum, hojeISO, num, ROTULO_TIPO, FASES, areaHa, progresso, fmtPct, plural } from '../util.js';
 import { lerPlanilha } from '../planilha.js';
+import { vivosDoLote } from '../calc.js';
 
 
 // 2,3 kg / 500 g; 5,5 ha
@@ -117,7 +118,7 @@ export async function renderTanques(ctx, el) {
 export async function renderTanque(ctx, el, id) {
   if (!ctx.podeGerir()) return semPermissao(el);
   const tanque = ctx.state.ref.tanques.find((t) => t.id === id);
-  if (!tanque) { el.innerHTML = '<div class="card vazio">Tanque não encontrado.<br><a class="btn" href="#/tanques">Voltar</a></div>'; return; }
+  if (!tanque) { el.innerHTML = '<div class="card vazio">Tanque não encontrado.<br></div>'; return; }
 
   el.innerHTML = `<h1>${esc(tanque.nome)}</h1><p class="carregando">Carregando…</p>`;
   const [lotesTodos, resumoRows] = await Promise.all([ctx.api.lotes(), ctx.api.resumoLotes().catch(() => [])]);
@@ -129,7 +130,7 @@ export async function renderTanque(ctx, el, id) {
   for (const l of ativos) {
     iniciais += Number(l.quantidade_inicial) || 0;
     const r = resumo[l.id];
-    const v = Math.max(0, Number(l.quantidade_inicial) - Number((r && r.mortos) || 0));
+    const v = vivosDoLote(l, r);
     const pm = r && r.ultimo_peso_medio_kg != null ? Number(r.ultimo_peso_medio_kg) : Number(l.peso_inicial_kg) / Math.max(1, Number(l.quantidade_inicial));
     vivos += v; biomassa += v * (pm || 0);
   }
@@ -139,7 +140,6 @@ export async function renderTanque(ctx, el, id) {
   const hoje = hojeISO();
 
   el.innerHTML = `
-    <p class="no-print"><a class="voltar" href="#/tanques">${icone('voltar', 18)} Todos os tanques</a></p>
     <h1>${esc(tanque.nome)}</h1>
     ${avisoOffline()}
     ${ativos.length || area ? `<div class="kpis tq-resumo">
