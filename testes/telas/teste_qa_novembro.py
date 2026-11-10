@@ -108,6 +108,12 @@ with sync_playwright() as pw:
     checa(pg.locator('.dialogo', has_text='Confira a mortalidade').count() == 1, '[30] 2.000 mortos (20% do tanque) pede confirmação')
     if pg.get_by_role('button', name='Corrigir').count(): pg.get_by_role('button', name='Corrigir').click()
     pg.wait_for_timeout(300)
+    # [pente fino] nenhum lançamento com data antes da entrada do lote (Tanque 01 entrou em 01/09/2026)
+    pg.goto(BASE + '#/lancar?tipo=mortalidade'); pg.wait_for_timeout(1200); escolhe(pg, 'Tanque 01')
+    pg.get_by_text('Mudar').first.click(); pg.wait_for_timeout(200); pg.fill('#data', '2026-08-15'); pg.fill('#qtd', '5')
+    antes = sum(1 for t, _ in posts if t == 'mortalidade')
+    pg.get_by_text('Salvar mortalidade').click(); pg.wait_for_timeout(1200)
+    checa('antes da entrada do lote' in pg.inner_text('#erro') and sum(1 for t, _ in posts if t == 'mortalidade') == antes, '[pf] mortalidade com data antes da entrada do lote é barrada')
     # [1] ração lançada com sinal, app fechado e aberto sem sinal: tanque continua alimentado
     pg.goto(BASE + f'#/lancar?tipo=racao&tanque={T}'); pg.wait_for_timeout(1500)
     pg.fill('#qtd', '4'); pg.get_by_text('Salvar ração').click(); pg.wait_for_timeout(2500)

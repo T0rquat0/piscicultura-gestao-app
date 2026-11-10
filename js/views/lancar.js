@@ -473,6 +473,9 @@ export async function renderLancar(ctx, el, params = {}) {
     const data = f.querySelector('#data').value;
     if (!lote_id) return mostrarErro('Selecione um tanque com lote ativo.');
     if (!data) return mostrarErro('Informe a data.');
+    // nenhum lançamento antes de o lote existir (antes só a despesca conferia: dava para lançar mortos em julho num lote de agosto)
+    const loteSel = lotes.find((l) => l.id === lote_id);
+    if (loteSel && data < loteSel.data_entrada) return mostrarErro(`A data não pode ser antes da entrada do lote (${fmtData(loteSel.data_entrada)}).`);
 
     const id = uuid();
     const base = { uuid_local: id, lote_id, data, registrado_por: state.perfil.id };
