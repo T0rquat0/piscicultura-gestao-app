@@ -22,6 +22,7 @@ import { renderHistorico } from './views/historico.js';
 import { renderAdmin } from './views/admin.js';
 import { renderPendencias } from './views/pendencias.js';
 import { renderMais } from './views/mais.js';
+import { renderLucro, renderDespesas } from './views/lucro.js';
 import { htmlAtalhos, atualizarLateral, marcarAtalho, pintarAtalhos } from './lateral.js';
 import { registrarRota, linhaVoltar, ehAbaPrincipal } from './voltar.js';
 import { olhoNasSenhas } from './senha.js';
@@ -442,6 +443,8 @@ async function rotear() {
     switch (rota) {
       case 't': await renderTanqueDetalhe(ctx, el, partes[0]); break;
       case 'lancar': await renderLancar(ctx, el, params); break;
+      case 'lucro': await renderLucro(ctx, el); break;
+      case 'despesas': await renderDespesas(ctx, el); break;
       case 'relatorio': await (partes[0] === 'racao' ? renderRacaoDia(ctx, el) : partes[0] ? renderRelatorioLote(ctx, el, partes[0]) : renderRelatorios(ctx, el)); break;
       case 'tanques': await renderTanques(ctx, el); break;
       case 'tanque': await renderTanque(ctx, el, partes[0], params); break;

@@ -10,7 +10,7 @@ export class ErroApi extends Error {
   }
 }
 
-const TABELAS_EXCLUIVEIS = new Set(['biometrias', 'mortalidade', 'despescas', 'manejos', 'qualidade_agua', 'racao_consumo', 'racao_estoque', 'racao_contagens']);
+const TABELAS_EXCLUIVEIS = new Set(['despesas_gerais', 'biometrias', 'mortalidade', 'despescas', 'manejos', 'qualidade_agua', 'racao_consumo', 'racao_estoque', 'racao_contagens']);
 const TABELAS_EDITAVEIS = new Set(['biometrias', 'mortalidade', 'despescas', 'manejos', 'qualidade_agua', 'racao_consumo', 'racao_estoque', 'lotes']);
 
 export function criarApi(client) {
@@ -166,6 +166,20 @@ export function criarApi(client) {
       const { error } = await client.from('despescas').select('preco_kg').limit(1);
       return !(error && (error.code === '42703' || error.code === 'PGRST204' || /preco_kg/i.test(error.message || '')));
     },
+    // ----- custos (sql/24). null = tabela ainda não existe -----
+    async despesasGerais() {
+      const { data, error } = await client.from('despesas_gerais').select('id,data,categoria,valor,descricao').order('data', { ascending: false }).order('id').limit(1000);
+      if (error) { if (error.code === '42P01' || error.code === 'PGRST205') return null; throw new ErroApi(error); }
+      return data || [];
+    },
+    async custosLote() {
+      const { data, error } = await client.from('custos_lote').select('lote_id,custo_alevino');
+      if (error) { if (error.code === '42P01' || error.code === 'PGRST205') return null; throw new ErroApi(error); }
+      return data || [];
+    },
+    async criarDespesa(linha) { ok(await client.from('despesas_gerais').insert(linha)); },
+    async salvarCustoLote(loteId, valor) { ok(await client.from('custos_lote').upsert({ lote_id: loteId, custo_alevino: valor }, { onConflict: 'lote_id' })); },
+    async apagarCustoLote(loteId) { ok(await client.from('custos_lote').delete().eq('lote_id', loteId)); },
     async manejoAtivo() {
       const { error } = await client.from('manejos').select('id').limit(1);
       return !(error && (error.code === '42P01' || error.code === 'PGRST205'));
@@ -339,7 +353,7 @@ export function criarApi(client) {
 
     // ----- cópia de segurança (dono): tudo o que a fazenda tem, tabela por tabela -----
     async exportarTudo() {
-      const tabelas = ['fazendas', 'usuarios', 'tanques', 'usuario_tanques', 'lotes', 'biometrias', 'mortalidade', 'despescas', 'manejos', 'qualidade_agua', 'racao_consumo', 'racao_estoque', 'racao_contagens'];
+      const tabelas = ['fazendas', 'usuarios', 'tanques', 'usuario_tanques', 'lotes', 'biometrias', 'mortalidade', 'despescas', 'manejos', 'qualidade_agua', 'custos_lote', 'despesas_gerais', 'racao_consumo', 'racao_estoque', 'racao_contagens'];
       const out = { gerado_em: new Date().toISOString(), versao: 1, tabelas: {}, sem_acesso: [] };
       for (const t of tabelas) {
         try {

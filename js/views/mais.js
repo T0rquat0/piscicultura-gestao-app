@@ -13,6 +13,7 @@ export function renderMais(ctx, el) {
   const itens = [
     gerir && ['#/tanques', 'tanque', 'Tanques e lotes', 'Cadastrar tanques e lotes de peixes'],
     p.papel === 'dono' && ['#/plano', 'check', 'Meu plano', 'Pacote de tanques e prazo'],
+    gerir && ['#/despesas', 'estoque', 'Despesas gerais', 'Energia, mão de obra e outros custos'],
     ['#/estoque', 'estoque', 'Estoque de ração', gerir ? 'Saldo, compras e custos' : 'Saldo de ração'],
     p.papel === 'dono' && ['#/equipe', 'equipe', 'Equipe', 'Pessoas, papéis e tanques liberados'],
     p.papel === 'dono' && ['#/historico', 'historico', 'Histórico e lixeira', 'Quem alterou ou excluiu, e restaurar'],

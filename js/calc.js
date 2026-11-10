@@ -236,6 +236,41 @@ export function previsaoDespesca(lote, r, alvoKg, hoje) {
   return { ...base, estado: 'previsto', gpdG: gpd * 1000, data, dias: Math.max(0, diasEntre(hoje, data)) };
 }
 
+// ----- lucro por ciclo -----
+// Peso que o lote produziu: o retirado mais o que está na água, menos o que entrou
+export const pesoProduzido = (c) => Math.max(0, Number(c && c.ganhoBiomassa) || 0);
+
+// Divide cada despesa geral entre os lotes em cultivo na data, proporcional ao peso produzido.
+// ciclos: [{ id, ini, fim, peso }]. Despesa sem lote com peso na data fica em semRateio.
+export function ratearDespesas(despesas, ciclos) {
+  const porLote = {}; let semRateio = 0;
+  for (const d of despesas || []) {
+    const v = Number(d.valor) || 0;
+    const ativos = ciclos.filter((c) => c.ini <= d.data && d.data <= c.fim && c.peso > 0);
+    const soma = ativos.reduce((s, c) => s + c.peso, 0);
+    if (!(soma > 0)) { semRateio += v; continue; }
+    for (const c of ativos) porLote[c.id] = (porLote[c.id] || 0) + (v * c.peso) / soma;
+  }
+  return { porLote, semRateio };
+}
+
+// Conta do ciclo. Sem receita não há lucro; o que faltar é listado em vez de virar zero.
+export function fecharCiclo({ c, custoAlevino = null, despesas = 0, fechado = false }) {
+  const faltando = [];
+  if (c.receita == null) faltando.push('preço de venda na despesca');
+  else if (c.despescasSemPreco) faltando.push(`preço em ${c.despescasSemPreco} ${c.despescasSemPreco === 1 ? 'despesca' : 'despescas'}`);
+  if (custoAlevino == null) faltando.push('custo do alevino');
+  if (c.custoRacao == null) faltando.push('valor pago nas compras de ração');
+  const custoTotal = Number(c.custoRacao || 0) + Number(custoAlevino || 0) + Number(despesas || 0);
+  const lucro = c.receita != null ? c.receita - custoTotal : null;
+  return {
+    receita: c.receita, custoRacao: c.custoRacao, custoAlevino, despesas, custoTotal, lucro, faltando,
+    completo: fechado && !faltando.length,
+    margem: lucro != null && c.receita > 0 ? lucro / c.receita : null,
+    custoKg: c.pesoDespescado > 0 ? custoTotal / c.pesoDespescado : null,
+  };
+}
+
 // Confere uma medição da água com a faixa do tambaqui. critico = pede ação; atencao = fora do ideal.
 export const ehTambaqui = (especie) => /tambaqui/i.test(String(especie || ''));
 export function avaliarAgua(m) {

@@ -1113,3 +1113,11 @@ table.cmp td b { font-weight: 600; }
 .agua-campos { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; align-items: end; }
 .agua-campos label { min-width: 0; }
 .desp-venda { grid-template-columns: 1fr 1fr; align-items: end; }
+
+/* lucro por ciclo */
+.lucro-ciclo header { display: flex; justify-content: space-between; gap: .8rem; align-items: flex-start; margin-bottom: .5rem; }
+.lucro-ciclo header b { display: block; } .lucro-ciclo header small { color: var(--tinta-2); }
+.valor-lucro { font-family: Manrope, sans-serif; font-weight: 800; font-size: 1.2rem; color: var(--rio); text-align: right; white-space: nowrap; }
+.valor-lucro small { display: block; font-family: Inter, sans-serif; font-weight: 400; font-size: .78rem; }
+.valor-lucro.neg, .destaque b.neg { color: var(--erro, #b3261e); }
+.acoes-lucro { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .6rem; }
