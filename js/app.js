@@ -443,7 +443,7 @@ async function rotear() {
       case 'lancar': await renderLancar(ctx, el, params); break;
       case 'relatorio': await (partes[0] === 'racao' ? renderRacaoDia(ctx, el) : partes[0] ? renderRelatorioLote(ctx, el, partes[0]) : renderRelatorios(ctx, el)); break;
       case 'tanques': await renderTanques(ctx, el); break;
-      case 'tanque': await renderTanque(ctx, el, partes[0]); break;
+      case 'tanque': await renderTanque(ctx, el, partes[0], params); break;
       case 'estoque': await renderEstoque(ctx, el); break;
       case 'equipe': await renderEquipe(ctx, el); break;
       case 'plano': await renderPlano(ctx, el); break;
