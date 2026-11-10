@@ -6,6 +6,7 @@ import { esc, fmtData, fmtInt, fmtNum, hojeISO, num, ROTULO_TIPO, FASES, areaHa,
 import { lerPlanilha } from '../planilha.js';
 import { vivosDoLote } from '../calc.js';
 import * as db from '../db.js';
+import { ordemNatural } from './home.js';
 
 
 // 2,3 kg / 500 g; 5,5 ha
@@ -24,7 +25,7 @@ export async function renderTanques(ctx, el) {
     <h1>Tanques</h1>
     ${avisoOffline()}
     <div class="card">
-      ${tanques.length ? `<ul class="lista lista-grade">${tanques.map((t) => {
+      ${tanques.length ? `<ul class="lista lista-grade">${[...tanques].sort(ordemNatural).map((t) => {
         const ls = lotes.filter((l) => l.tanque_id === t.id);
         const peixes = ls.reduce((a, l) => a + (resumo[l.id] ? vivosDoLote(l, resumo[l.id]) : Number(l.quantidade_inicial) || 0), 0);
         const sub = ls.length > 1 ? `${ls.length} lotes ativos · ${fmtInt(peixes)} peixes` : ls.length ? `${ROTULO_TIPO[ls[0].tipo] || ls[0].tipo} · ${fmtInt(peixes)} peixes` : 'sem lote ativo';
