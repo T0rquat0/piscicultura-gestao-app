@@ -122,9 +122,9 @@ with sync_playwright() as pw:
     # 2) Estoque: editar compra
     pg.goto(BASE + '#/estoque'); pg.wait_for_selector('[data-edit="c1"]', timeout=15000)
     pg.click('[data-edit="c1"]'); pg.wait_for_selector('.dialogo form')
-    pg.fill('.dialogo [name=kg]', '750'); pg.fill('.dialogo [name=custo]', ''); pg.fill('.dialogo [name=forn]', '  Agro Y ')
+    pg.fill('.dialogo [name=sacos]', '30'); pg.fill('.dialogo [name=custo]', ''); pg.fill('.dialogo [name=forn]', '  Agro Y ')
     pg.click('.dialogo button[type=submit]'); pg.wait_for_timeout(800)
-    checa(('racao_estoque', 'c1', {'data_compra': '2026-10-01', 'quantidade_kg': 750, 'custo_total': None, 'fornecedor': 'Agro Y'}) in patches, 'compra: grava 750 kg, sem valor, fornecedor sem espaços')
+    checa(('racao_estoque', 'c1', {'data_compra': '2026-10-01', 'quantidade_kg': 750, 'custo_total': None, 'fornecedor': 'Agro Y'}) in patches, 'compra: 30 sacos de 25 kg gravam 750 kg, sem valor, fornecedor sem espaços')
 
     # 3) Tanque: editar lote e reabrir encerrado
     pg.goto(BASE + f'#/tanque/{T}'); pg.wait_for_selector(f'[data-editar-lote="{L1}"]', timeout=15000)
