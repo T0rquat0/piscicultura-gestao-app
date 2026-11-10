@@ -487,6 +487,7 @@ export async function renderLancar(ctx, el, params = {}) {
       if (pesoTxt.includes('.') && pesoTxt.includes(',')) return mostrarErro('Digite o peso sem ponto de milhar. Ex.: 1250,5');
       if (!(p > 0)) return mostrarErro(`Informe o peso total da amostra em ${pesoEmGramas() ? 'gramas' : 'kg'}.`);
       if (!(q >= 1) || !Number.isInteger(q)) return mostrarErro('Informe quantos peixes foram pesados (número inteiro).');
+      if (p / q > 100) return mostrarErro(`Deu ${fmtNum(p / q, 0)} kg por peixe, o que não existe em viveiro. Confira se o peso não foi digitado em gramas (${pesoEmGramas() ? 'o campo está em gramas' : 'o campo está em kg: 2.400 g = 2,4 kg'}).`);
       payload = { ...base, peso_amostra_kg: p, quantidade_amostrada: q };
       if (!(await pesoConferido(lote_id, q, p, data, await dadosRapidos()))) return;
     } else if (tipo === 'despesca') {

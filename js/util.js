@@ -58,7 +58,7 @@ export function numDecimal(v) {
   return s.includes('.') && s.includes(',') ? NaN : num(s);
 }
 // Peso médio de um peixe: em gramas abaixo de 1 kg, para nunca aparecer "0,00 kg"
-export const pesoMedioTxt = (kg) => (kg < 1 ? `${fmtNum(kg * 1000, kg < 0.01 ? 1 : 0)} g` : `${fmtNum(kg, 2)} kg`);
+export const pesoMedioTxt = (kg) => { if (kg >= 1) return `${fmtNum(kg, 2)} kg`; const g = kg * 1000; return `${fmtNum(g, g < 10 && Math.abs(g - Math.round(g)) >= 0.05 ? 1 : 0)} g`; }; // 2,5 g · 8 g · 150 g · 1,54 kg
 
 export function num(v) {
   if (typeof v === 'number') return v;

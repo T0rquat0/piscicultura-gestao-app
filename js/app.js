@@ -114,6 +114,8 @@ async function sincronizarAgora() {
   if (r.ocupado) return r;
   state.semRede = !!r.semRede;
   await atualizarPendentes();
+  // a tela de Pendentes mostrava "Sem internet" e os itens já enviados até sair dela: redesenha
+  if (rotaAtual === 'pendencias' && (r.enviados || r.falhas || !r.semRede)) rotear();
   if (r.sessaoExpirada) { mostrarLogin('Sua sessão expirou. Entre novamente para enviar os lançamentos pendentes.'); return r; }
   if (r.enviados) {
     toast(`${plural(r.enviados, 'lançamento enviado', 'lançamentos enviados')}`, 'ok');

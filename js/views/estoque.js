@@ -65,9 +65,9 @@ export async function renderEstoque(ctx, el) {
     <div class="pc-duas"><div>
     <div class="estoque-hero n-${sit.nivel}">
       <span>${porTipo ? `Ração de ${tipoAtual} em estoque` : 'Em estoque agora'}</span>
-      <b>${kg < 0 ? '−' : ''}${sc(Math.abs(kg), 0)}<em>sacos</em></b>
+      <b>${kg < 0 ? '−' : ''}${sc(Math.abs(kg), 0)}<em>${sc(Math.abs(kg), 0) === '1' ? 'saco' : 'sacos'}</em></b>
       <small>${fmtNum(kg, 0)} kg${sit.dias != null ? ` · dura cerca de <strong>${fmtInt(Math.floor(sit.dias))} dias</strong>` : ''}</small>
-      ${sit.porDia > 0 ? `<small>Gasta ~${sc(sit.porDia)} sacos por dia (${peloDeHoje ? 'pelo que foi dado hoje' : 'média dos últimos 7 dias'})</small>` : ''}
+      ${sit.porDia > 0 ? `<small>Gasta ~${sc(sit.porDia)} ${sc(sit.porDia) === '1' ? 'saco' : 'sacos'} por dia (${peloDeHoje ? 'pelo que foi dado hoje' : 'média dos últimos 7 dias'})</small>` : ''}
       ${sit.dias != null || sit.nivel === 'negativo' ? `<div class="hero-prog">${progresso(((sit.dias || 0) / ESTOQUE_COBERTURA_DIAS) * 100, { tom: { atencao: 'alerta', critico: 'erro', negativo: 'erro' }[sit.nivel] || '', rotulo: `Ração para ${fmtInt(Math.floor(sit.dias || 0))} de ${ESTOQUE_COBERTURA_DIAS} dias` })}<p class="h-trilho-leg"><span>${fmtInt(Math.floor(sit.dias || 0))} de ${ESTOQUE_COBERTURA_DIAS} dias de ração${peloDeHoje ? ' (no ritmo de hoje)' : ''}</span><span>meta: ${ESTOQUE_COBERTURA_DIAS} dias</span></p></div>` : ''}
       ${sit.nivel === 'ok' ? '' : `<p>${MENSAGEM[sit.nivel]}</p>`}
     </div>
