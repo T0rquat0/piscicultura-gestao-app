@@ -243,14 +243,14 @@ export async function renderHome(ctx, el) {
   function painelKpis() {
     const ks = [];
     if (gerir && !semDetalhe) {
-      let peixes = 0, kg = 0, ini = 0;
+      let peixes = 0, kg = 0, ini = 0, mortos = 0;
       for (const l of lotes) {
         const r = resumo[l.id];
         const v = vivosDoLote(l, r);
         const pm = r && r.ultimo_peso_medio_kg != null ? Number(r.ultimo_peso_medio_kg) : Number(l.peso_inicial_kg) / Math.max(1, Number(l.quantidade_inicial));
-        peixes += v; kg += v * (pm || 0); ini += Number(l.quantidade_inicial) || 0;
+        peixes += v; kg += v * (pm || 0); ini += Number(l.quantidade_inicial) || 0; mortos += Number(r && r.mortos) || 0;
       }
-      const sob = ini > 0 ? (peixes / ini) * 100 : 100;
+      const sob = ini > 0 ? (Math.max(0, ini - mortos) / ini) * 100 : 100; // despescado não conta como perda
       ks.push(`<div class="kp"><span>Peixe na água</span><b>${kg >= 1000 ? fmtNum(kg / 1000, 1) : fmtNum(kg, 0)}<em>${kg >= 1000 ? 't' : 'kg'}</em></b><small>${fmtInt(peixes)} peixes vivos</small></div>`);
       ks.push(`<div class="kp"><span>Sobrevivência</span><b>${fmtPct(sob)}<em>%</em></b>${progresso(sob, { fina: true, tom: sob >= 90 ? 'ok' : sob >= 75 ? 'alerta' : 'erro', rotulo: `Sobrevivência ${fmtPct(sob)}%` })}<small>desde a entrada dos lotes</small></div>`);
     } else {

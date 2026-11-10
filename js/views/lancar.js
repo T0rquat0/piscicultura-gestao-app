@@ -228,10 +228,10 @@ export async function renderLancar(ctx, el, params = {}) {
     const doTanque = lotes.filter((l) => l.tanque_id === t.id);
     const { dias, porDia, media, hojeKg } = await racaoSemana(t.id);
     const maxD = Math.max(1, ...Object.values(porDia));
-    let vivos = 0, ini = 0, pm = null;
+    let vivos = 0, ini = 0, pm = null, mortos = 0;
     for (const l of doTanque) {
       const r = dadosPainel && dadosPainel.res[l.id];
-      ini += Number(l.quantidade_inicial) || 0;
+      ini += Number(l.quantidade_inicial) || 0; mortos += Number(r && r.mortos) || 0;
       vivos += vivosDoLote(l, r);
       if (r && r.ultimo_peso_medio_kg != null) pm = Number(r.ultimo_peso_medio_kg);
     }
@@ -243,7 +243,7 @@ export async function renderLancar(ctx, el, params = {}) {
         <div><dt>Peixes vivos</dt><dd>${fmtInt(vivos)}</dd></div>
         <div><dt>Peso médio</dt><dd>${pm != null ? (pm < 1 ? fmtNum(pm * 1000, 0) + ' g' : fmtNum(pm, 2) + ' kg') : '—'}</dd></div>
       </dl>
-      ${ini > 0 && dadosPainel ? `${progresso((vivos / ini) * 100, { tom: 'ok', fina: true, rotulo: 'Sobrevivência do lote' })}<p class="h-trilho-leg"><span>Sobrevivência</span><b>${fmtPct((vivos / ini) * 100)}%</b></p>` : ''}` : ''}
+      ${ini > 0 && dadosPainel ? `${progresso((Math.max(0, ini - mortos) / ini) * 100, { tom: 'ok', fina: true, rotulo: 'Sobrevivência do lote' })}<p class="h-trilho-leg"><span>Sobrevivência</span><b>${fmtPct((Math.max(0, ini - mortos) / ini) * 100)}%</b></p>` : ''}` : ''}
       ${tipo === 'racao' || media || hojeKg ? `<h3 class="lc-sub">Ração de hoje</h3>
       ${media ? `${progresso((hojeKg / media) * 100, { tom: hojeKg >= media ? 'ok' : '', rotulo: 'Ração de hoje comparada à média' })}
         <p class="h-trilho-leg"><span><b>${sc(hojeKg)}</b> de ~${sc(media)} sacos (média dos dias com ração)</span></p>`
