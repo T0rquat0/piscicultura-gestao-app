@@ -59,6 +59,11 @@ export async function sincronizar(client, userId) {
         let error = null, status = 0;
         try {
           ({ error, status } = await client.from(it.tabela).insert(it.payload));
+          // banco ainda sem as colunas de venda (sql/23 não rodado): salva a despesca sem elas em vez de travar a fila
+          if (error && it.tabela === 'despescas' && /preco_kg|comprador/i.test(error.message || '')) {
+            const { preco_kg, comprador, ...semVenda } = it.payload;
+            ({ error, status } = await client.from(it.tabela).insert(semVenda));
+          }
           // banco ainda sem a coluna "causa" (sql/08 não rodado): salva sem ela em vez de travar a fila
           if (error && it.payload.causa !== undefined && /causa/i.test(error.message || '')) {
             const { causa, ...semCausa } = it.payload;

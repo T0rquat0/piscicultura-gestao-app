@@ -82,4 +82,11 @@ const alev = { data_entrada: '2026-01-01', quantidade_inicial: 1000, peso_inicia
 assert.equal(avisoPesoMedio({ quantidade: 30, pesoTotalKg: 4.5, lote: alev, r: null, data: '2026-03-02' }), null);
 assert.equal(avisoPesoMedio({ quantidade: 1, pesoTotalKg: 0, lote: alev, r: null, data: '2026-03-02' }), null, 'sem peso não pergunta');
 
+// 7) venda: receita sobre o peso bruto; despesca sem preço não vira zero
+assert.equal(indicadoresDespesca({ quantidade: 100, peso_bruto_kg: 200, peso_liquido_kg: 190, preco_kg: '9.50' }).receita, 1900);
+assert.equal(indicadoresDespesca({ quantidade: 100, peso_bruto_kg: 200, preco_kg: null }).receita, null);
+const venda = calcularLote(lote, bios, mort, rac, D, null, [{ data: D, tipo: 'parcial', quantidade: 10, peso_bruto_kg: 20, preco_kg: 10 }, { data: D, tipo: 'parcial', quantidade: 10, peso_bruto_kg: 30, preco_kg: null }]);
+assert.equal(venda.receita, 200); assert.equal(venda.despescasSemPreco, 1);
+assert.equal(calcularLote(lote, bios, mort, rac, D, null, [{ data: D, tipo: 'parcial', quantidade: 10, peso_bruto_kg: 20 }]).receita, null);
+
 console.log('RESULTADO: TUDO OK (despesca)');

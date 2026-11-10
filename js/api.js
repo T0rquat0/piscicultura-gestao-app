@@ -161,6 +161,11 @@ export function criarApi(client) {
     aguaTanque(tanqueId, desde) {
       return todos(() => client.from('qualidade_agua').select('id,data,hora,tanque_id,oxigenio_mgl,temperatura_c,ph,amonia_mgl,obs,registrado_por').eq('tanque_id', tanqueId).gte('data', desde).order('data').order('id')).catch(() => []);
     },
+    // o banco já tem as colunas de venda (sql/23)?
+    async vendaAtiva() {
+      const { error } = await client.from('despescas').select('preco_kg').limit(1);
+      return !(error && (error.code === '42703' || error.code === 'PGRST204' || /preco_kg/i.test(error.message || '')));
+    },
     async manejoAtivo() {
       const { error } = await client.from('manejos').select('id').limit(1);
       return !(error && (error.code === '42P01' || error.code === 'PGRST205'));
@@ -264,7 +269,9 @@ export function criarApi(client) {
           .catch(() => todos(() => client.from('mortalidade').select('id,data,quantidade,registrado_por').eq('lote_id', loteId).order('data').order('id'))),
         todos(() => client.from('racao_consumo').select('id,data,quantidade_kg,registrado_por').eq('lote_id', loteId).order('data').order('id')),
         // sem o sql/20 a tabela não existe: o relatório segue sem despescas
-        todos(() => client.from('despescas').select('id,data,tipo,quantidade,peso_bruto_kg,peso_liquido_kg,registrado_por').eq('lote_id', loteId).order('data').order('id')).catch(() => []),
+        todos(() => client.from('despescas').select('id,data,tipo,quantidade,peso_bruto_kg,peso_liquido_kg,preco_kg,comprador,registrado_por').eq('lote_id', loteId).order('data').order('id'))
+          .catch(() => todos(() => client.from('despescas').select('id,data,tipo,quantidade,peso_bruto_kg,peso_liquido_kg,registrado_por').eq('lote_id', loteId).order('data').order('id')))
+          .catch(() => []),
         todos(() => client.from('manejos').select('id,data,tipo,produto,dose,unidade,via,obs,registrado_por').eq('lote_id', loteId).order('data').order('id')).catch(() => []), // sem o sql/21: segue sem manejos
       ]);
       return { bios, mort, rac, desp, man };

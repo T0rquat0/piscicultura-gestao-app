@@ -1,5 +1,5 @@
 // Relatório de despesca (uma despesca, parcial ou total): dados, indicadores e observações.
-import { fmtNum, fmtInt, fmtData, ROTULO_TIPO, pesoMedioTxt } from './util.js';
+import { fmtNum, fmtInt, fmtData, fmtBRL, ROTULO_TIPO, pesoMedioTxt } from './util.js';
 import { COR, M, LARG, ferramentas, rodape, logoPdf, tabela } from './pdf_lote.js';
 import { indicadoresDespesca } from './calc.js';
 
@@ -41,6 +41,9 @@ export function gerarPdfDespesca(jsPDF, d) {
     ['Peso médio por peixe (bruto)', pesoMedioTxt(i.medioBrutoKg)],
     ...(i.medioLiquidoKg != null ? [['Peso médio por peixe (líquido)', pesoMedioTxt(i.medioLiquidoKg)]] : []),
     ...(i.peixesHa != null ? [['Peixes por hectare', `${fmtInt(i.peixesHa)} peixes/ha`]] : []),
+    ...(x.preco_kg != null ? [['Preço de venda', `${fmtBRL(x.preco_kg)} por kg`]] : []),
+    ...(x.comprador ? [['Comprador', x.comprador]] : []),
+    ...(i.receita != null ? [['Receita (sobre o peso bruto)', fmtBRL(i.receita)]] : []),
   ]);
 
   const nota = quebra(`Gerado em ${fmtData(geradoEm)}. A conversão alimentar e a sobrevivência do lote estão no relatório do lote.`, LARG, 8, false);

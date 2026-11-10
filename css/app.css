@@ -1112,3 +1112,4 @@ table.cmp td b { font-weight: 600; }
 /* água: medições em duas colunas */
 .agua-campos { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; align-items: end; }
 .agua-campos label { min-width: 0; }
+.desp-venda { grid-template-columns: 1fr 1fr; align-items: end; }

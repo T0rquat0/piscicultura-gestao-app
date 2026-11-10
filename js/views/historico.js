@@ -36,6 +36,7 @@ function descrever(h, nomeTanque, nomePessoa) {
 const ROTULO_CAMPO = {
   data: 'Data', data_compra: 'Data', data_entrada: 'Entrada', quantidade_kg: 'Quantidade (kg)', quantidade: 'Quantidade', causa: 'Causa',
   oxigenio_mgl: 'Oxigênio (mg/L)', temperatura_c: 'Temperatura (°C)', ph: 'pH', amonia_mgl: 'Amônia (mg/L)',
+  preco_kg: 'Preço (R$/kg)', comprador: 'Comprador',
   produto: 'Produto', dose: 'Dose', unidade: 'Unidade', via: 'Aplicação', obs: 'Observação',
   peso_bruto_kg: 'Peso bruto (kg)', peso_liquido_kg: 'Peso líquido (kg)',
   quantidade_amostrada: 'Peixes pesados', peso_amostra_kg: 'Peso da amostra (kg)', custo_total: 'Valor pago', fornecedor: 'Fornecedor',

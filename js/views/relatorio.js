@@ -50,8 +50,8 @@ export function montarCsv(lote, nomeTanque, calc, bios, mort, rac, quem, desp = 
   L.push([], ['MORTALIDADE'], ['Data', 'Quantidade', 'Registrado por', 'Causa provável']);
   mort.forEach((m) => L.push([fmtData(m.data), m.quantidade, quem(m.registrado_por), m.causa || '']));
   if (desp.length) {
-    L.push([], ['DESPESCAS'], ['Data', 'Tipo', 'Peixes', 'Peso bruto (kg)', 'Peso líquido (kg)', 'Registrado por']);
-    desp.forEach((d) => L.push([fmtData(d.data), d.tipo === 'total' ? 'Total' : 'Parcial', d.quantidade, csvNum(d.peso_bruto_kg, 3), csvNum(d.peso_liquido_kg, 3), quem(d.registrado_por)]));
+    L.push([], ['DESPESCAS'], ['Data', 'Tipo', 'Peixes', 'Peso bruto (kg)', 'Peso líquido (kg)', 'Preço (R$/kg)', 'Receita (R$)', 'Comprador', 'Registrado por']);
+    desp.forEach((d) => L.push([fmtData(d.data), d.tipo === 'total' ? 'Total' : 'Parcial', d.quantidade, csvNum(d.peso_bruto_kg, 3), csvNum(d.peso_liquido_kg, 3), csvNum(d.preco_kg, 2), csvNum(indicadoresDespesca(d).receita, 2), d.comprador || '', quem(d.registrado_por)]));
   }
   if (agua.length) {
     L.push([], ['QUALIDADE DA ÁGUA'], ['Data', 'Hora', 'Oxigênio (mg/L)', 'Temperatura (°C)', 'pH', 'Amônia tóxica (mg/L)', 'Observação', 'Registrado por']);
@@ -250,6 +250,7 @@ export async function renderRelatorioLote(ctx, el, id) {
         ${linhaNum('Dias de cultivo', fmtInt(c.diasCultivo))}
         ${linhaNum(lote.ativo ? 'Peixes vivos (estim.)' : 'Peixes no tanque', fmtInt(c.vivos), `${fmtPct(c.sobrevivencia)}% de sobrevivência · ${fmtInt(c.mortos)} mortos`)}
         ${c.despescados ? linhaNum('Peixes retirados', fmtInt(c.despescados), gerir ? `${fmtNum(c.pesoDespescado, 0)} kg de peso bruto` : '') : ''}
+        ${gerir && c.despescados ? linhaNum('Receita das despescas', c.receita != null ? fmtBRL(c.receita) : '—', c.receita == null ? 'informe o preço de venda na despesca' : c.despescasSemPreco ? `falta o preço em ${fmtInt(c.despescasSemPreco)} ${c.despescasSemPreco === 1 ? 'despesca' : 'despescas'}` : 'sobre o peso bruto') : ''}
         ${linhaNum('Biomassa estimada', c.biomassaAtual != null ? fmtNum(c.biomassaAtual, 0) + ' kg' : '—', `na entrada: ${fmtNum(c.biomassaInicial, 0)} kg`)}
         ${gerir ? linhaNum('Custo de ração', c.custoRacao != null ? fmtBRL(c.custoRacao) : '—', c.custoRacao != null ? 'pelo preço médio pago por kg' : 'registre o valor nas compras') : ''}
         ${gerir ? linhaNum('Custo de ração por kg produzido', c.custoKgProduzido != null ? fmtBRL(c.custoKgProduzido) : '—', c.custoKgProduzido != null ? 'ração até a última biometria ÷ peixe que ganhou peso' : 'precisa de preço nas compras e biometria com ganho') : ''}
@@ -304,10 +305,12 @@ export async function renderRelatorioLote(ctx, el, id) {
           ${linhaNum('Peso médio por peixe (bruto)', pesoMedioTxt(i.medioBrutoKg))}
           ${i.medioLiquidoKg != null ? linhaNum('Peso médio por peixe (líquido)', pesoMedioTxt(i.medioLiquidoKg)) : ''}
           ${i.peixesHa != null ? linhaNum('Peixes por hectare', `${fmtInt(i.peixesHa)} peixes/ha`) : ''}
+          ${d.preco_kg != null ? linhaNum('Preço de venda', `${fmtBRL(d.preco_kg)}/kg`, d.comprador ? esc(d.comprador) : '') : d.comprador ? linhaNum('Comprador', esc(d.comprador)) : ''}
+          ${i.receita != null ? linhaNum('Receita', fmtBRL(i.receita), 'sobre o peso bruto') : ''}
         </ul>
         <button class="btn no-print" type="button" data-pdf-desp="${esc(d.id)}">Gerar PDF desta despesca</button></div></section>`;
     };
-    return `${desp.length > 1 ? `<div class="card destaques3">${destaque('Peixes retirados', fmtInt(c.despescados), `em ${fmtInt(desp.length)} despescas`)}${destaque('Peso bruto retirado', unid(fmtNum(c.pesoDespescado, 0), 'kg'), '')}</div>` : ''}${[...desp].reverse().map(cartao).join('')}`;
+    return `${desp.length > 1 ? `<div class="card destaques3">${destaque('Peixes retirados', fmtInt(c.despescados), `em ${fmtInt(desp.length)} despescas`)}${destaque('Peso bruto retirado', unid(fmtNum(c.pesoDespescado, 0), 'kg'), '')}${c.receita != null ? destaque('Receita', fmtBRL(c.receita), c.despescasSemPreco ? `falta o preço em ${fmtInt(c.despescasSemPreco)}` : '') : ''}</div>` : ''}${[...desp].reverse().map(cartao).join('')}`;
   };
 
   const painelAgua = () => {
@@ -451,11 +454,14 @@ export async function renderRelatorioLote(ctx, el, id) {
         lista: [dataCampo(d.data),
           { nome: 'qtd', rotulo: 'Peixes retirados', tipo: 'number', valor: d.quantidade, step: '1', min: '1', inputmode: 'numeric' },
           { nome: 'bruto', rotulo: 'Peso total bruto (kg)', tipo: 'text', valor: d.peso_bruto_kg, inputmode: 'decimal' },
-          { nome: 'liquido', rotulo: 'Peso total líquido (kg, opcional)', tipo: 'text', valor: d.peso_liquido_kg ?? '', inputmode: 'decimal' }],
+          { nome: 'liquido', rotulo: 'Peso total líquido (kg, opcional)', tipo: 'text', valor: d.peso_liquido_kg ?? '', inputmode: 'decimal' },
+          ...('preco_kg' in d ? [{ nome: 'preco', rotulo: 'Preço de venda (R$/kg, opcional)', tipo: 'text', valor: d.preco_kg == null ? '' : String(Number(d.preco_kg)).replace('.', ','), inputmode: 'decimal' },
+            { nome: 'comprador', rotulo: 'Comprador (opcional)', tipo: 'text', valor: d.comprador || '', maxlength: 80 }] : [])],
         validar: (v) => dataOk(v.data) || (Number.isInteger(num(v.qtd)) && num(v.qtd) >= 1 ? null : 'Informe quantos peixes saíram (número inteiro).') || pesoOk(v.bruto) || pesoOk(v.liquido) || (numDecimal(v.bruto) > 0 ? null : 'Informe o peso bruto em kg.')
-          || (String(v.liquido ?? '').trim() === '' || (numDecimal(v.liquido) > 0 && numDecimal(v.liquido) <= numDecimal(v.bruto)) ? null : 'O peso líquido deve ser maior que zero e até o peso bruto.'),
+          || (String(v.liquido ?? '').trim() === '' || (numDecimal(v.liquido) > 0 && numDecimal(v.liquido) <= numDecimal(v.bruto)) ? null : 'O peso líquido deve ser maior que zero e até o peso bruto.')
+          || (String(v.preco ?? '').trim() === '' || (numDecimal(v.preco) > 0 && numDecimal(v.preco) <= 1000) ? null : 'Confira o preço de venda por kg, ou deixe em branco.'),
         conferir: (v) => conferirPeso(num(v.qtd), numDecimal(v.bruto), v.data, null),
-        montar: (v) => ({ data: v.data, quantidade: num(v.qtd), peso_bruto_kg: numDecimal(v.bruto), peso_liquido_kg: String(v.liquido ?? '').trim() === '' ? null : numDecimal(v.liquido) }),
+        montar: (v) => ({ data: v.data, quantidade: num(v.qtd), peso_bruto_kg: numDecimal(v.bruto), peso_liquido_kg: String(v.liquido ?? '').trim() === '' ? null : numDecimal(v.liquido), ...('preco_kg' in d ? { preco_kg: String(v.preco ?? '').trim() === '' ? null : numDecimal(v.preco), comprador: String(v.comprador || '').trim() || null } : {}) }),
       };
     }
     if (tab === 'mortalidade') {
@@ -491,7 +497,7 @@ export async function renderRelatorioLote(ctx, el, id) {
       await abrirVisualizador({ blob, nome, titulo: `${nomeTanque} · ${lote.especie}`, toast: ctx.toast });
     } catch (e) { ctx.toast(e.message || 'Não foi possível gerar o PDF', 'erro'); bpdf.disabled = false; bpdf.textContent = texto; }
   });
-  el.querySelector('#b-csv').addEventListener('click', () => baixarCsv(nomeArquivo(['Relatório do lote', nomeTanque || 'Tanque', lote.especie, `lote de ${dataArquivo(lote.data_entrada)}`, dataArquivo(hojeISO())], 'csv'), montarCsv(lote, nomeTanque, c, bios, mort, rac, quem, desp, man, agua)));
+  el.querySelector('#b-csv').addEventListener('click', () => baixarCsv(nomeArquivo(['Relatório do lote', nomeTanque || 'Tanque', lote.especie, `lote de ${dataArquivo(lote.data_entrada)}`, dataArquivo(hojeISO())], 'csv'), montarCsv(lote, nomeTanque, c, bios, mort, rac, quem, gerir ? desp : [], man, agua)));
 }
 
 function baixarCsv(nome, texto) {

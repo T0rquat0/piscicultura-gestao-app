@@ -16,6 +16,7 @@ export function indicadoresDespesca(d, areaHa) {
     difKg: l != null ? b - l : null,
     difPct: l != null && b > 0 ? ((b - l) / b) * 100 : null,
     peixesHa: Number(areaHa) > 0 && q > 0 ? q / Number(areaHa) : null,
+    receita: Number(d.preco_kg) > 0 && b > 0 ? b * Number(d.preco_kg) : null, // sobre o peso bruto
   };
 }
 
@@ -57,6 +58,8 @@ export function calcularLote(lote, bios, mort, rac, hoje, precoKg = null, desp =
   const mortos = soma(mort, 'quantidade');
   const despescados = soma(desp, 'quantidade');
   const pesoDespescado = soma(desp, 'peso_bruto_kg');
+  const comPreco = desp.filter((d) => Number(d.preco_kg) > 0);
+  const receita = comPreco.length ? comPreco.reduce((s, d) => s + Number(d.peso_bruto_kg) * Number(d.preco_kg), 0) : null;
   const fechado = !lote.ativo && desp.some((d) => d.tipo === 'total'); // a despesca total contou os peixes de verdade
   const vivos = fechado ? 0 : Math.max(0, qtdInicial - mortos - despescados);
   const racaoTotal = soma(rac, 'quantidade_kg');
@@ -81,6 +84,8 @@ export function calcularLote(lote, bios, mort, rac, hoje, precoKg = null, desp =
     vivos,
     despescados,
     pesoDespescado,
+    receita,
+    despescasSemPreco: desp.length - comPreco.length,
     // retirado também sobreviveu; na despesca total vale a contagem real (no máximo 100%)
     sobrevivencia: qtdInicial > 0 ? Math.min(100, ((fechado ? despescados : Math.max(0, qtdInicial - mortos)) / qtdInicial) * 100) : null,
     racaoTotal,

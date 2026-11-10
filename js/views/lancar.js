@@ -1,7 +1,7 @@
 // Lançamento de ração, biometria, mortalidade, despesca e manejo (probiótico). Funciona sem internet:
 // o item é gravado na fila local (IndexedDB) e enviado quando houver conexão.
 import { icone } from '../icons.js';
-import { esc, hojeISO, fmtData, fmtNum, fmtInt, num, uuid, ROTULO_TIPO, progresso, fmtPct, plural, numDecimal, pesoMedioTxt } from '../util.js';
+import { esc, hojeISO, fmtData, fmtNum, fmtInt, num, uuid, ROTULO_TIPO, progresso, fmtPct, plural, numDecimal, pesoMedioTxt, fmtBRL } from '../util.js';
 import * as db from '../db.js';
 import { confirmar } from '../dialogo.js';
 import { ordemNatural } from './home.js';
@@ -94,6 +94,12 @@ function camposDoTipo(tipo, kgSaco) {
         <input id="desp-bruto" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 9547" required></label>
       <label>Peso total líquido (kg) <small class="mudo">(opcional)</small>
         <input id="desp-liquido" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 9356"></label>
+      <div class="man-dose desp-venda">
+        <label>Preço de venda (R$/kg) <small class="mudo">(opcional)</small>
+          <input id="desp-preco" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 9,50"></label>
+        <label>Comprador <small class="mudo">(opcional)</small>
+          <input id="desp-comprador" type="text" maxlength="80" autocomplete="off"></label>
+      </div>
       <div class="calc resultado" id="desp-calc" hidden></div>`;
   }
   return `<label>Quantos peixes morreram?
@@ -418,6 +424,8 @@ export async function renderLancar(ctx, el, params = {}) {
       const L = [`Peso médio bruto: ${pesoMedioTxt(i.medioBrutoKg)} por peixe`];
       if (i.medioLiquidoKg != null) L.push(`Peso médio líquido: ${pesoMedioTxt(i.medioLiquidoKg)} por peixe`, `Diferença: ${fmtNum(i.difKg, 0)} kg (${fmtNum(i.difPct, 1)}% do bruto)`);
       if (i.peixesHa != null) L.push(`${fmtInt(i.peixesHa)} peixes por hectare`);
+      const prTxt = f.querySelector('#desp-preco').value.trim(), pr = prTxt ? numDecimal(prTxt) : null;
+      if (pr > 0) L.push(`Receita: ${fmtBRL(b * pr)} (sobre o peso bruto)`);
       box.textContent = L.join('\n'); box.hidden = false;
     };
     f.querySelectorAll('#desp-tipo .tile').forEach((b) => b.addEventListener('click', () => {
@@ -425,7 +433,7 @@ export async function renderLancar(ctx, el, params = {}) {
       f.querySelectorAll('#desp-tipo .tile').forEach((x) => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', String(on)); });
       pintarDica();
     }));
-    ['#desp-qtd', '#desp-bruto', '#desp-liquido'].forEach((s) => f.querySelector(s).addEventListener('input', contas));
+    ['#desp-qtd', '#desp-bruto', '#desp-liquido', '#desp-preco'].forEach((s) => f.querySelector(s).addEventListener('input', contas));
     selTanque.addEventListener('change', contas);
     pintarDica();
   }
@@ -571,7 +579,12 @@ export async function renderLancar(ctx, el, params = {}) {
         dadosRapidos(),
       ]);
       if (!despescaLigada) return mostrarErro('A despesca ainda não foi ativada neste sistema (falta rodar o sql/20 no Supabase).');
-      payload = { ...base, tipo: despTipo, quantidade: q, peso_bruto_kg: b, peso_liquido_kg: lq };
+      const precoTxt = f.querySelector('#desp-preco').value.trim(), preco = precoTxt ? numDecimal(precoTxt) : null;
+      if (precoTxt.includes('.') && precoTxt.includes(',')) return mostrarErro('Digite o preço sem ponto de milhar. Ex.: 9,50');
+      if (precoTxt && !(preco > 0 && preco <= 1000)) return mostrarErro('Confira o preço de venda por kg (até R$ 1.000), ou deixe em branco.');
+      const comprador = f.querySelector('#desp-comprador').value.trim();
+      if ((precoTxt || comprador) && navigator.onLine && !(await Promise.race([ctx.api.vendaAtiva().catch(() => true), new Promise((r) => setTimeout(() => r(true), 2500))]))) return mostrarErro('A venda na despesca ainda não foi ativada neste sistema (falta rodar o sql/23 no Supabase). Deixe preço e comprador em branco para salvar só a despesca.');
+      payload = { ...base, tipo: despTipo, quantidade: q, peso_bruto_kg: b, peso_liquido_kg: lq, ...(preco ? { preco_kg: preco } : {}), ...(comprador ? { comprador } : {}) };
       if (!(await pesoConferido(lote_id, q, b, data, dados))) return;
       // confere com o que o app estimava (só com internet); nunca bloqueia, porque a contagem da despesca é a real
       const vivos = dados && lote ? vivosDoLote(lote, dados.res[lote.id]) : null;

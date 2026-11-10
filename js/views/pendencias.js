@@ -15,7 +15,7 @@ function descricao(it, ref) {
   else if (it.tabela === 'biometrias') valor = `${fmtNum(p.peso_amostra_kg, 3)} kg em ${plural(p.quantidade_amostrada, 'peixe', 'peixes')} (médio ${fmtNum((p.peso_amostra_kg / p.quantidade_amostrada) * 1000, 0)} g)`;
   else if (it.tabela === 'qualidade_agua') valor = [p.oxigenio_mgl != null && `O₂ ${fmtNum(p.oxigenio_mgl, 1)}`, p.temperatura_c != null && `${fmtNum(p.temperatura_c, 1)} °C`, p.ph != null && `pH ${fmtNum(p.ph, 1)}`, p.amonia_mgl != null && `NH₃ ${fmtNum(p.amonia_mgl, 2)}`].filter(Boolean).join(', ');
   else if (it.tabela === 'manejos') valor = `${p.produto}, ${fmtNum(p.dose, Number.isInteger(p.dose) ? 0 : 2)} ${p.unidade}, ${p.via === 'agua' ? 'na água' : 'na ração'}`;
-  else if (it.tabela === 'despescas') valor = `${p.tipo === 'total' ? 'total' : 'parcial'}, ${plural(p.quantidade, 'peixe', 'peixes')}, ${fmtNum(p.peso_bruto_kg, 0)} kg bruto`;
+  else if (it.tabela === 'despescas') valor = `${p.tipo === 'total' ? 'total' : 'parcial'}, ${plural(p.quantidade, 'peixe', 'peixes')}, ${fmtNum(p.peso_bruto_kg, 0)} kg bruto${p.preco_kg ? `, R$ ${fmtNum(p.preco_kg, 2)}/kg` : ''}`;
   else valor = `${plural(p.quantidade, 'peixe', 'peixes')}`;
   return { titulo: `${ROTULO[it.tabela] || it.tabela} · ${tanque ? tanque.nome : 'tanque'}`, sub: `${fmtData(p.data)} · ${valor}` };
 }
