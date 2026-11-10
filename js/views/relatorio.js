@@ -312,7 +312,7 @@ export async function renderRelatorioLote(ctx, el, id) {
 
   const painelRegistros = () => `
     ${secao('Ração lançada', [...rac].reverse().map((r) => registro(r.data, r.registrado_por, `${fmtNum(r.quantidade_kg, 1)} kg (≈ ${fmtNum(r.quantidade_kg / kgS, 1)} sacos)`, 'racao_consumo', r.id)), 'Nenhuma ração lançada.')}
-    ${secao('Biometrias', [...bios].reverse().map((b) => registro(b.data, b.registrado_por, `${fmtNum(pesoMedioKg(b) * 1000, 0)} g<small>${fmtInt(b.quantidade_amostrada)} peixes · ${fmtNum(b.peso_amostra_kg, 3)} kg</small>`, 'biometrias', b.id)), 'Nenhuma biometria registrada.')}
+    ${secao('Biometrias', [...bios].reverse().map((b) => registro(b.data, b.registrado_por, `${fmtNum(pesoMedioKg(b) * 1000, 0)} g<small>${fmtInt(b.quantidade_amostrada)} ${Number(b.quantidade_amostrada) === 1 ? 'peixe' : 'peixes'} · ${fmtNum(b.peso_amostra_kg, 3)} kg</small>`, 'biometrias', b.id)), 'Nenhuma biometria registrada.')}
     ${secao('Mortalidade', [...mort].reverse().map((m) => registro(m.data, m.registrado_por, `${fmtInt(m.quantidade)} peixes${m.causa ? `<small class="causa">${esc(m.causa)}</small>` : ''}`, 'mortalidade', m.id)), 'Nenhuma mortalidade registrada.')}
     ${desp.length ? secao('Despescas', [...desp].reverse().map((d) => registro(d.data, d.registrado_por, `${fmtNum(d.peso_bruto_kg, 0)} kg bruto<small>${d.tipo === 'total' ? 'Total' : 'Parcial'} · ${fmtInt(d.quantidade)} peixes</small>`, 'despescas', d.id)), '') : ''}`;
 
@@ -593,11 +593,13 @@ export async function renderRacaoDia(ctx, el) {
   let r = null;
   // ração do período dividida por fase do lote (só quando há mais de uma fase)
   function pizzaFase(lista) {
+    // ração de tanque cujo lote já foi encerrado (despesca total) entra como "Lote encerrado":
+    // sem isso o centro da pizza dava 19 sacos e o total do dia 23
     const porFase = {};
-    for (const t of lista) if (t.kg > 0 && t.fase) porFase[t.fase] = (porFase[t.fase] || 0) + t.kg;
-    const fases = ORDEM_FASE.filter((f) => porFase[f] > 0);
+    for (const t of lista) if (t.kg > 0) { const f = t.fase || 'encerrado'; porFase[f] = (porFase[f] || 0) + t.kg; }
+    const fases = [...ORDEM_FASE, 'encerrado'].filter((f) => porFase[f] > 0);
     if (fases.length < 2) return '';
-    return `<div class="pz-faixa">${pizza(fases.map((f) => ({ nome: ROTULO_TIPO[f] || f, valor: porFase[f], cor: COR_FASE[f], txt: `${sacos(porFase[f])} sacos` })), { centro: sacos(Object.values(porFase).reduce((a, b) => a + b, 0)), sub: 'sacos', rotulo: 'Ração por fase' })}</div>`;
+    return `<div class="pz-faixa">${pizza(fases.map((f) => ({ nome: f === 'encerrado' ? 'Lote encerrado' : ROTULO_TIPO[f] || f, valor: porFase[f], cor: f === 'encerrado' ? '#b9c4bf' : COR_FASE[f], txt: `${sacos(porFase[f])} ${sacos(porFase[f]) === '1' ? 'saco' : 'sacos'}` })), { centro: sacos(Object.values(porFase).reduce((a, b) => a + b, 0)), sub: 'sacos', rotulo: 'Ração por fase' })}</div>`;
   }
   function pintar() {
     el.querySelectorAll('[data-per]').forEach((b) => b.classList.toggle('on', b.dataset.per === per));

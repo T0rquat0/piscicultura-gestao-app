@@ -61,7 +61,7 @@ export async function renderEstoque(ctx, el) {
 
   el.innerHTML = `
     <h1>Estoque de ração</h1>
-    ${porTipo ? `<div class="seg" style="--n:2" role="tablist">${Object.entries(NOME_RACAO).map(([k]) => `<button type="button" data-tipo-racao="${k}" class="${k === tipoAtual ? 'on' : ''}">${k === 'engorda' ? 'Engorda' : 'Alevino'} <small>${((v) => `${v < 0 ? '−' : ''}${sc(Math.abs(v), 0)}`)(Number((saldos.linhas.find((x) => x.tipo_racao === k) || {}).saldo_kg || 0))} sacos</small></button>`).join('')}</div>` : ''}
+    ${porTipo ? `<div class="seg" style="--n:2" role="tablist">${Object.entries(NOME_RACAO).map(([k]) => `<button type="button" data-tipo-racao="${k}" class="${k === tipoAtual ? 'on' : ''}">${k === 'engorda' ? 'Engorda' : 'Alevino'} <small>${((v) => `${v < 0 ? '−' : ''}${sc(Math.abs(v), 0)} ${Math.abs(v / kgS) === 1 ? 'saco' : 'sacos'}`)(Number((saldos.linhas.find((x) => x.tipo_racao === k) || {}).saldo_kg || 0))}</small></button>`).join('')}</div>` : ''}
     <div class="pc-duas"><div>
     <div class="estoque-hero n-${sit.nivel}">
       <span>${porTipo ? `Ração de ${tipoAtual} em estoque` : 'Em estoque agora'}</span>
@@ -216,7 +216,7 @@ export async function renderEstoque(ctx, el) {
     const dif = n * kgS - kg;
     const ok = await confirmar({
       titulo: 'Registrar contagem?',
-      texto: `Você contou ${fmtNum(n, 1)} sacos. O sistema calculava ${sc(kg)}. ` + (Math.abs(dif) < 0.5 ? 'Bateu certinho.' : `O saldo será corrigido em ${dif < 0 ? '−' : '+'}${sc(Math.abs(dif))} sacos.`),
+      texto: `Você contou ${fmtNum(n, Number.isInteger(n) ? 0 : 1)} ${n === 1 ? 'saco' : 'sacos'}. O sistema calculava ${sc(kg)}. ` + (Math.abs(dif) < 0.5 ? 'Bateu certinho.' : `O saldo será corrigido em ${dif < 0 ? '−' : '+'}${sc(Math.abs(dif))} sacos.`),
       ok: 'Registrar',
     });
     if (!ok) return;
@@ -292,7 +292,9 @@ Faltaram ${fmtNum(nota - rec, (nota - rec) % 1 ? 1 : 0)} ${nota - rec === 1 ? 's
 
   el.querySelectorAll('[data-del]').forEach((b) =>
     b.addEventListener('click', async () => {
-      if (!(await confirmar({ titulo: 'Excluir esta entrada de ração?', texto: 'O saldo de estoque será recalculado.', ok: 'Excluir', perigo: true }))) return;
+      const c = compras.find((x) => x.id === b.dataset.del);
+      const qual = c ? `${fmtData(c.data_compra)}: ${sc(c.quantidade_kg)} sacos${c.fornecedor ? ` (${c.fornecedor})` : ''}. ` : '';
+      if (!(await confirmar({ titulo: 'Excluir esta entrada de ração?', texto: `${qual}O saldo de estoque será recalculado.`, ok: 'Excluir', perigo: true }))) return;
       try { await ctx.api.excluir('racao_estoque', b.dataset.del); ctx.toast('Entrada excluída', 'ok'); renderEstoque(ctx, el); }
       catch (e) { ctx.toast(e.message, 'erro'); }
     }));
@@ -306,16 +308,16 @@ Faltaram ${fmtNum(nota - rec, (nota - rec) % 1 ? 1 : 0)} ${nota - rec === 1 ? 's
         titulo: 'Corrigir entrada de ração', texto: 'O saldo de estoque será recalculado.',
         campos: [
           { nome: 'data', rotulo: 'Data da compra', tipo: 'date', valor: c.data_compra, max: hoje },
-          { nome: 'kg', rotulo: 'Quantidade (kg)', tipo: 'number', valor: c.quantidade_kg, step: '0.1', min: '0.1', inputmode: 'decimal', ajuda: `Hoje equivale a ${sc(c.quantidade_kg)} sacos de ${fmtNum(kgS, 0)} kg.` },
+          { nome: 'sacos', rotulo: `Quantidade (sacos de ${fmtNum(kgS, 0)} kg)`, tipo: 'number', valor: Math.round((Number(c.quantidade_kg) / kgS) * 100) / 100, step: '0.5', min: '0.5', inputmode: 'decimal', ajuda: `Hoje: ${fmtNum(Number(c.quantidade_kg), 0)} kg.` },
           { nome: 'custo', rotulo: 'Valor pago (R$, opcional)', tipo: 'number', valor: c.custo_total ?? '', step: '0.01', min: '0', inputmode: 'decimal' },
           { nome: 'forn', rotulo: 'Fornecedor (opcional)', tipo: 'text', valor: c.fornecedor || '', maxlength: '80' },
           ...(porTipo ? [{ nome: 'tipo', rotulo: 'Qual ração', tipo: 'select', valor: c.tipo_racao || 'engorda', opcoes: [['engorda', 'Ração de engorda'], ['alevino', 'Ração de alevino']] }] : []),
         ],
-        validar: (x) => (!x.data ? 'Informe a data.' : x.data > hoje ? 'A data não pode ser no futuro.' : !(num(x.kg) > 0) ? 'Informe a quantidade em kg.' : x.custo !== '' && !(num(x.custo) >= 0) ? 'Valor pago inválido.' : null),
+        validar: (x) => (!x.data ? 'Informe a data.' : x.data > hoje ? 'A data não pode ser no futuro.' : !(num(x.sacos) > 0) ? 'Informe a quantidade de sacos.' : x.custo !== '' && !(num(x.custo) >= 0) ? 'Valor pago inválido.' : null),
       });
       if (!v) return;
       try {
-        await ctx.api.atualizar('racao_estoque', c.id, { data_compra: v.data, quantidade_kg: num(v.kg), custo_total: v.custo === '' ? null : num(v.custo), fornecedor: v.forn.trim() || null, ...(porTipo ? { tipo_racao: v.tipo } : {}) });
+        await ctx.api.atualizar('racao_estoque', c.id, { data_compra: v.data, quantidade_kg: Math.round(num(v.sacos) * kgS * 100) / 100, custo_total: v.custo === '' ? null : num(v.custo), fornecedor: v.forn.trim() || null, ...(porTipo ? { tipo_racao: v.tipo } : {}) });
         ctx.toast('Entrada corrigida', 'ok'); renderEstoque(ctx, el);
       } catch (e) { ctx.toast(e.message, 'erro'); }
     }));

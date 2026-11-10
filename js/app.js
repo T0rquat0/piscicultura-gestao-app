@@ -150,7 +150,7 @@ const ctx = {
 // ---------- login / sessão ----------
 function mostrarLogin(aviso) {
   state.user = null;
-  if (!aviso && state.convite) aviso = 'Você recebeu um convite para entrar numa fazenda. Se já tem conta, entre. Se não tem, toque em "Criar conta" abaixo.';
+  if (!aviso && state.convite) aviso = 'Você recebeu um convite para entrar numa fazenda. Se já tem conta, entre. Se não tem, toque em "Criar minha conta" abaixo.';
   atualizarPendentes();
   renderLogin(ctx, root, aviso);
 }

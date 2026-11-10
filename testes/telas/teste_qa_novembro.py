@@ -124,6 +124,17 @@ with sync_playwright() as pw:
     t = pg.inner_text('#view')
     checa('Cadastrar o primeiro tanque' not in t and 'liberado' in t, '[14] gerente sem tanques liberados vê "nenhum tanque liberado", sem botão de cadastrar')
     ctx.close()
+    # [grupo 2] janelas compridas cabem na tela e rolam (antes o Salvar/Voltar ficava fora da tela no iPhone)
+    ctx = b.new_context(reduced_motion='reduce', viewport={'width': 375, 'height': 600}); pg = ctx.new_page()
+    dados['usuarios'][0]['papel'] = 'dono'; dados['tanques'] = TQ
+    pg.on('pageerror', lambda e: erros_js.append(str(e))); pg.route('**/*', rota)
+    pg.add_init_script(f"localStorage.setItem('sb-ppvliseblxpsepmeknnl-auth-token', {json.dumps(json.dumps(sessao))});")
+    pg.goto(BASE + f'#/tanque/{T}'); pg.wait_for_selector('[data-editar-lote]', timeout=20000); pg.locator('[data-editar-lote]').first.click(); pg.wait_for_timeout(700)
+    caixa = pg.evaluate("(() => { const c = document.querySelector('.dialogo-caixa'); const r = c.getBoundingClientRect(); return { cabe: r.bottom <= innerHeight + 1, rola: getComputedStyle(c).overflowY } })()")
+    checa(caixa['cabe'] and caixa['rola'] == 'auto', f'[g2] formulário "corrigir lote" cabe numa tela de 600 px e rola ({caixa})')
+    pg.get_by_role('button', name='Voltar').click(); pg.wait_for_timeout(300)
+    checa(pg.locator('.dialogo').count() == 0, '[g2] o Voltar da janela comprida é alcançável')
+    ctx.close()
     # [13] erro do Supabase em português
     ctx, pg = abrir(b, 'dono', tanques=TQ)
     msg = pg.evaluate("import('./js/util.js').then(m => m.traduzErro({ message: 'email rate limit exceeded' }))")
