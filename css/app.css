@@ -1101,3 +1101,10 @@ table.cmp td b { font-weight: 600; }
 /* Lançar: o tanque veio do último lançamento (evita lançar no tanque errado ao trocar de aba) */
 .tq-ultimo { display: block; margin-top: .2rem; font-size: .82rem; font-weight: 500; color: var(--alerta); }
 .tile .tile-fase { display: block; font-size: .75rem; font-weight: 400; color: var(--tinta-2); margin-top: .1rem; }
+/* Lançar com 5 abas: rolam de lado se não couberem, em vez de cortar o nome */
+.seg[style*="--n:5"] { display: flex; gap: 1rem; overflow-x: auto; scrollbar-width: none; }
+.seg[style*="--n:5"]::-webkit-scrollbar { display: none; }
+.seg[style*="--n:5"] > button { flex: 1 0 auto; font-size: .86rem; padding-inline: .1rem; }
+/* manejo: na ração ou na água lado a lado; dose e unidade na mesma linha */
+#man-via { grid-template-columns: 1fr 1fr; }
+.man-dose { display: grid; grid-template-columns: 1fr 6.5rem; gap: .6rem; }

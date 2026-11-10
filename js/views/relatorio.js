@@ -36,7 +36,7 @@ export function svgPeso(pts) {
 }
 
 const csvNum = (n, d = 2) => (n == null ? '' : Number(n).toFixed(d).replace('.', ','));
-export function montarCsv(lote, nomeTanque, calc, bios, mort, rac, quem, desp = []) {
+export function montarCsv(lote, nomeTanque, calc, bios, mort, rac, quem, desp = [], man = []) {
   const L = [];
   L.push(['Relatório do lote'], ['Tanque', nomeTanque], ['Fase', ROTULO_TIPO[lote.tipo] || lote.tipo], ['Espécie', lote.especie],
     ['Entrada', fmtData(lote.data_entrada)], ['Peixes iniciais', lote.quantidade_inicial], ['Peso total inicial (kg)', csvNum(lote.peso_inicial_kg)],
@@ -52,6 +52,10 @@ export function montarCsv(lote, nomeTanque, calc, bios, mort, rac, quem, desp = 
   if (desp.length) {
     L.push([], ['DESPESCAS'], ['Data', 'Tipo', 'Peixes', 'Peso bruto (kg)', 'Peso líquido (kg)', 'Registrado por']);
     desp.forEach((d) => L.push([fmtData(d.data), d.tipo === 'total' ? 'Total' : 'Parcial', d.quantidade, csvNum(d.peso_bruto_kg, 3), csvNum(d.peso_liquido_kg, 3), quem(d.registrado_por)]));
+  }
+  if (man.length) {
+    L.push([], ['PROBIÓTICO'], ['Data', 'Produto', 'Dose', 'Unidade', 'Aplicação', 'Observação', 'Registrado por']);
+    man.forEach((m) => L.push([fmtData(m.data), m.produto, String(Number(m.dose)).replace('.', ','), m.unidade, m.via === 'agua' ? 'Na água' : 'Na ração', m.obs || '', quem(m.registrado_por)]));
   }
   return '﻿' + L.map((l) => l.map(celulaCsv).join(';')).join('\r\n');
 }
@@ -148,7 +152,7 @@ export async function renderRelatorioLote(ctx, el, id) {
   const gerir = ctx.podeGerir();
   const lote = await ctx.api.lote(id);
   if (!lote) { el.innerHTML = '<div class="card vazio">Lote não encontrado.<br><a class="btn" href="#/relatorio">Voltar</a></div>'; return; }
-  const [{ bios, mort, rac, desp }, nomes, compras] = await Promise.all([
+  const [{ bios, mort, rac, desp, man }, nomes, compras] = await Promise.all([
     ctx.api.dadosLote(id),
     ctx.api.nomesUsuarios().catch(() => ({})),
     gerir ? ctx.api.compras(true).catch(() => []) : Promise.resolve([]),
@@ -314,7 +318,8 @@ export async function renderRelatorioLote(ctx, el, id) {
     ${secao('Ração lançada', [...rac].reverse().map((r) => registro(r.data, r.registrado_por, `${fmtNum(r.quantidade_kg, 1)} kg (≈ ${fmtNum(r.quantidade_kg / kgS, 1)} sacos)`, 'racao_consumo', r.id)), 'Nenhuma ração lançada.')}
     ${secao('Biometrias', [...bios].reverse().map((b) => registro(b.data, b.registrado_por, `${pesoMedioTxt(pesoMedioKg(b))}<small>${fmtInt(b.quantidade_amostrada)} ${Number(b.quantidade_amostrada) === 1 ? 'peixe' : 'peixes'} · ${fmtNum(b.peso_amostra_kg, 3)} kg</small>`, 'biometrias', b.id)), 'Nenhuma biometria registrada.')}
     ${secao('Mortalidade', [...mort].reverse().map((m) => registro(m.data, m.registrado_por, `${fmtInt(m.quantidade)} peixes${m.causa ? `<small class="causa">${esc(m.causa)}</small>` : ''}`, 'mortalidade', m.id)), 'Nenhuma mortalidade registrada.')}
-    ${desp.length ? secao('Despescas', [...desp].reverse().map((d) => registro(d.data, d.registrado_por, `${fmtNum(d.peso_bruto_kg, 0)} kg bruto<small>${d.tipo === 'total' ? 'Total' : 'Parcial'} · ${fmtInt(d.quantidade)} peixes</small>`, 'despescas', d.id)), '') : ''}`;
+    ${desp.length ? secao('Despescas', [...desp].reverse().map((d) => registro(d.data, d.registrado_por, `${fmtNum(d.peso_bruto_kg, 0)} kg bruto<small>${d.tipo === 'total' ? 'Total' : 'Parcial'} · ${fmtInt(d.quantidade)} peixes</small>`, 'despescas', d.id)), '') : ''}
+    ${man.length ? secao('Probiótico', [...man].reverse().map((m) => registro(m.data, m.registrado_por, `${String(Number(m.dose)).replace('.', ',')} ${esc(m.unidade)}<small>${esc(m.produto)} · ${m.via === 'agua' ? 'na água' : 'na ração'}${m.obs ? ` · ${esc(m.obs)}` : ''}</small>`, 'manejos', m.id)), '') : ''}`;
 
   const paineis = { resumo: painelResumo, peso: painelPeso, racao: painelRacao, despesca: painelDespesca, registros: painelRegistros };
 
@@ -397,6 +402,19 @@ export async function renderRelatorioLote(ctx, el, id) {
         montar: (v) => ({ data: v.data, quantidade_amostrada: num(v.qtd), peso_amostra_kg: numDecimal(v.peso) }),
       };
     }
+    if (tab === 'manejos') {
+      const m = man.find((x) => x.id === rid); if (!m) return null;
+      return {
+        lista: [dataCampo(m.data),
+          { nome: 'produto', rotulo: 'Produto', tipo: 'text', valor: m.produto, maxlength: 80 },
+          { nome: 'dose', rotulo: 'Dose', tipo: 'text', valor: String(Number(m.dose)).replace('.', ','), inputmode: 'decimal' },
+          { nome: 'unidade', rotulo: 'Unidade', tipo: 'select', valor: m.unidade, opcoes: [['g', 'g'], ['kg', 'kg'], ['mL', 'mL'], ['L', 'L']] },
+          { nome: 'via', rotulo: 'Aplicação', tipo: 'select', valor: m.via, opcoes: [['racao', 'Na ração'], ['agua', 'Na água']] },
+          { nome: 'obs', rotulo: 'Observação (opcional)', tipo: 'text', valor: m.obs || '', maxlength: 200 }],
+        validar: (v) => dataOk(v.data) || (String(v.produto || '').trim() ? null : 'Informe o nome do produto.') || pesoOk(v.dose) || (numDecimal(v.dose) > 0 && numDecimal(v.dose) <= 1000000 ? null : 'Informe a dose aplicada (até 1.000.000).'),
+        montar: (v) => ({ data: v.data, produto: String(v.produto).trim(), dose: numDecimal(v.dose), unidade: v.unidade, via: v.via, obs: String(v.obs || '').trim() || null }),
+      };
+    }
     if (tab === 'despescas') {
       const d = desp.find((x) => x.id === rid); if (!d) return null;
       return {
@@ -443,7 +461,7 @@ export async function renderRelatorioLote(ctx, el, id) {
       await abrirVisualizador({ blob, nome, titulo: `${nomeTanque} · ${lote.especie}`, toast: ctx.toast });
     } catch (e) { ctx.toast(e.message || 'Não foi possível gerar o PDF', 'erro'); bpdf.disabled = false; bpdf.textContent = texto; }
   });
-  el.querySelector('#b-csv').addEventListener('click', () => baixarCsv(nomeArquivo(['Relatório do lote', nomeTanque || 'Tanque', lote.especie, `lote de ${dataArquivo(lote.data_entrada)}`, dataArquivo(hojeISO())], 'csv'), montarCsv(lote, nomeTanque, c, bios, mort, rac, quem, desp)));
+  el.querySelector('#b-csv').addEventListener('click', () => baixarCsv(nomeArquivo(['Relatório do lote', nomeTanque || 'Tanque', lote.especie, `lote de ${dataArquivo(lote.data_entrada)}`, dataArquivo(hojeISO())], 'csv'), montarCsv(lote, nomeTanque, c, bios, mort, rac, quem, desp, man)));
 }
 
 function baixarCsv(nome, texto) {

@@ -56,7 +56,7 @@ def sessao(vencida):
     return {'access_token': 'x', 'refresh_token': 'y', 'token_type': 'bearer', 'expires_in': 3600, 'expires_at': int(time.time()) + (-7200 if vencida else 2592000), 'user': {'id': U, 'aud': 'authenticated'}}
 
 ROTAS = ['#/', '#/lancar', f'#/t/{T}', '#/relatorio', '#/tanques', '#/estoque', '#/mais', '#/pendencias', '#/equipe', '#/plano', '#/historico']
-LANC = [('racao', {'#qtd': '2'}), ('biometria', {'#peso': '30', '#amostra': '20'}), ('mortalidade', {'#qtd': '3'}), ('despesca', {'#desp-qtd': '100', '#desp-bruto': '150'})]
+LANC = [('racao', {'#qtd': '2'}), ('biometria', {'#peso': '30', '#amostra': '20'}), ('mortalidade', {'#qtd': '3'}), ('despesca', {'#desp-qtd': '100', '#desp-bruto': '150'}), ('manejo', {'#man-produto': 'Probiótico X', '#man-dose': '200'})]
 
 def cenario(b, nome, modo, vencida):
     posts.clear(); morto.clear(); erros = []
@@ -107,15 +107,15 @@ def cenario(b, nome, modo, vencida):
         d = time.time() - t1
         checa(fim == 'salvo' and d < LIM_LANCAR, f'{nome}: {tipo} guardado em {d:.1f}s ({fim})')
     pend = pg.evaluate("new Promise(r => { const q = indexedDB.open('piscicultura'); q.onsuccess = () => { const t = q.result.transaction('fila').objectStore('fila').getAll(); t.onsuccess = () => r(t.result.length); }; })")
-    checa(pend == 4 and not posts, f'{nome}: 4 lançamentos guardados, nada enviado ({pend})')
+    checa(pend == 5 and not posts, f'{nome}: 5 lançamentos guardados, nada enviado ({pend})')
 
     morto.clear(); ctx.set_offline(False)
     if modo == 'offline': pg.evaluate("window.dispatchEvent(new Event('online'))")
     for _ in range(70):
         pg.wait_for_timeout(1000)
-        if len(posts) >= 4: break
+        if len(posts) >= 5: break
     pg.wait_for_timeout(1200)
-    checa(sorted(posts) == ['biometrias', 'despescas', 'mortalidade', 'racao_consumo'], f'{nome}: sinal voltou, envia cada lançamento uma vez ({sorted(posts)})')
+    checa(sorted(posts) == ['biometrias', 'despescas', 'manejos', 'mortalidade', 'racao_consumo'], f'{nome}: sinal voltou, envia cada lançamento uma vez ({sorted(posts)})')
     checa(pg.locator('#pill').count() and pg.inner_text('#pill') == 'Online' and not pg.locator('input[type=password]').count(), f'{nome}: volta a mostrar Online, sem pedir login')
     checa(not erros, f'{nome}: sem erro de JavaScript {erros[:2]}')
     ctx.close()

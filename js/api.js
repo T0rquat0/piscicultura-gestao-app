@@ -10,8 +10,8 @@ export class ErroApi extends Error {
   }
 }
 
-const TABELAS_EXCLUIVEIS = new Set(['biometrias', 'mortalidade', 'despescas', 'racao_consumo', 'racao_estoque', 'racao_contagens']);
-const TABELAS_EDITAVEIS = new Set(['biometrias', 'mortalidade', 'despescas', 'racao_consumo', 'racao_estoque', 'lotes']);
+const TABELAS_EXCLUIVEIS = new Set(['biometrias', 'mortalidade', 'despescas', 'manejos', 'racao_consumo', 'racao_estoque', 'racao_contagens']);
+const TABELAS_EDITAVEIS = new Set(['biometrias', 'mortalidade', 'despescas', 'manejos', 'racao_consumo', 'racao_estoque', 'lotes']);
 
 export function criarApi(client) {
   const ok = (res) => {
@@ -154,6 +154,10 @@ export function criarApi(client) {
       const { error } = await client.from('despescas').select('id').limit(1);
       return !(error && (error.code === '42P01' || error.code === 'PGRST205'));
     },
+    async manejoAtivo() {
+      const { error } = await client.from('manejos').select('id').limit(1);
+      return !(error && (error.code === '42P01' || error.code === 'PGRST205'));
+    },
     async encerrarLote(id) {
       ok(await client.from('lotes').update({ ativo: false }).eq('id', id));
     },
@@ -161,8 +165,8 @@ export function criarApi(client) {
     // lançamentos já gravados no mesmo dia (para avisar de duplicidade ao lançar)
     async registrosDoDia(tipo, pl) {
       if (tipo === 'racao') return ok(await client.from('racao_consumo').select('quantidade_kg,criado_em').eq('tanque_id', pl.tanque_id).eq('data', pl.data)) || [];
-      const tab = tipo === 'mortalidade' ? 'mortalidade' : tipo === 'despesca' ? 'despescas' : 'biometrias';
-      return ok(await client.from(tab).select(tipo === 'biometria' ? 'criado_em' : 'quantidade,criado_em').eq('lote_id', pl.lote_id).eq('data', pl.data)) || [];
+      const tab = tipo === 'mortalidade' ? 'mortalidade' : tipo === 'despesca' ? 'despescas' : tipo === 'manejo' ? 'manejos' : 'biometrias';
+      return ok(await client.from(tab).select(tipo === 'biometria' ? 'criado_em' : tipo === 'manejo' ? 'produto,criado_em' : 'quantidade,criado_em').eq('lote_id', pl.lote_id).eq('data', pl.data)) || [];
     },
 
     // ----- ração: estoque -----
@@ -256,15 +260,16 @@ export function criarApi(client) {
 
     // ----- relatório de um lote -----
     async dadosLote(loteId) {
-      const [bios, mort, rac, desp] = await Promise.all([
+      const [bios, mort, rac, desp, man] = await Promise.all([
         todos(() => client.from('biometrias').select('id,data,peso_amostra_kg,quantidade_amostrada,registrado_por').eq('lote_id', loteId).order('data').order('id')),
         todos(() => client.from('mortalidade').select('id,data,quantidade,causa,registrado_por').eq('lote_id', loteId).order('data').order('id'))
           .catch(() => todos(() => client.from('mortalidade').select('id,data,quantidade,registrado_por').eq('lote_id', loteId).order('data').order('id'))),
         todos(() => client.from('racao_consumo').select('id,data,quantidade_kg,registrado_por').eq('lote_id', loteId).order('data').order('id')),
         // sem o sql/20 a tabela não existe: o relatório segue sem despescas
         todos(() => client.from('despescas').select('id,data,tipo,quantidade,peso_bruto_kg,peso_liquido_kg,registrado_por').eq('lote_id', loteId).order('data').order('id')).catch(() => []),
+        todos(() => client.from('manejos').select('id,data,tipo,produto,dose,unidade,via,obs,registrado_por').eq('lote_id', loteId).order('data').order('id')).catch(() => []), // sem o sql/21: segue sem manejos
       ]);
-      return { bios, mort, rac, desp };
+      return { bios, mort, rac, desp, man };
     },
     // ração de todos os tanques visíveis ao usuário a partir de uma data (para a tabela dia × tanque)
     async racaoPeriodo(desde) {
@@ -329,7 +334,7 @@ export function criarApi(client) {
 
     // ----- cópia de segurança (dono): tudo o que a fazenda tem, tabela por tabela -----
     async exportarTudo() {
-      const tabelas = ['fazendas', 'usuarios', 'tanques', 'usuario_tanques', 'lotes', 'biometrias', 'mortalidade', 'despescas', 'racao_consumo', 'racao_estoque', 'racao_contagens'];
+      const tabelas = ['fazendas', 'usuarios', 'tanques', 'usuario_tanques', 'lotes', 'biometrias', 'mortalidade', 'despescas', 'manejos', 'racao_consumo', 'racao_estoque', 'racao_contagens'];
       const out = { gerado_em: new Date().toISOString(), versao: 1, tabelas: {}, sem_acesso: [] };
       for (const t of tabelas) {
         try {

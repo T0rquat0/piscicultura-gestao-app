@@ -20,7 +20,7 @@ def P(n):  # cada campo leva um número, para saber de onde veio o furo
     return f'<img src=x id=xss{n} onerror="window.__xss=(window.__xss||[]).concat({n})">"\'><b id=xb{n}>b</b>'
 CAMPOS = {1: 'nome do tanque', 2: 'nome da fazenda', 3: 'nome da pessoa', 4: 'espécie', 5: 'causa da mortalidade', 6: 'fornecedor',
           7: 'observação da contagem', 8: 'nome na equipe', 9: 'histórico', 10: 'painel admin: fazenda', 11: 'painel admin: dono',
-          12: 'pacote', 13: 'convite: fazenda'}
+          12: 'pacote', 13: 'convite: fazenda', 14: 'probiótico (produto)'}
 hoje = time.strftime('%Y-%m-%d')
 DADOS = {
   'tanques': [{'id': T, 'nome': P(1), 'area_ha': 1}],
@@ -38,6 +38,7 @@ DADOS = {
     {'id': 3, 'tabela': 'mortalidade', 'registro_id': 'm9', 'acao': 'excluiu', 'operacao': 3, 'quem': U, 'quando': '2026-11-01T10:00:00Z', 'antes': {'causa': P(9), 'quantidade': 1, 'lote_id': L}, 'depois': None, 'restaurado_em': None},
     {'id': 4, 'tabela': 'lotes', 'registro_id': L, 'acao': 'excluiu', 'operacao': 4, 'quem': U, 'quando': '2026-11-01T10:00:00Z', 'antes': {'especie': P(9), 'tanque_id': T}, 'depois': None, 'restaurado_em': None},
     {'id': 5, 'tabela': 'usuarios', 'registro_id': U, 'acao': 'alterou', 'operacao': 5, 'quem': U, 'quando': '2026-11-01T10:00:00Z', 'antes': {'nome': P(9)}, 'depois': {'nome': P(9)}, 'restaurado_em': None}],
+  'manejos': [{'id': 'p1', 'uuid_local': 'p1', 'lote_id': L, 'data': '2026-10-08', 'tipo': 'probiotico', 'produto': P(14), 'dose': 2, 'unidade': 'kg', 'via': 'racao', 'obs': P(14), 'registrado_por': U}],
   'pacotes': [{'tanques_max': 5, 'nome': P(12), 'preco_mensal': 200, 'ativo': True}],
 }
 RPC = {
