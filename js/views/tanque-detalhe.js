@@ -56,6 +56,7 @@ export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje, meta
         <a class="btn" href="#/lancar?tipo=biometria&tanque=${esc(tanque.id)}">Biometria</a>
         <a class="btn" href="#/lancar?tipo=mortalidade&tanque=${esc(tanque.id)}">Mortalidade</a>
         <a class="btn" href="#/lancar?tipo=manejo&tanque=${esc(tanque.id)}">Manejo</a>
+        <a class="btn" href="#/lancar?tipo=agua&tanque=${esc(tanque.id)}">Água</a>
         ${podeGerir ? `<a class="btn" href="#/lancar?tipo=despesca&tanque=${esc(tanque.id)}">Despesca</a>` : ''}
       </div>
     </div>` : ''}

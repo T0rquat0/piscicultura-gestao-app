@@ -74,6 +74,10 @@ export const CLIMA = {
 };
 
 // Alertas de manejo na Início (dono/gerente)
+// Água do tambaqui: Tabela 1 da cartilha "Criação de tambaqui" (Embrapa Amazônia Oriental, 2018).
+// Para as outras espécies não há faixa no app: mostra as medições, sem alerta.
+export const AGUA_TAMBAQUI = { oxigenio: { min: 4, max: 8 }, temperatura: { min: 28, max: 30, letal: 18 }, ph: { min: 5, max: 7 }, amonia: { max: 0.46 } };
+export const AGUA_LIMITES = { oxigenio: [0, 25], temperatura: [0, 50], ph: [0, 14], amonia: [0, 50] }; // valor possível de digitar
 export const ALERTAS = {
   biometriaDias: 30,     // lote sem pesagem há mais que isso: números estimados desatualizados
   racaoDesvio: 0.4,      // ração de hoje 40% abaixo ou acima da média do tanque na semana

@@ -36,7 +36,7 @@ export async function anotarNoResumo(tabela, p) {
 }
 import { ehErroDeRede, ehErroDeSessao, traduzErro } from './util.js';
 
-const TABELAS = new Set(['biometrias', 'mortalidade', 'racao_consumo', 'despescas', 'manejos']);
+const TABELAS = new Set(['biometrias', 'mortalidade', 'racao_consumo', 'despescas', 'manejos', 'qualidade_agua']);
 let rodando = false;
 
 export async function sincronizar(client, userId) {

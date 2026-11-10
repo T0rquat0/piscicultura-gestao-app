@@ -5,8 +5,8 @@ import { esc, hojeISO, fmtData, fmtNum, fmtInt, num, uuid, ROTULO_TIPO, progress
 import * as db from '../db.js';
 import { confirmar } from '../dialogo.js';
 import { ordemNatural } from './home.js';
-import { PESO_SACO_PADRAO_KG, CAUSAS_MORTE, TAXA_RACAO } from '../config.js';
-import { sugestaoRacao, vivosDoLote, indicadoresDespesca, avisoPesoMedio } from '../calc.js';
+import { AGUA_LIMITES, PESO_SACO_PADRAO_KG, CAUSAS_MORTE, TAXA_RACAO } from '../config.js';
+import { sugestaoRacao, vivosDoLote, indicadoresDespesca, avisoPesoMedio, avaliarAgua, ehTambaqui } from '../calc.js';
 
 const TIPOS = {
   racao: { rotulo: 'Ração', tabela: 'racao_consumo' },
@@ -14,6 +14,7 @@ const TIPOS = {
   mortalidade: { rotulo: 'Mortalidade', tabela: 'mortalidade' },
   despesca: { rotulo: 'Despesca', tabela: 'despescas', gerir: true }, // peso total da fazenda: só dono e gerente
   manejo: { rotulo: 'Manejo', tabela: 'manejos' },
+  agua: { rotulo: 'Água', tabela: 'qualidade_agua' },
 };
 
 const casas = (x) => (Number.isInteger(x) ? 0 : Number.isInteger(Math.round(x * 100) / 10) ? 1 : 2);
@@ -21,7 +22,7 @@ const kgTxt = (v) => fmtNum(Number(v), casas(Number(v)));
 
 const sacosTxt = (n) => `${fmtNum(n, casas(n))} ${n === 1 ? 'saco' : 'sacos'}`;
 
-const TITULO2 = { racao: 'Quantidade de ração', biometria: 'Pesagem dos peixes', mortalidade: 'Peixes mortos', despesca: 'Dados da despesca', manejo: 'Aplicação de probiótico' };
+const TITULO2 = { racao: 'Quantidade de ração', biometria: 'Pesagem dos peixes', mortalidade: 'Peixes mortos', despesca: 'Dados da despesca', manejo: 'Aplicação de probiótico', agua: 'Medição da água' };
 
 function camposDoTipo(tipo, kgSaco) {
   if (tipo === 'racao') {
@@ -51,6 +52,18 @@ function camposDoTipo(tipo, kgSaco) {
         <input id="amostra" type="number" inputmode="numeric" step="1" min="1" placeholder="Ex.: 10" required></label>
       <div class="calc resultado" id="pm">Peso médio: —</div>
       <p id="aviso-amostra" class="aviso" hidden>Poucos peixes pesados: com menos de 30 o peso médio fica pouco confiável.</p>`;
+  }
+  if (tipo === 'agua') {
+    return `<p class="calc" style="margin-top:0">Preencha só o que você mediu.</p>
+      <div class="agua-campos">
+        <label>Oxigênio (mg/L)<input id="ag-od" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 5,2"></label>
+        <label>Temperatura (°C)<input id="ag-temp" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 29"></label>
+        <label>pH<input id="ag-ph" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 6,5"></label>
+        <label>Amônia tóxica (mg/L)<input id="ag-am" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 0,1"></label>
+      </div>
+      <div class="calc resultado" id="ag-res" hidden></div>
+      <label>Observação <small class="mudo">(opcional)</small>
+        <input id="ag-obs" type="text" maxlength="200" autocomplete="off"></label>`;
   }
   if (tipo === 'manejo') {
     return `<div class="tiles compactos" id="man-via" role="radiogroup" aria-label="Como foi aplicado">
@@ -145,7 +158,7 @@ export async function renderLancar(ctx, el, params = {}) {
         <label id="causa-outra-wrap" hidden>Qual foi a causa? <input id="causa-outra" maxlength="60" placeholder="Ex.: queda de energia no aerador"></label>
       </section>` : ''}
       <p id="erro" class="erro" hidden></p>
-      <button class="btn primario grande" type="submit">Salvar ${TIPOS[tipo].rotulo.toLowerCase()}</button>
+      <button class="btn primario grande" type="submit">Salvar ${tipo === 'agua' ? 'medição' : TIPOS[tipo].rotulo.toLowerCase()}</button>
       ${navigator.onLine ? '' : '<p class="mudo" style="margin:0;text-align:center">Sem internet: será salvo no celular e enviado depois.</p>'}
     </form></div>
     <aside class="lc-painel" id="painel-tq" aria-label="Resumo do tanque escolhido"></aside></div>`;
@@ -358,6 +371,23 @@ export async function renderLancar(ctx, el, params = {}) {
     }
   }
 
+  // água: mostra na hora o que está fora da faixa (só para tambaqui, a única espécie com faixa de fonte conhecida)
+  const AG_CAMPOS = [['#ag-od', 'oxigenio_mgl', 'oxigenio', 'Oxigênio'], ['#ag-temp', 'temperatura_c', 'temperatura', 'Temperatura'], ['#ag-ph', 'ph', 'ph', 'pH'], ['#ag-am', 'amonia_mgl', 'amonia', 'Amônia']];
+  const leituraAgua = () => Object.fromEntries(AG_CAMPOS.map(([s, k]) => { const t = f.querySelector(s).value.trim(); return [k, t ? numDecimal(t) : null]; }));
+  const temTambaqui = () => lotes.some((l) => l.tanque_id === selTanque.value && ehTambaqui(l.especie));
+  if (tipo === 'agua') {
+    const res = f.querySelector('#ag-res');
+    const pintar = () => {
+      const m = leituraAgua();
+      if (!temTambaqui() || Object.values(m).every((v) => v == null || !Number.isFinite(v))) { res.hidden = true; return; }
+      const fora = avaliarAgua(m);
+      res.textContent = fora.length ? fora.map((x) => x.texto[0].toUpperCase() + x.texto.slice(1)).join('\n') : 'Dentro da faixa do tambaqui.';
+      res.hidden = false;
+    };
+    AG_CAMPOS.forEach(([s]) => f.querySelector(s).addEventListener('input', pintar));
+    selTanque.addEventListener('change', pintar);
+  }
+
   // manejo: na ração ou na água; o último produto já vem preenchido
   let manVia = 'racao';
   if (tipo === 'manejo') {
@@ -453,6 +483,7 @@ export async function renderLancar(ctx, el, params = {}) {
   // Ração: mesmo tanque e dia com a mesma quantidade, ou qualquer um nos últimos 30 minutos.
   // Mortalidade: mesmo lote, dia e quantidade. Biometria: mesmo lote e dia.
   async function acharParecido(tp, pl) {
+    if (tp === 'agua') return null; // medir de manhã e à tarde no mesmo dia é normal
     try {
       const tab = TIPOS[tp].tabela;
       const locais = (await db.filaList()).filter((i) => i.tabela === tab && i.payload.data === pl.data && (tp === 'racao' ? i.payload.tanque_id === pl.tanque_id : i.payload.lote_id === pl.lote_id));
@@ -550,6 +581,20 @@ export async function renderLancar(ctx, el, params = {}) {
         const texto = despTipo === 'total' ? `Serão registrados ${plural(q, 'peixe', 'peixes')} e o lote será encerrado.${conta}` : `Você informou ${plural(q, 'peixe', 'peixes')}, mais do que o estimado.${conta}`;
         if (!(await confirmar({ titulo: despTipo === 'total' ? 'Encerrar o lote com esta despesca?' : 'Conferir a quantidade', texto, ok: despTipo === 'total' ? 'Registrar e encerrar' : 'Registrar assim', cancelar: 'Voltar' }))) return;
       }
+    } else if (tipo === 'agua') {
+      const m = {};
+      for (const [s, k, lim, nome] of AG_CAMPOS) {
+        const t = f.querySelector(s).value.trim();
+        if (!t) { m[k] = null; continue; }
+        const v = numDecimal(t), [a, b] = AGUA_LIMITES[lim];
+        if (!Number.isFinite(v) || v < a || v > b) return mostrarErro(`${nome}: confira o valor (de ${a} a ${b}).`);
+        m[k] = v;
+      }
+      if (Object.values(m).every((v) => v == null)) return mostrarErro('Preencha pelo menos uma medição.');
+      if (navigator.onLine && !(await Promise.race([ctx.api.aguaAtiva().catch(() => true), new Promise((r) => setTimeout(() => r(true), 2500))]))) return mostrarErro('A qualidade da água ainda não foi ativada neste sistema (falta rodar o sql/22 no Supabase).');
+      const { lote_id: _semLote, ...semLote } = base;
+      const agora = new Date();
+      payload = { ...semLote, tanque_id: selTanque.value, ...m, hora: data === hoje ? `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}` : null, obs: f.querySelector('#ag-obs').value.trim() || null };
     } else if (tipo === 'manejo') {
       const produto = f.querySelector('#man-produto').value.trim(), doseTxt = f.querySelector('#man-dose').value.trim(), dose = numDecimal(doseTxt);
       const obs = f.querySelector('#man-obs').value.trim();
@@ -609,6 +654,7 @@ export async function renderLancar(ctx, el, params = {}) {
     const nomeTanque = (tanques.find((t) => t.id === selTanque.value) || {}).nome || '';
     const resumo = tipo === 'racao' ? `${sacosTxt(num(f.querySelector('#qtd').value))} de ração (${kgTxt(payload.quantidade_kg)} kg)`
       : tipo === 'biometria' ? `${pesoMedioTxt(payload.peso_amostra_kg / payload.quantidade_amostrada)} de peso médio (${fmtInt(payload.quantidade_amostrada)} peixes pesados)`
+      : tipo === 'agua' ? [payload.oxigenio_mgl != null && `O₂ ${fmtNum(payload.oxigenio_mgl, 1)} mg/L`, payload.temperatura_c != null && `${fmtNum(payload.temperatura_c, 1)} °C`, payload.ph != null && `pH ${fmtNum(payload.ph, 1)}`, payload.amonia_mgl != null && `amônia ${fmtNum(payload.amonia_mgl, 2)} mg/L`].filter(Boolean).join(' · ')
       : tipo === 'manejo' ? `${payload.produto}: ${String(payload.dose).replace('.', ',')} ${payload.unidade} ${payload.via === 'agua' ? 'na água' : 'na ração'}`
       : tipo === 'despesca' ? `despesca ${payload.tipo}: ${plural(payload.quantidade, 'peixe', 'peixes')}, ${fmtNum(payload.peso_bruto_kg, 0)} kg bruto`
       : `${plural(payload.quantidade, 'peixe morto', 'peixes mortos')}`;
@@ -625,8 +671,9 @@ export async function renderLancar(ctx, el, params = {}) {
     f.outerHTML = `
       <div class="sucesso card" role="status">
         <div class="sucesso-ic">${icone('check', 34)}</div>
-        <h2>${tipo === 'manejo' ? 'Probiótico salvo' : `${TIPOS[tipo].rotulo} salva`}</h2>
+        <h2>${tipo === 'manejo' ? 'Probiótico salvo' : tipo === 'agua' ? 'Medição salva' : `${TIPOS[tipo].rotulo} salva`}</h2>
         <p class="sucesso-res"><b>${esc(nomeTanque)}</b> · ${esc(resumo)}</p>
+        ${tipo === 'agua' && temTambaqui() && avaliarAgua(payload).length ? `<p class="aviso">${avaliarAgua(payload).map((x) => esc(x.texto[0].toUpperCase() + x.texto.slice(1))).join('<br>')}</p>` : ''}
         ${navigator.onLine ? '' : '<p class="mudo nota">Sem internet: guardado no celular. Será enviado sozinho quando a internet voltar.</p>'}
         <div class="sucesso-acoes">
           ${proximo ? `<button type="button" class="btn primario grande" id="b-proximo">Próximo: ${esc(proximo.nome)}</button>` : `<button type="button" class="btn primario grande" id="b-outro">Lançar em outro tanque</button>`}

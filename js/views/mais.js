@@ -175,7 +175,7 @@ export function renderMais(ctx, el) {
     try { copia = JSON.parse(await arq.text()); } catch { return ctx.toast('Este arquivo não é uma cópia do app.', 'erro'); }
     if (!copia || typeof copia.tabelas !== 'object' || Array.isArray(copia.tabelas)) return ctx.toast('Este arquivo não é uma cópia do app.', 'erro');
     const qtd = (t) => (Array.isArray(copia.tabelas[t]) ? copia.tabelas[t].length : 0);
-    const resumo = `${plural(qtd('tanques'), 'tanque', 'tanques')}, ${plural(qtd('lotes'), 'lote', 'lotes')}, ${plural(qtd('racao_consumo') + qtd('biometrias') + qtd('mortalidade') + qtd('despescas') + qtd('manejos'), 'lançamento', 'lançamentos')} e ${plural(qtd('racao_estoque'), 'compra', 'compras')}`;
+    const resumo = `${plural(qtd('tanques'), 'tanque', 'tanques')}, ${plural(qtd('lotes'), 'lote', 'lotes')}, ${plural(qtd('racao_consumo') + qtd('biometrias') + qtd('mortalidade') + qtd('despescas') + qtd('manejos') + qtd('qualidade_agua'), 'lançamento', 'lançamentos')} e ${plural(qtd('racao_estoque'), 'compra', 'compras')}`;
     if (!(await confirmar({ titulo: 'Importar esta cópia?', texto: `Cópia de ${copia.gerado_em ? fmtData(copia.gerado_em) : 'data desconhecida'} com ${resumo}. Só volta o que estiver faltando; nada que já existe é alterado.`, ok: 'Importar' }))) return;
     bimp.disabled = true;
     try {

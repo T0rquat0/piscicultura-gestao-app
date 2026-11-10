@@ -53,14 +53,16 @@ export async function renderHome(ctx, el) {
   const desde = (n) => { const d = new Date(`${hoje}T00:00:00Z`); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10); };
   const gerir = ctx.podeGerir();
   const resumo = {};
-  let semDetalhe = false, saldos = null, racao = null, mortes = null;
+  let semDetalhe = false, saldos = null, racao = null, mortes = null, agua = [];
   if (navigator.onLine) {
-    const [rs, sd, rc, mt] = await Promise.all([
+    const [rs, sd, rc, mt, ag] = await Promise.all([
       ctx.api.resumoLotes().catch(() => null),
       ctx.api.saldosRacao().catch(() => null),
       ctx.api.racaoPeriodo(desde(13)).catch(() => null), // 14 dias: hoje e os 13 anteriores
       gerir ? ctx.api.mortalidadePeriodo(desde(6)).catch(() => null) : null, // 7 dias com hoje
+      gerir ? ctx.api.aguaPeriodo(desde(1)).catch(() => null) : null,
     ]);
+    agua = ag || [];
     if (rs) for (const r of rs) resumo[r.lote_id] = r; else semDetalhe = true;
     saldos = sd; racao = rc; mortes = mt;
     if (rc) db.kvSet('racao14', rc).catch(() => {}); // sem sinal, "ração dada hoje" continua com o que já foi enviado
@@ -197,11 +199,17 @@ export async function renderHome(ctx, el) {
       const kg = (porTanque[t.id] || {}).hojeKg; if (kg) racaoHoje[t.id] = kg;
       const m = mediaKg(t.id); if (m) mediaSemana[t.id] = m;
     }
-    const als = alertasManejo({ lotes, resumo, racaoHoje, mediaSemana, mortes: mortes || [], hoje, cfg: ALERTAS });
+    const als = alertasManejo({ lotes, resumo, racaoHoje, mediaSemana, mortes: mortes || [], hoje, cfg: ALERTAS, agua });
     if (!als.length) return '';
     const nomeT = (id) => (tanques.find((t) => t.id === id) || {}).nome || 'Tanque';
     const lista = (itens, f) => { const n = itens.slice(0, 3).map(f).join(', '); return itens.length > 3 ? `${n} e mais ${itens.length - 3}` : n; };
     const linhas = als.map((a) => {
+      if (a.tipo === 'agua') {
+        const p = a.itens[0];
+        return `<li class="al-morte"><div><b>Água fora da faixa ${a.itens.length === 1 ? `no ${esc(nomeT(p.tanque))}` : `em ${fmtInt(a.itens.length)} tanques`}</b>
+          <span>${esc(lista(a.itens, (x) => `${nomeT(x.tanque)}: ${x.problemas.join(', ')}`))}. Confira a medição e os aeradores.</span></div>
+          <a class="btn mini" href="#/lancar?tipo=agua&tanque=${esc(p.tanque)}">Medir de novo</a></li>`;
+      }
       if (a.tipo === 'biometria') {
         const p = a.itens[0];
         return `<li class="al-bio"><div><b>${a.itens.length === 1 ? 'Biometria atrasada' : `${fmtInt(a.itens.length)} tanques sem biometria recente`}</b>

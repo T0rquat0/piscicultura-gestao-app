@@ -9,11 +9,11 @@ import { confirmar, formulario } from '../dialogo.js';
 import { icone } from '../icons.js';
 import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num, ROTULO_TIPO, faseCss, nomeArquivo, dataArquivo, progresso, fmtPct, numDecimal, pesoMedioTxt } from '../util.js';
 import { pizza, COR_FASE, ORDEM_FASE } from '../graficos.js';
-import { calcularNaIdade, fimDoLote, mediaDe, vivosDoLote, indicadoresDespesca, avisoPesoMedio } from '../calc.js';
+import { calcularNaIdade, fimDoLote, mediaDe, vivosDoLote, indicadoresDespesca, avisoPesoMedio, avaliarAgua, ehTambaqui } from '../calc.js';
 import { calcularLote, precoMedioKg, pontosPeso, pesoMedioKg, evolucaoPeso, racaoPorSemana, matrizRacao, situacaoEstoque } from '../calc.js';
 
-export function svgPeso(pts) {
-  if (pts.length < 2) return '<p class="mudo">O gráfico aparece a partir da primeira biometria.</p>';
+export function svgPeso(pts, { un = 'g', dec = 0, vazio = 'O gráfico aparece a partir da primeira biometria.', rotulo = 'Evolução do peso médio' } = {}) {
+  if (pts.length < 2) return `<p class="mudo">${vazio}</p>`;
   const W = 320, H = 150, pl = 36, pr = 10, pt = 10, pb = 22;
   const t = (d) => Date.parse(`${d}T00:00:00Z`);
   const t0 = t(pts[0].data), t1 = t(pts[pts.length - 1].data);
@@ -24,10 +24,10 @@ export function svgPeso(pts) {
   const X = (d) => pl + ((t(d) - t0) / span) * (W - pl - pr);
   const Y = (g) => pt + (1 - (g - ymin) / (ymax - ymin)) * (H - pt - pb);
   const linha = pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.data).toFixed(1)},${Y(p.g).toFixed(1)}`).join(' ');
-  return `<svg class="grafico" viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolução do peso médio">
+  return `<svg class="grafico" viewBox="0 0 ${W} ${H}" role="img" aria-label="${rotulo}">
     <line class="eixo" x1="${pl}" y1="${pt}" x2="${pl}" y2="${H - pb}"/><line class="eixo" x1="${pl}" y1="${H - pb}" x2="${W - pr}" y2="${H - pb}"/>
-    <text x="${pl - 4}" y="${pt + 8}" text-anchor="end">${fmtNum(ymax, 0)} g</text>
-    <text x="${pl - 4}" y="${H - pb}" text-anchor="end">${fmtNum(ymin, 0)} g</text>
+    <text x="${pl - 4}" y="${pt + 8}" text-anchor="end">${fmtNum(ymax, dec)} ${un}</text>
+    <text x="${pl - 4}" y="${H - pb}" text-anchor="end">${fmtNum(ymin, dec)} ${un}</text>
     <text x="${pl}" y="${H - 6}">${fmtData(pts[0].data)}</text>
     <text x="${W - pr}" y="${H - 6}" text-anchor="end">${fmtData(pts[pts.length - 1].data)}</text>
     <path class="linha" d="${linha}"/>
@@ -36,7 +36,7 @@ export function svgPeso(pts) {
 }
 
 const csvNum = (n, d = 2) => (n == null ? '' : Number(n).toFixed(d).replace('.', ','));
-export function montarCsv(lote, nomeTanque, calc, bios, mort, rac, quem, desp = [], man = []) {
+export function montarCsv(lote, nomeTanque, calc, bios, mort, rac, quem, desp = [], man = [], agua = []) {
   const L = [];
   L.push(['Relatório do lote'], ['Tanque', nomeTanque], ['Fase', ROTULO_TIPO[lote.tipo] || lote.tipo], ['Espécie', lote.especie],
     ['Entrada', fmtData(lote.data_entrada)], ['Peixes iniciais', lote.quantidade_inicial], ['Peso total inicial (kg)', csvNum(lote.peso_inicial_kg)],
@@ -52,6 +52,10 @@ export function montarCsv(lote, nomeTanque, calc, bios, mort, rac, quem, desp = 
   if (desp.length) {
     L.push([], ['DESPESCAS'], ['Data', 'Tipo', 'Peixes', 'Peso bruto (kg)', 'Peso líquido (kg)', 'Registrado por']);
     desp.forEach((d) => L.push([fmtData(d.data), d.tipo === 'total' ? 'Total' : 'Parcial', d.quantidade, csvNum(d.peso_bruto_kg, 3), csvNum(d.peso_liquido_kg, 3), quem(d.registrado_por)]));
+  }
+  if (agua.length) {
+    L.push([], ['QUALIDADE DA ÁGUA'], ['Data', 'Hora', 'Oxigênio (mg/L)', 'Temperatura (°C)', 'pH', 'Amônia tóxica (mg/L)', 'Observação', 'Registrado por']);
+    agua.forEach((a) => L.push([fmtData(a.data), a.hora || '', csvNum(a.oxigenio_mgl, 2), csvNum(a.temperatura_c, 1), csvNum(a.ph, 2), csvNum(a.amonia_mgl, 3), a.obs || '', quem(a.registrado_por)]));
   }
   if (man.length) {
     L.push([], ['PROBIÓTICO'], ['Data', 'Produto', 'Dose', 'Unidade', 'Aplicação', 'Observação', 'Registrado por']);
@@ -143,10 +147,11 @@ export async function renderRelatorioLote(ctx, el, id) {
   const gerir = ctx.podeGerir();
   const lote = await ctx.api.lote(id);
   if (!lote) { el.innerHTML = '<div class="card vazio">Lote não encontrado.<br><a class="btn" href="#/relatorio">Voltar</a></div>'; return; }
-  const [{ bios, mort, rac, desp, man }, nomes, compras] = await Promise.all([
+  const [{ bios, mort, rac, desp, man }, nomes, compras, agua] = await Promise.all([
     ctx.api.dadosLote(id),
     ctx.api.nomesUsuarios().catch(() => ({})),
     gerir ? ctx.api.compras(true).catch(() => []) : Promise.resolve([]),
+    ctx.api.aguaTanque(lote.tanque_id, lote.data_entrada),
   ]);
   const kgS = ctx.state.ref.kgSaco || PESO_SACO_PADRAO_KG;
   const quem = (uid) => nomes[uid] || (uid === ctx.state.perfil.id ? 'Você' : 'Colega');
@@ -231,7 +236,7 @@ export async function renderRelatorioLote(ctx, el, id) {
   const pintarCmp = (h) => { cmpHtml = h; const box = el.querySelector('#cmp-ciclos'); if (box) box.innerHTML = `<h2>Comparação com ciclos anteriores</h2>${h}`; };
   compararCiclos().then(pintarCmp).catch(() => pintarCmp('<div class="card"><p class="mudo" style="margin:0">Não foi possível buscar os ciclos anteriores agora.</p></div>'));
 
-  const abas = [['resumo', 'Resumo'], ['peso', 'Peso'], ['racao', 'Ração'], ...(gerir && desp.length ? [['despesca', 'Despesca']] : []), ...(gerir ? [['registros', 'Registros']] : [])];
+  const abas = [['resumo', 'Resumo'], ['peso', 'Peso'], ['racao', 'Ração'], ['agua', 'Água'], ...(gerir && desp.length ? [['despesca', 'Despesca']] : []), ...(gerir ? [['registros', 'Registros']] : [])];
   let aba = 'resumo';
 
   const painelResumo = () => `
@@ -305,14 +310,36 @@ export async function renderRelatorioLote(ctx, el, id) {
     return `${desp.length > 1 ? `<div class="card destaques3">${destaque('Peixes retirados', fmtInt(c.despescados), `em ${fmtInt(desp.length)} despescas`)}${destaque('Peso bruto retirado', unid(fmtNum(c.pesoDespescado, 0), 'kg'), '')}</div>` : ''}${[...desp].reverse().map(cartao).join('')}`;
   };
 
+  const painelAgua = () => {
+    if (!agua.length) return '<div class="card vazio"><p>Nenhuma medição da água neste tanque desde a entrada do lote.</p><a class="btn primario" href="#/lancar?tipo=agua&tanque=' + esc(lote.tanque_id) + '">Medir agora</a></div>';
+    const n = (v, d) => (v == null ? '—' : fmtNum(Number(v), d));
+    const tam = ehTambaqui(lote.especie), u = agua[agua.length - 1];
+    const mortesDia = {}; mort.forEach((m) => { mortesDia[m.data] = (mortesDia[m.data] || 0) + Number(m.quantidade); });
+    const od = agua.filter((a) => a.oxigenio_mgl != null).map((a) => ({ data: a.data, g: Number(a.oxigenio_mgl) }));
+    const foraU = tam ? avaliarAgua(u) : [];
+    return `<div class="card destaques3">
+      ${destaque('Oxigênio', u.oxigenio_mgl != null ? unid(n(u.oxigenio_mgl, 1), 'mg/L') : '—', `em ${fmtData(u.data)}${u.hora ? ` às ${esc(u.hora)}` : ''}`)}
+      ${destaque('Temperatura', u.temperatura_c != null ? unid(n(u.temperatura_c, 1), '°C') : '—', '')}
+      ${destaque('pH', n(u.ph, 1), '')}
+      ${destaque('Amônia tóxica', u.amonia_mgl != null ? unid(n(u.amonia_mgl, 2), 'mg/L') : '—', '')}
+    </div>
+    ${foraU.length ? `<p class="aviso">${foraU.map((x) => esc(x.texto[0].toUpperCase() + x.texto.slice(1))).join('<br>')}</p>` : ''}
+    <section class="bloco"><h2>Oxigênio ao longo do tempo (mg/L)</h2><div class="card">${svgPeso(od, { un: '', dec: 1, vazio: 'O gráfico aparece a partir da segunda medição de oxigênio.', rotulo: 'Evolução do oxigênio' })}</div></section>
+    <section class="bloco"><h2>Medições e mortes do dia</h2><div class="card tabela"><table><thead><tr><th>Data</th><th class="n">O₂</th><th class="n">°C</th><th class="n">pH</th><th class="n">NH₃</th><th class="n">Mortes</th></tr></thead><tbody>
+      ${[...agua].reverse().slice(0, 30).map((a) => `<tr><td>${fmtData(a.data).slice(0, 5)}${a.hora ? ` <small>${esc(a.hora)}</small>` : ''}</td><td class="n">${n(a.oxigenio_mgl, 1)}</td><td class="n">${n(a.temperatura_c, 1)}</td><td class="n">${n(a.ph, 1)}</td><td class="n">${n(a.amonia_mgl, 2)}</td><td class="n">${mortesDia[a.data] ? fmtInt(mortesDia[a.data]) : '—'}</td></tr>`).join('')}
+    </tbody></table></div>
+    <p class="mudo nota">${tam ? 'Faixas do tambaqui: oxigênio de 4 a 8 mg/L, temperatura de 28 a 30 °C, pH de 5 a 7 e amônia tóxica abaixo de 0,46 mg/L (Embrapa, 2018). Confirme com o técnico da fazenda.' : `Ainda não há faixa de referência no app para ${esc(lote.especie)}. As medições aparecem sem alerta.`}</p></section>`;
+  };
+
   const painelRegistros = () => `
     ${secao('Ração lançada', [...rac].reverse().map((r) => registro(r.data, r.registrado_por, `${fmtNum(r.quantidade_kg, 1)} kg (≈ ${fmtNum(r.quantidade_kg / kgS, 1)} sacos)`, 'racao_consumo', r.id)), 'Nenhuma ração lançada.')}
     ${secao('Biometrias', [...bios].reverse().map((b) => registro(b.data, b.registrado_por, `${fmtNum(pesoMedioKg(b) * 1000, 0)} g<small>${fmtInt(b.quantidade_amostrada)} peixes · ${fmtNum(b.peso_amostra_kg, 3)} kg</small>`, 'biometrias', b.id)), 'Nenhuma biometria registrada.')}
     ${secao('Mortalidade', [...mort].reverse().map((m) => registro(m.data, m.registrado_por, `${fmtInt(m.quantidade)} peixes${m.causa ? `<small class="causa">${esc(m.causa)}</small>` : ''}`, 'mortalidade', m.id)), 'Nenhuma mortalidade registrada.')}
     ${desp.length ? secao('Despescas', [...desp].reverse().map((d) => registro(d.data, d.registrado_por, `${fmtNum(d.peso_bruto_kg, 0)} kg bruto<small>${d.tipo === 'total' ? 'Total' : 'Parcial'} · ${fmtInt(d.quantidade)} peixes</small>`, 'despescas', d.id)), '') : ''}
+    ${agua.length ? secao('Água', [...agua].reverse().map((a) => registro(a.data, a.registrado_por, `${[a.oxigenio_mgl != null && `O₂ ${fmtNum(Number(a.oxigenio_mgl), 1)}`, a.temperatura_c != null && `${fmtNum(Number(a.temperatura_c), 1)} °C`, a.ph != null && `pH ${fmtNum(Number(a.ph), 1)}`, a.amonia_mgl != null && `NH₃ ${fmtNum(Number(a.amonia_mgl), 2)}`].filter(Boolean).join(' · ')}${a.obs ? `<small>${esc(a.obs)}</small>` : ''}`, 'qualidade_agua', a.id)), '') : ''}
     ${man.length ? secao('Probiótico', [...man].reverse().map((m) => registro(m.data, m.registrado_por, `${String(Number(m.dose)).replace('.', ',')} ${esc(m.unidade)}<small>${esc(m.produto)} · ${m.via === 'agua' ? 'na água' : 'na ração'}${m.obs ? ` · ${esc(m.obs)}` : ''}</small>`, 'manejos', m.id)), '') : ''}`;
 
-  const paineis = { resumo: painelResumo, peso: painelPeso, racao: painelRacao, despesca: painelDespesca, registros: painelRegistros };
+  const paineis = { resumo: painelResumo, peso: painelPeso, racao: painelRacao, agua: painelAgua, despesca: painelDespesca, registros: painelRegistros };
 
   el.innerHTML = `
     <h1>${esc(nomeTanque)} · ${esc(lote.especie)}</h1>
@@ -393,6 +420,18 @@ export async function renderRelatorioLote(ctx, el, id) {
         montar: (v) => ({ data: v.data, quantidade_amostrada: num(v.qtd), peso_amostra_kg: numDecimal(v.peso) }),
       };
     }
+    if (tab === 'qualidade_agua') {
+      const a = agua.find((x) => x.id === rid); if (!a) return null;
+      const LIM = { od: [0, 25], temp: [0, 50], ph: [0, 14], am: [0, 50] };
+      const txt = (v) => (v == null ? '' : String(Number(v)).replace('.', ','));
+      const lista = [['od', 'Oxigênio (mg/L)', a.oxigenio_mgl], ['temp', 'Temperatura (°C)', a.temperatura_c], ['ph', 'pH', a.ph], ['am', 'Amônia tóxica (mg/L)', a.amonia_mgl]];
+      const val = (v, k) => (String(v[k] ?? '').trim() === '' ? null : numDecimal(v[k]));
+      return {
+        lista: [dataCampo(a.data), ...lista.map(([nome, rotulo, valor]) => ({ nome, rotulo, tipo: 'text', valor: txt(valor), inputmode: 'decimal' })), { nome: 'obs', rotulo: 'Observação (opcional)', tipo: 'text', valor: a.obs || '', maxlength: 200 }],
+        validar: (v) => dataOk(v.data) || (lista.every(([k]) => val(v, k) == null) ? 'Preencha pelo menos uma medição.' : null) || (lista.map(([k, r]) => { const x = val(v, k); return x != null && !(Number.isFinite(x) && x >= LIM[k][0] && x <= LIM[k][1]) ? `${r}: confira o valor.` : null; }).find(Boolean) || null),
+        montar: (v) => ({ data: v.data, oxigenio_mgl: val(v, 'od'), temperatura_c: val(v, 'temp'), ph: val(v, 'ph'), amonia_mgl: val(v, 'am'), obs: String(v.obs || '').trim() || null }),
+      };
+    }
     if (tab === 'manejos') {
       const m = man.find((x) => x.id === rid); if (!m) return null;
       return {
@@ -452,7 +491,7 @@ export async function renderRelatorioLote(ctx, el, id) {
       await abrirVisualizador({ blob, nome, titulo: `${nomeTanque} · ${lote.especie}`, toast: ctx.toast });
     } catch (e) { ctx.toast(e.message || 'Não foi possível gerar o PDF', 'erro'); bpdf.disabled = false; bpdf.textContent = texto; }
   });
-  el.querySelector('#b-csv').addEventListener('click', () => baixarCsv(nomeArquivo(['Relatório do lote', nomeTanque || 'Tanque', lote.especie, `lote de ${dataArquivo(lote.data_entrada)}`, dataArquivo(hojeISO())], 'csv'), montarCsv(lote, nomeTanque, c, bios, mort, rac, quem, desp, man)));
+  el.querySelector('#b-csv').addEventListener('click', () => baixarCsv(nomeArquivo(['Relatório do lote', nomeTanque || 'Tanque', lote.especie, `lote de ${dataArquivo(lote.data_entrada)}`, dataArquivo(hojeISO())], 'csv'), montarCsv(lote, nomeTanque, c, bios, mort, rac, quem, desp, man, agua)));
 }
 
 function baixarCsv(nome, texto) {

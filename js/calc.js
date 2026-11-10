@@ -1,5 +1,6 @@
 // Cálculos do relatório de um lote (puros, testáveis em Node)
 import { diasEntre, fmtInt, fmtNum, pesoMedioTxt } from './util.js';
+import { AGUA_TAMBAQUI as AG } from './config.js';
 
 const soma = (arr, k) => arr.reduce((s, x) => s + Number(x[k] || 0), 0);
 
@@ -230,14 +231,38 @@ export function previsaoDespesca(lote, r, alvoKg, hoje) {
   return { ...base, estado: 'previsto', gpdG: gpd * 1000, data, dias: Math.max(0, diasEntre(hoje, data)) };
 }
 
+// Confere uma medição da água com a faixa do tambaqui. critico = pede ação; atencao = fora do ideal.
+export const ehTambaqui = (especie) => /tambaqui/i.test(String(especie || ''));
+export function avaliarAgua(m) {
+  const v = (k) => (m[k] == null || m[k] === '' ? null : Number(m[k]));
+  const fora = [], od = v('oxigenio_mgl'), t = v('temperatura_c'), ph = v('ph'), am = v('amonia_mgl');
+  if (od != null && od < AG.oxigenio.min) fora.push({ nivel: 'critico', texto: `oxigênio baixo (${fmtNum(od, 1)} mg/L, mínimo ${AG.oxigenio.min})` });
+  if (t != null && t < AG.temperatura.letal) fora.push({ nivel: 'critico', texto: `temperatura perigosa (${fmtNum(t, 1)} °C, abaixo de ${AG.temperatura.letal} causa mortalidade)` });
+  else if (t != null && (t < AG.temperatura.min || t > AG.temperatura.max)) fora.push({ nivel: 'atencao', texto: `temperatura fora do ideal (${fmtNum(t, 1)} °C, ideal ${AG.temperatura.min} a ${AG.temperatura.max})` });
+  if (ph != null && (ph < AG.ph.min || ph > AG.ph.max)) fora.push({ nivel: 'critico', texto: `pH fora da faixa (${fmtNum(ph, 1)}, faixa ${AG.ph.min} a ${AG.ph.max})` });
+  if (am != null && am >= AG.amonia.max) fora.push({ nivel: 'critico', texto: `amônia tóxica alta (${fmtNum(am, 2)} mg/L, limite ${fmtNum(AG.amonia.max, 2)})` });
+  return fora;
+}
+
 /**
  * Alertas de manejo (funções puras, testáveis em Node).
  * lotes: ativos; resumo: {lote_id: linha do resumo_lotes}; racaoHoje/mediaSemana: {tanque_id: kg};
  * mortes: [{data, lote_id, quantidade}] dos últimos dias; cfg: { biometriaDias, racaoDesvio, morteDiasSeguidos }.
  * Retorna [{ tipo: 'biometria' | 'racao' | 'morte', tanques: [tanque_id], ...detalhes }]
  */
-export function alertasManejo({ lotes, resumo, racaoHoje, mediaSemana, mortes, hoje, cfg }) {
+export function alertasManejo({ lotes, resumo, racaoHoje, mediaSemana, mortes, hoje, cfg, agua = [] }) {
   const out = [];
+  // 0) água: a medição mais recente de cada tanque com tambaqui, se for de hoje ou de ontem
+  const comTambaqui = new Set(lotes.filter((l) => ehTambaqui(l.especie)).map((l) => l.tanque_id));
+  const ultima = {};
+  for (const m of agua) { const u = ultima[m.tanque_id]; if (!u || `${m.data} ${m.hora || ''}` >= `${u.data} ${u.hora || ''}`) ultima[m.tanque_id] = m; }
+  const ruins = [];
+  for (const [t, m] of Object.entries(ultima)) {
+    if (!comTambaqui.has(t) || diasEntre(m.data, hoje) > 1) continue;
+    const crit = avaliarAgua(m).filter((x) => x.nivel === 'critico');
+    if (crit.length) ruins.push({ tanque: t, data: m.data, problemas: crit.map((x) => x.texto) });
+  }
+  if (ruins.length) out.push({ tipo: 'agua', itens: ruins });
   // 1) biometria vencida: última pesagem (ou a entrada, se nunca pesou) há mais de N dias
   const vencidos = [];
   for (const l of lotes) {
