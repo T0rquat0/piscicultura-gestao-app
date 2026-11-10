@@ -2,6 +2,7 @@
 import { esc, fmtData, ROTULO_PAPEL } from '../util.js';
 import { icone } from '../icons.js';
 import { TESTE_DIAS, TERMOS_VERSAO } from '../config.js';
+import { documentoValido } from '../financeiro.js';
 
 const LINKS_TERMOS = 'os <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> e a <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a>';
 
@@ -52,6 +53,8 @@ export function renderCriarFazenda(ctx, root, user) {
     <form id="f-faz" class="form" novalidate>
       <label>Nome da fazenda <input id="fazenda" type="text" maxlength="80" autocomplete="organization" required></label>
       <label>Seu nome <input id="nome" type="text" maxlength="80" autocomplete="name" required></label>
+      <label>CPF ou CNPJ <input id="documento" type="text" inputmode="numeric" maxlength="18" autocomplete="off" required>
+        <small class="mudo">O teste grátis vale uma vez por CPF ou CNPJ. Só o dono da fazenda vê este número.</small></label>
       <p id="erro" class="erro" hidden></p>
       <button class="btn primario grande" type="submit">Criar minha fazenda</button>
     </form>
@@ -65,12 +68,15 @@ export function renderCriarFazenda(ctx, root, user) {
   f.addEventListener('submit', async (ev) => {
     ev.preventDefault(); erro.hidden = true;
     const fazenda = f.querySelector('#fazenda').value.trim(), nome = f.querySelector('#nome').value.trim();
+    const documento = f.querySelector('#documento').value.replace(/\D/g, '');
     const falha = (m) => { erro.textContent = m; erro.hidden = false; };
     if (fazenda.length < 2) return falha('Informe o nome da fazenda.');
     if (nome.length < 2) return falha('Informe o seu nome.');
+    if (!documento) return falha('Informe o seu CPF ou o CNPJ da fazenda.');
+    if (!documentoValido(documento)) return falha('CPF ou CNPJ inválido. Confira os números.');
     if (!navigator.onLine) return falha('Sem internet. Conecte-se para continuar.');
     const btn = f.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'Criando…';
-    try { await ctx.criarFazenda(fazenda, nome, user); }
+    try { await ctx.criarFazenda(fazenda, nome, user, documento); }
     catch (e) { falha(e.message || 'Não foi possível criar a fazenda.'); btn.disabled = false; btn.textContent = 'Criar minha fazenda'; }
   });
 }

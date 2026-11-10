@@ -31,7 +31,7 @@ checa((await db.query(`select count(*)::int c from pacotes`)).rows[0].c === 6, '
 const U = '00000000-0000-4000-8000-0000000000a1';
 await db.exec(`insert into auth.users values ('${U}', 'cliente@novo')`);
 async function como(uid, q) { await db.exec(`set role authenticated; set teste.uid = '${uid}';`); try { return { rows: (await db.query(q)).rows }; } catch (e) { return { erro: e.message }; } finally { await db.exec(`reset role; set teste.uid = '';`); } }
-const F = (await como(U, `select criar_fazenda('Fazenda Nova', 'Cliente') f`)).rows[0].f;
+const F = (await como(U, `select criar_fazenda('Fazenda Nova', 'Cliente', '529.982.247-25') f`)).rows[0].f;
 const T = '00000000-0000-4000-8000-0000000000c1', L = '00000000-0000-4000-8000-0000000000d1';
 let r = await como(U, `insert into tanques (id, fazenda_id, nome) values ('${T}', '${F}', 'T1')`);
 r = r.erro ? r : await como(U, `insert into lotes (id, tanque_id, tipo, especie, data_entrada, quantidade_inicial, peso_inicial_kg) values ('${L}', '${T}', 'engorda', 'Tambaqui', current_date, 100, 10)`);

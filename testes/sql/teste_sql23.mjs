@@ -8,6 +8,7 @@ const db = new PGlite();
 await db.exec(`create role anon; create role authenticated; create schema auth; create table auth.users (id uuid primary key, email text);
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('teste.uid', true), '')::uuid $$; grant usage on schema auth to anon, authenticated;`);
 for (const f of readdirSync(DIR).filter((f) => /^\d\d_.*\.sql$/.test(f) && !f.startsWith('05_')).sort()) await db.exec(readFileSync(DIR + f, 'utf8'));
+await db.exec(readFileSync(new URL('./compat_cadastro.sql', import.meta.url), 'utf8')); // sql/26: cadastro com CPF (atalho só de teste)
 await db.exec(readFileSync(DIR + '23_venda_na_despesca.sql', 'utf8')); // de novo: pode repetir
 const D = '00000000-0000-4000-8000-0000000000a1', T = '00000000-0000-4000-8000-0000000000b1', L = '00000000-0000-4000-8000-0000000000c1';
 await db.exec(`grant usage on schema public to anon, authenticated; grant select, insert, update, delete on all tables in schema public to anon, authenticated; insert into auth.users values ('${D}','d@x');`);

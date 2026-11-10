@@ -48,8 +48,8 @@ export function criarApi(client) {
     async contratarPacote(n) {
       return ok(await client.rpc('contratar_pacote', { p_tanques_max: n }));
     },
-    async criarFazenda(fazenda, nome) {
-      return ok(await client.rpc('criar_fazenda', { p_fazenda: fazenda, p_nome: nome }));
+    async criarFazenda(fazenda, nome, documento) {
+      return ok(await client.rpc('criar_fazenda', { p_fazenda: fazenda, p_nome: nome, p_documento: documento }));
     },
     // fim do teste grátis; null se não houver (fazenda antiga) ou se o sql/06 não foi rodado
     async testeAte() {
@@ -350,6 +350,16 @@ export function criarApi(client) {
     async adminBloquear(fazenda, bloquear) { ok(await client.rpc('admin_bloquear', { p_fazenda: fazenda, p_bloquear: bloquear })); },
     async adminSalvarPacote(p) { ok(await client.rpc('admin_salvar_pacote', { p_tanques_max: p.tanques_max, p_nome: p.nome, p_preco: p.preco, p_ativo: p.ativo })); },
     async adminDefinirPiloto(ligado) { ok(await client.rpc('admin_definir_piloto', { p_ligado: ligado })); },
+    async adminDefinirDocumento(fazenda, documento) { ok(await client.rpc('admin_definir_documento', { p_fazenda: fazenda, p_documento: documento })); },
+    // financeiro do sistema (sql/27); null = SQL ainda não rodado
+    async adminFinanceiro() {
+      const r = await client.rpc('admin_financeiro');
+      if (r.error && (r.error.code === 'PGRST202' || r.error.code === '42883')) return null;
+      return ok(r) || null;
+    },
+    async adminSalvarLancamento(l) { return ok(await client.rpc('admin_salvar_lancamento', { p: l })); },
+    async adminExcluirLancamento(id) { ok(await client.rpc('admin_excluir_lancamento', { p_id: id })); },
+    async adminSalvarSocios(lista) { ok(await client.rpc('admin_salvar_socios', { p: lista })); },
 
     // ----- cópia de segurança (dono): tudo o que a fazenda tem, tabela por tabela -----
     async exportarTudo() {
