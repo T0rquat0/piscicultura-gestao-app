@@ -1121,3 +1121,7 @@ table.cmp td b { font-weight: 600; }
 .valor-lucro small { display: block; font-family: Inter, sans-serif; font-weight: 400; font-size: .78rem; }
 .valor-lucro.neg, .destaque b.neg { color: var(--erro, #b3261e); }
 .acoes-lucro { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .6rem; }
+
+/* rascunho do Lançar */
+.rascunho-aviso { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .3rem .8rem; margin: 0 0 1rem; }
+

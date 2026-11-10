@@ -3,6 +3,7 @@
 import { icone } from '../icons.js';
 import { esc, hojeISO, fmtData, fmtNum, fmtInt, num, uuid, ROTULO_TIPO, progresso, fmtPct, plural, numDecimal, pesoMedioTxt, fmtBRL } from '../util.js';
 import * as db from '../db.js';
+import * as rascunho from '../rascunho.js';
 import { confirmar } from '../dialogo.js';
 import { ordemNatural } from './home.js';
 import { AGUA_LIMITES, PESO_SACO_PADRAO_KG, CAUSAS_MORTE, TAXA_RACAO } from '../config.js';
@@ -176,6 +177,7 @@ export async function renderLancar(ctx, el, params = {}) {
     b.addEventListener('click', () => renderLancar(ctx, el, { tipo: b.dataset.tipo, tanque: el.querySelector('#tanque').value, de: tiposVisiveis.findIndex(([k]) => k === tipo) })));
 
   const f = el.querySelector('#f');
+  let rascunhoSalvo = false, timerRascunho = null;
   const selTanque = f.querySelector('#tanque');
   f.querySelectorAll('#tiles .tile').forEach((b) => b.addEventListener('click', () => {
     selTanque.value = b.dataset.tanque;
@@ -666,6 +668,7 @@ export async function renderLancar(ctx, el, params = {}) {
     if (tipo === 'racao') {
       try { const m = (await db.kvGet('ultimaRacao')) || {}; m[selTanque.value] = payload.quantidade_kg; await db.kvSet('ultimaRacao', m); } catch { /* opcional */ }
     }
+    rascunhoSalvo = true; clearTimeout(timerRascunho); await rascunho.apagar(state.perfil.id, tipo);
     await ctx.atualizarPendentes();
     ctx.sincronizarAgora(); // em segundo plano; não trava a tela
     const nomeTanque = (tanques.find((t) => t.id === selTanque.value) || {}).nome || '';
@@ -701,6 +704,31 @@ export async function renderLancar(ctx, el, params = {}) {
     const bp = el.querySelector('#b-proximo');
     if (bp) bp.addEventListener('click', () => renderLancar(ctx, el, { tipo, tanque: proximo.id }));
   };
+  // ---- rascunho: o que foi digitado fica no aparelho até salvar (sair da tela não perde) ----
+  const guardarRascunho = () => { if (!rascunhoSalvo && f.isConnected) rascunho.guardar(state.perfil.id, tipo, rascunho.capturar(f)); };
+  const agendarRascunho = () => { clearTimeout(timerRascunho); timerRascunho = setTimeout(guardarRascunho, 300); };
+  f.addEventListener('input', agendarRascunho);
+  f.addEventListener('change', agendarRascunho);
+  f.addEventListener('click', (ev) => { if (ev.target.closest('#man-via, #desp-tipo, #causas')) agendarRascunho(); });
+  // celular apagando a tela ou trocando de app: guarda na hora
+  const aoEsconder = () => { if (!f.isConnected) { document.removeEventListener('visibilitychange', aoEsconder); return; } if (document.visibilityState === 'hidden') { clearTimeout(timerRascunho); guardarRascunho(); } };
+  document.addEventListener('visibilitychange', aoEsconder);
+  const salvoAntes = await rascunho.ler(state.perfil.id, tipo);
+  if (salvoAntes && (!params.tanque || params.tanque === salvoAntes.tanque) && f.isConnected) {
+    if (salvoAntes.tanque !== selTanque.value && tanques.some((t) => t.id === salvoAntes.tanque)) {
+      const tile = f.querySelector(`#tiles .tile[data-tanque="${CSS.escape(salvoAntes.tanque)}"]`);
+      if (tile) tile.click();
+    }
+    rascunho.aplicarCampos(f, salvoAntes);
+    const quando = rascunho.diaDe(salvoAntes.em) === rascunho.diaDe(Date.now()) ? `das ${rascunho.horaDe(salvoAntes.em)}` : `de ${rascunho.diaDe(salvoAntes.em)} às ${rascunho.horaDe(salvoAntes.em)}`;
+    f.insertAdjacentHTML('afterbegin', `<div class="aviso rascunho-aviso" id="rascunho-aviso" role="status"><span>Rascunho ${quando} recuperado. Confira antes de salvar.</span> <button type="button" class="link" id="b-limpar-rascunho">Limpar</button></div>`);
+    f.querySelector('#b-limpar-rascunho').addEventListener('click', async () => {
+      rascunhoSalvo = true; clearTimeout(timerRascunho);
+      await rascunho.apagar(state.perfil.id, tipo);
+      renderLancar(ctx, el, { tipo, tanque: selTanque.value });
+    });
+  }
+
   // toque duplo: enquanto um salvamento está em andamento, o segundo é ignorado
   let salvando = false;
   f.addEventListener('submit', async (ev) => {

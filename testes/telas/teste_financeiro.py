@@ -55,7 +55,8 @@ with sync_playwright() as pw:
     k = pg.inner_text('.adm-kpis')
     for x in ['900,00', '100,00', '800,00', '450,00']: checa(x in k, f'resumo do mês mostra {x}')
     # acerto: 400 cada; Hugo pagou 100 → 500 a receber; Guilherme retirou 300 → 100 a receber; caixa 900 - 300 = 600
-    checa('Tem a receber: R$ 500,00' in t.replace('\xa0', ' ') and 'Tem a receber: R$ 100,00' in t.replace('\xa0', ' ') and 'Caixa: R$ 600,00' in t.replace('\xa0', ' '), 'acerto entre sócios conferido à mão')
+    u = ' '.join(t.replace('\xa0', ' ').split())  # o valor fica em negrito na linha de baixo
+    checa('Tem a receber: R$ 500,00' in u and 'Tem a receber: R$ 100,00' in u and 'Caixa: R$ 600,00' in u, 'acerto entre sócios conferido à mão')
     checa('11.222.333/0001-81' in t and 'Em dia' in t, 'clientes pagantes com CNPJ e situação')
     checa('Mensalidade · Piscicultura Lua' in t and X in t and pg.evaluate('!window.__xss'), 'movimento do mês; texto malicioso aparece só como texto')
     checa(pg.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'), '390 px: sem transbordar')
