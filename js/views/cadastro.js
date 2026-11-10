@@ -35,8 +35,10 @@ export function renderCadastro(ctx, root) {
     try {
       const r = await ctx.cadastrar(email, senha);
       if (r === 'confirmar') {
-        okp.textContent = 'Enviamos um e-mail para confirmar sua conta. Abra o e-mail, toque no link e depois volte aqui para entrar.';
-        okp.hidden = false; btn.textContent = 'Criar conta';
+        // sucesso não pode parecer erro: troca o formulário por um cartão claro, com o e-mail e o spam
+        f.innerHTML = `<div class="conta-criada"><p class="cc-tit">Conta criada ✓</p>
+          <p>Mandamos um link de confirmação para <b>${esc(email)}</b>.</p>
+          <p>Abra o e-mail, toque no link e depois volte aqui para entrar. Não chegou em 2 minutos? Olhe a pasta de spam ou lixo eletrônico.</p></div>`;
       }
     } catch (e) { falha(e.message || 'Não foi possível criar a conta.'); btn.disabled = false; btn.textContent = 'Criar conta'; }
   });

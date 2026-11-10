@@ -16,7 +16,7 @@ export function renderLogin(ctx, root, aviso) {
         <button class="btn primario grande" type="submit">Entrar</button>
       </form>
       <p style="margin-top:1rem;text-align:center"><button class="link" id="b-esqueci" type="button">Esqueci minha senha</button></p>
-      <p style="margin-top:1.2rem"><button class="btn" id="b-criar" type="button">Criar conta da minha fazenda</button></p>
+      <p style="margin-top:1.2rem"><button class="btn" id="b-criar" type="button">${ctx.state.convite ? 'Criar minha conta' : 'Criar conta da minha fazenda'}</button></p>
       ${pend ? `<p class="aviso">Há ${plural(pend, 'lançamento salvo', 'lançamentos salvos')} neste aparelho aguardando envio. Entre para enviar.</p>` : ''}
       ${navigator.onLine ? '' : '<p class="aviso">Sem internet. O primeiro acesso precisa de conexão.</p>'}
     </div>

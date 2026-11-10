@@ -5,3 +5,7 @@ banco_pendentes_parte2.sql
 demo_duas_contas.sql
 demo_hugo.sql
 demo_teste.sql
+testes/qa/.contas.json
+testes/qa/prints/
+testes/qa/.links.json
+__pycache__/

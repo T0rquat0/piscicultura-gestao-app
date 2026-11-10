@@ -1094,3 +1094,10 @@ table.cmp td b { font-weight: 600; }
 /* despesca: Parcial e Total lado a lado; botão do PDF afastado da lista */
 #desp-tipo { grid-template-columns: 1fr 1fr; }
 [data-pdf-desp] { margin-top: .75rem; }
+/* cadastro: conta criada (sucesso, não aviso) */
+.conta-criada { border: 1px solid var(--rio); background: color-mix(in srgb, var(--rio) 8%, var(--card)); border-radius: 12px; padding: 1rem 1.1rem; text-align: left; }
+.conta-criada p { margin: .35rem 0; }
+.conta-criada .cc-tit { font-weight: 600; font-size: 1.1rem; color: var(--rio); margin-top: 0; }
+/* Lançar: o tanque veio do último lançamento (evita lançar no tanque errado ao trocar de aba) */
+.tq-ultimo { display: block; margin-top: .2rem; font-size: .82rem; font-weight: 500; color: var(--alerta); }
+.tile .tile-fase { display: block; font-size: .75rem; font-weight: 400; color: var(--tinta-2); margin-top: .1rem; }

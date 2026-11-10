@@ -268,7 +268,7 @@ async function abrirApp(user) {
   let daRede = false;
   const guardado = await db.kvGet('perfil');
   const temGuardado = !!(guardado && guardado.id === user.id);
-  if (guardado && !temGuardado) await db.kvDel('resumo'); // outra conta neste aparelho
+  if (guardado && !temGuardado) { await db.kvDel('resumo'); await db.kvDel('racao14'); } // outra conta neste aparelho
   try {
     perfil = await (temGuardado ? comLimite(api.perfil(user.id), LIMITE_ABERTURA_MS) : api.perfil(user.id));
     daRede = true;
@@ -373,6 +373,7 @@ async function sair(forcar = false) {
   await db.kvDel('perfil');
   await db.kvDel('ref');
   await db.kvDel('resumo');
+  await db.kvDel('racao14');
   state.user = null; state.perfil = null; state.ref = { tanques: [], lotes: [] };
   saindo = false;
   mostrarLogin();
