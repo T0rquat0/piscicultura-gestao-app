@@ -1,0 +1,27 @@
+from base import *
+def L(t, n=200): return t[:n].replace('\n', ' | ')
+with sync_playwright() as pw:
+    s = Sessao(pw, 'p46'); entrar(s, 'dono'); s.pg.wait_for_timeout(2000)
+    s.ir('#/equipe', espera='details'); d = s.pg.locator('details', has_text='Gerente QA'); d.locator('summary').click(); s.pg.wait_for_timeout(300)
+    d.locator('select[name=papel]').select_option('gerente'); d.locator('[data-todos]').click(); d.locator('button[type=submit]').click(); s.pg.wait_for_timeout(2500)
+    print('EQUIPE:', L(s.texto('#view'), 120))
+    s.ir('#/'); s.pg.wait_for_timeout(2500); s.offline(True)
+    def tanque(nome):
+        s.pg.click('#b-trocar'); s.pg.wait_for_timeout(300); s.pg.locator('#tiles .tile', has_text=nome).first.click(); s.pg.wait_for_timeout(500)
+    # biometria offline (Tanque 5, engorda 1,2 kg → 30 peixes 39 kg = 1,3 kg)
+    s.pg.evaluate("location.hash='#/lancar?tipo=biometria'"); s.pg.wait_for_timeout(1200); tanque('Tanque 5')
+    s.pg.fill('#peso', '39'); s.pg.fill('#amostra', '30'); s.pg.get_by_text('Salvar biometria').click(); s.pg.wait_for_timeout(2000)
+    print('BIO offline:', L(s.texto('#view'), 150))
+    # despesca offline (Tanque 6, parcial 1.000 peixes 310 kg)
+    s.pg.evaluate("location.hash='#/lancar?tipo=despesca'"); s.pg.wait_for_timeout(1200); tanque('Tanque 6')
+    s.pg.locator('#desp-tipo .tile', has_text='Parcial').click(); s.pg.fill('#desp-qtd', '1000'); s.pg.fill('#desp-bruto', '310'); s.pg.get_by_text('Salvar despesca').click(); s.pg.wait_for_timeout(2500)
+    dl = s.pg.locator('.dialogo')
+    if dl.count() and dl.is_visible(): print('  pergunta:', L(dl.inner_text(), 160)); dl.locator('button').first.click(); s.pg.wait_for_timeout(2000)
+    print('DESP offline:', L(s.texto('#view'), 150))
+    # cadastro de tanque offline: deve avisar
+    s.pg.evaluate("location.hash='#/tanques'"); s.pg.wait_for_timeout(1500); print('TANQUES offline:', L(s.texto('#view'), 120))
+    s.pg.goto(BASE + '#/pendencias', wait_until='domcontentloaded'); s.pg.wait_for_selector('#view', timeout=30000); s.pg.wait_for_timeout(2500)
+    print('PENDENTES (reaberto offline):', L(s.texto('#view'), 300))
+    s.offline(False); s.pg.wait_for_timeout(9000); s.pg.evaluate("location.hash='#/pendencias'"); s.pg.wait_for_timeout(2000)
+    print('PENDENTES (com sinal):', L(s.texto('#view'), 120))
+    print('ERROS:', [e for e in s.erros if 'internal' not in e and 'network' not in e.lower() and 'Load failed' not in e]); s.fechar()
