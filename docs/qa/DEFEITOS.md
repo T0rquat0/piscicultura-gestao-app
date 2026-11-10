@@ -40,7 +40,7 @@ Níveis: 🔴 vergonha na frente do dono · 🟡 incomoda · ⚪ detalhe. Prazo:
 | 30 | 🔴 | Mortalidade · número absurdo | Aceita 999.999 mortos num tanque de 20.000, sem aviso. A Início passa a mostrar "1.000.154 peixes mortos · 94% do plantel" e sobrevivência de 75,6% | Barrar mais mortos do que peixes vivos e pedir confirmação acima de ~5% do tanque num dia | **corrigido** |
 | 31 | ⚪ | Tanques · nome | Nome com mais de 60 letras é cortado sem avisar | Contador ou aviso | mantido (60 letras bastam) |
 | 32 | 🟡 | Sobrevivência (Início, tela do tanque, painel do Lançar) | Peixe despescado contava como perda: depois de despescar 500, a sobrevivência caiu de 99,8% para 99,2% | (entrada − mortos) ÷ entrada, como no relatório do lote | **corrigido** |
-| 33 | ⚪ | PDF geral · estoque | Soma o −1 saco do alevino (77 em vez de 78) e não usa o ritmo de hoje numa fazenda nova | Igual à Início | anotado |
+| 33 | ⚪ | PDF geral · estoque | Soma o −1 saco do alevino (77 em vez de 78) e não usa o ritmo de hoje numa fazenda nova | Igual à Início | **corrigido** (78 sacos; dura 3 dias no ritmo de hoje) |
 
 ## Conferido e OK
 - Contas: 12.465 × 1,54 kg = 19,2 t; total 22,3 t; despesca do Tanque 1 em 16/03 (0,3→1,54 kg em 162 dias = 7,7 g/dia; faltam 0,96 kg = 126 dias).
