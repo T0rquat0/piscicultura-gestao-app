@@ -115,6 +115,8 @@ async function sincronizarAgora() {
   if (r.ocupado) return r;
   state.semRede = !!r.semRede;
   await atualizarPendentes();
+  // a tela de Pendentes mostrava "Sem internet" e os itens já enviados até sair dela: redesenha
+  if (rotaAtual === 'pendencias' && (r.enviados || r.falhas || !r.semRede)) rotear();
   if (r.sessaoExpirada) { mostrarLogin('Sua sessão expirou. Entre novamente para enviar os lançamentos pendentes.'); return r; }
   if (r.enviados) {
     toast(`${plural(r.enviados, 'lançamento enviado', 'lançamentos enviados')}`, 'ok');
@@ -151,7 +153,7 @@ const ctx = {
 // ---------- login / sessão ----------
 function mostrarLogin(aviso) {
   state.user = null;
-  if (!aviso && state.convite) aviso = 'Você recebeu um convite para entrar numa fazenda. Se já tem conta, entre. Se não tem, toque em "Criar conta" abaixo.';
+  if (!aviso && state.convite) aviso = 'Você recebeu um convite para entrar numa fazenda. Se já tem conta, entre. Se não tem, toque em "Criar minha conta" abaixo.';
   atualizarPendentes();
   renderLogin(ctx, root, aviso);
 }

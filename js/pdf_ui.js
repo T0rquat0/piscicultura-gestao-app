@@ -81,9 +81,11 @@ export async function abrirVisualizador({ blob, nome, titulo, toast }) {
       <button type="button" class="btn primario" data-compartilhar>Enviar (WhatsApp, e-mail…)</button>
       <button type="button" class="btn" data-baixar>Baixar</button>
     </footer>`;
-  const fechar = () => { document.removeEventListener('keydown', tecla); fundo.remove(); document.body.classList.remove('sem-rolagem'); };
+  // trocar de tela (gesto de voltar do celular, menu de baixo) também fecha: antes o PDF ficava por cima da tela nova
+  const fechar = () => { document.removeEventListener('keydown', tecla); window.removeEventListener('hashchange', fechar); fundo.remove(); document.body.classList.remove('sem-rolagem'); };
   const tecla = (e) => { if (e.key === 'Escape') fechar(); };
   document.addEventListener('keydown', tecla);
+  window.addEventListener('hashchange', fechar);
   fundo.querySelector('[data-fechar]').addEventListener('click', fechar);
   fundo.querySelector('[data-baixar]').addEventListener('click', () => baixarArquivo(blob, nome));
   fundo.querySelector('[data-compartilhar]').addEventListener('click', async () => {

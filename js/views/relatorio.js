@@ -108,12 +108,21 @@ export async function renderRelatorios(ctx, el) {
       const kgS = ctx.state.ref.kgSaco || PESO_SACO_PADRAO_KG;
       const d30 = new Date(`${hoje}T00:00:00Z`); d30.setUTCDate(d30.getUTCDate() - 29);
       const desde = d30.toISOString().slice(0, 10);
-      const [[jsPDF, fontes], saldo, linhas, compras, contagens] = await Promise.all([
+      const [[jsPDF, fontes], saldoTotal, linhas, saldosTipo, compras, contagens] = await Promise.all([
         Promise.all([carregarGerador(), carregarFontes()]),
         ctx.api.saldoRacao(), ctx.api.racaoPeriodo(desde),
+        ctx.api.saldosRacao().catch(() => null),
         gerir ? ctx.api.compras(true).catch(() => []) : Promise.resolve([]),
         gerir ? ctx.api.contagens().catch(() => []) : Promise.resolve([]),
       ]);
+      // estoque igual ao da Início: ração que ficou negativa não desconta da outra (77 → 78 sacos),
+      // e a duração usa a ração de engorda; numa fazenda nova (sem 7 dias), o ritmo de hoje
+      const tiposR = saldosTipo && saldosTipo.porTipo ? saldosTipo.linhas : null;
+      const saldo = saldoTotal ? { ...saldoTotal, ...(tiposR ? { saldo_kg: tiposR.reduce((t, x) => t + Math.max(0, Number(x.saldo_kg) || 0), 0) } : {}) } : saldoTotal;
+      const engorda = tiposR ? (tiposR.find((x) => x.tipo_racao === 'engorda') || tiposR[0]) : saldoTotal;
+      const tipoDoTanque = (tid) => { const l = lotes.find((x) => x.ativo && x.tanque_id === tid); return l && ['alevinagem', 'bercario'].includes(l.tipo) ? 'alevino' : 'engorda'; };
+      const hojeKgEng = (linhas || []).filter((r) => r.data === hoje && (!tiposR || tipoDoTanque(r.tanque_id) === 'engorda')).reduce((t, r) => t + Number(r.quantidade_kg || 0), 0);
+      const ritmoHoje = !(Number(engorda && engorda.consumo_7d_kg) > 0) && hojeKgEng > 0;
       const precoKg = gerir ? precoMedioKg(compras) : null;
       const nomeDe = (tid) => (tanques.find((t) => t.id === tid) || {}).nome || '';
       const ativos = lotes.filter((l) => l.ativo);
@@ -130,7 +139,7 @@ export async function renderRelatorios(ctx, el) {
         .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR', { numeric: true, sensitivity: 'base' }));
       const doc = gerarPdfFazenda(jsPDF, {
         logo: ctx.state.ref.logo || null, fazenda: (ctx.state.perfil.fazendas && ctx.state.perfil.fazendas.nome) || 'Piscicultura', geradoEm: hoje, kgSaco: kgS, gerir, fontes, saldo: saldo || {},
-        sit: situacaoEstoque(saldo && saldo.saldo_kg, saldo && saldo.consumo_7d_kg, ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS),
+        sit: situacaoEstoque(engorda && engorda.saldo_kg, ritmoHoje ? hojeKgEng * 7 : engorda && engorda.consumo_7d_kg, ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS), ritmoHoje,
         lotes: detalhes, racaoDia, racaoTanque, precoKg, ultimaContagem: contagens[0] || null,
       });
       bf.disabled = false; bf.innerHTML = texto;
@@ -244,7 +253,7 @@ export async function renderRelatorioLote(ctx, el, id) {
     <div class="card destaques3">
       ${destaque('Peso médio atual', c.pmAtualG != null ? pesoUnid(c.pmAtualG) : '—', c.pmAtualG != null ? `em ${fmtData(c.dataUltimaBio)}` : 'sem biometria ainda')}
       ${destaque('Ração fornecida', unid(fmtNum(c.racaoTotal, 0), 'kg'), `≈ ${fmtNum(c.racaoTotal / kgS, 1)} sacos` + (c.racaoMediaDia != null ? ` · média ${fmtNum(c.racaoMediaDia, 1)} kg/dia` : ''))}
-      ${destaque('Conversão alimentar', c.ca != null ? fmtNum(c.ca, 2) : '—', c.ca != null ? 'kg de ração por kg ganho' : c.dataUltimaBio ? 'aparece quando houver ração lançada até a última biometria' : 'precisa de biometria com ganho')}
+      ${destaque('Conversão alimentar', c.ca != null ? fmtNum(c.ca, 2) : '—', c.ca != null ? 'kg de ração por kg ganho' : c.caAguardaPesagem ? 'lote cadastrado em andamento: aparece depois da próxima pesagem' : c.dataUltimaBio ? 'aparece quando houver ração lançada até a última biometria' : 'precisa de biometria com ganho')}
     </div>
     <section class="bloco"><h2>Situação do lote</h2>
       <div class="card"><ul class="lista numeros">
@@ -337,7 +346,7 @@ export async function renderRelatorioLote(ctx, el, id) {
 
   const painelRegistros = () => `
     ${secao('Ração lançada', [...rac].reverse().map((r) => registro(r.data, r.registrado_por, `${fmtNum(r.quantidade_kg, 1)} kg (≈ ${fmtNum(r.quantidade_kg / kgS, 1)} sacos)`, 'racao_consumo', r.id)), 'Nenhuma ração lançada.')}
-    ${secao('Biometrias', [...bios].reverse().map((b) => registro(b.data, b.registrado_por, `${fmtNum(pesoMedioKg(b) * 1000, 0)} g<small>${fmtInt(b.quantidade_amostrada)} peixes · ${fmtNum(b.peso_amostra_kg, 3)} kg</small>`, 'biometrias', b.id)), 'Nenhuma biometria registrada.')}
+    ${secao('Biometrias', [...bios].reverse().map((b) => registro(b.data, b.registrado_por, `${pesoMedioTxt(pesoMedioKg(b))}<small>${fmtInt(b.quantidade_amostrada)} ${Number(b.quantidade_amostrada) === 1 ? 'peixe' : 'peixes'} · ${fmtNum(b.peso_amostra_kg, 3)} kg</small>`, 'biometrias', b.id)), 'Nenhuma biometria registrada.')}
     ${secao('Mortalidade', [...mort].reverse().map((m) => registro(m.data, m.registrado_por, `${fmtInt(m.quantidade)} peixes${m.causa ? `<small class="causa">${esc(m.causa)}</small>` : ''}`, 'mortalidade', m.id)), 'Nenhuma mortalidade registrada.')}
     ${desp.length ? secao('Despescas', [...desp].reverse().map((d) => registro(d.data, d.registrado_por, `${fmtNum(d.peso_bruto_kg, 0)} kg bruto<small>${d.tipo === 'total' ? 'Total' : 'Parcial'} · ${fmtInt(d.quantidade)} peixes</small>`, 'despescas', d.id)), '') : ''}
     ${agua.length ? secao('Água', [...agua].reverse().map((a) => registro(a.data, a.registrado_por, `${[a.oxigenio_mgl != null && `O₂ ${fmtNum(Number(a.oxigenio_mgl), 1)}`, a.temperatura_c != null && `${fmtNum(Number(a.temperatura_c), 1)} °C`, a.ph != null && `pH ${fmtNum(Number(a.ph), 1)}`, a.amonia_mgl != null && `NH₃ ${fmtNum(Number(a.amonia_mgl), 2)}`].filter(Boolean).join(' · ')}${a.obs ? `<small>${esc(a.obs)}</small>` : ''}`, 'qualidade_agua', a.id)), '') : ''}
@@ -648,11 +657,13 @@ export async function renderRacaoDia(ctx, el) {
   let r = null;
   // ração do período dividida por fase do lote (só quando há mais de uma fase)
   function pizzaFase(lista) {
+    // ração de tanque cujo lote já foi encerrado (despesca total) entra como "Lote encerrado":
+    // sem isso o centro da pizza dava 19 sacos e o total do dia 23
     const porFase = {};
-    for (const t of lista) if (t.kg > 0 && t.fase) porFase[t.fase] = (porFase[t.fase] || 0) + t.kg;
-    const fases = ORDEM_FASE.filter((f) => porFase[f] > 0);
+    for (const t of lista) if (t.kg > 0) { const f = t.fase || 'encerrado'; porFase[f] = (porFase[f] || 0) + t.kg; }
+    const fases = [...ORDEM_FASE, 'encerrado'].filter((f) => porFase[f] > 0);
     if (fases.length < 2) return '';
-    return `<div class="pz-faixa">${pizza(fases.map((f) => ({ nome: ROTULO_TIPO[f] || f, valor: porFase[f], cor: COR_FASE[f], txt: `${sacos(porFase[f])} sacos` })), { centro: sacos(Object.values(porFase).reduce((a, b) => a + b, 0)), sub: 'sacos', rotulo: 'Ração por fase' })}</div>`;
+    return `<div class="pz-faixa">${pizza(fases.map((f) => ({ nome: f === 'encerrado' ? 'Lote encerrado' : ROTULO_TIPO[f] || f, valor: porFase[f], cor: f === 'encerrado' ? '#b9c4bf' : COR_FASE[f], txt: `${sacos(porFase[f])} ${sacos(porFase[f]) === '1' ? 'saco' : 'sacos'}` })), { centro: sacos(Object.values(porFase).reduce((a, b) => a + b, 0)), sub: 'sacos', rotulo: 'Ração por fase' })}</div>`;
   }
   function pintar() {
     el.querySelectorAll('[data-per]').forEach((b) => b.classList.toggle('on', b.dataset.per === per));

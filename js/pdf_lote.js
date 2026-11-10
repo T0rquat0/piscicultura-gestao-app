@@ -114,12 +114,12 @@ export function gerarPdfLote(jsPDF, d) {
   secao('Indicadores do lote', 70);
   const ind = [
     ['Dias de cultivo', fmtInt(c.diasCultivo), 'dias', `desde ${fmtData(lote.data_entrada)}`],
-    ['Peso médio atual', c.pmAtualG != null ? n(c.pmAtualG, 0) : '-', c.pmAtualG != null ? 'g' : '', c.dataUltimaBio ? `biometria de ${fmtData(c.dataUltimaBio)}` : 'sem biometria'],
+    ['Peso médio atual', c.pmAtualG != null ? (c.pmAtualG >= 1000 ? n(c.pmAtualG / 1000, 2) : n(c.pmAtualG, 0)) : '-', c.pmAtualG != null ? (c.pmAtualG >= 1000 ? 'kg' : 'g') : '', c.dataUltimaBio ? `biometria de ${fmtData(c.dataUltimaBio)}` : 'sem biometria'],
     ['Peixes vivos', fmtInt(c.vivos), 'estim.', `de ${fmtInt(lote.quantidade_inicial)} na entrada`],
     ['Sobrevivência', c.sobrevivencia != null ? fmtPct(c.sobrevivencia) : '-', '%', `${plural(c.mortos, 'morto', 'mortos')}`],
     ['Biomassa', c.biomassaAtual != null ? n(c.biomassaAtual, 0) : '-', c.biomassaAtual != null ? 'kg' : '', `na entrada: ${n(c.biomassaInicial, 0)} kg`],
     ['Ração fornecida', n(c.racaoTotal, 0), 'kg', `${n(c.racaoTotal / kgSaco, 1)} sacos de ${n(kgSaco, 0)} kg`],
-    ['Conversão alimentar', c.ca != null ? n(c.ca, 2) : '-', '', c.ca != null ? 'kg de ração por kg ganho' : 'precisa de biometria'],
+    ['Conversão alimentar', c.ca != null ? n(c.ca, 2) : '-', '', c.ca != null ? 'kg de ração por kg ganho' : c.caAguardaPesagem ? 'aparece após a próxima pesagem' : 'precisa de biometria'],
     ['Ganho diário', c.gpd != null ? n(c.gpd, 1) : '-', c.gpd != null ? 'g/dia' : '', 'por peixe desde a entrada'],
   ];
   if (gerir) {

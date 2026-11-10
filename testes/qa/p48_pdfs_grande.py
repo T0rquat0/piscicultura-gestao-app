@@ -1,0 +1,21 @@
+from base import *
+def L(t, n=200): return t[:n].replace('\n', ' | ')
+def paginas(s, nome):
+    s.pg.wait_for_selector('.pdf-view canvas', timeout=30000); s.pg.wait_for_timeout(2500)
+    cs = s.pg.locator('.pdf-view canvas'); n = cs.count(); print(f'  {nome}: {n} página(s)')
+    for i in range(n): cs.nth(i).screenshot(path=os.path.join(PRINTS, f'p48_{nome}_{i+1}.png'))
+    s.pg.locator('.pdf-view [data-fechar]').click(); s.pg.wait_for_timeout(500)
+with sync_playwright() as pw:
+    s = Sessao(pw, 'p48', aparelho='Desktop Chrome'); entrar(s, 'dono'); s.pg.wait_for_timeout(2500)
+    s.ir('#/relatorio'); s.pg.wait_for_timeout(1500); s.pg.click('#b-pdf-fazenda'); paginas(s, 'fazenda')
+    s.ir('#/relatorio/racao'); s.pg.wait_for_timeout(2000); s.pg.locator('[data-per="30"]').click(); s.pg.wait_for_timeout(1500)
+    t = s.texto('#view'); print('RAÇÃO 30 dias tela:', L(t[t.find('Últimos'):], 160))
+    with s.pg.expect_download(timeout=15000) as d: s.pg.locator('#b-csv').click()
+    p = os.path.join(PRINTS, 'racao30.csv'); d.value.save_as(p); linhas = open(p, encoding='utf-8-sig').read().splitlines(); print('  CSV:', len(linhas), 'linhas; cabeçalho:', linhas[3][:160] if len(linhas) > 3 else linhas)
+    print('  última linha:', linhas[-1][:200])
+    s.pg.click('#b-pdf-racao'); paginas(s, 'racao30')
+    # PDF da despesca (Tanque 1)
+    s.ir('#/relatorio'); s.pg.wait_for_timeout(1200); s.pg.locator('a[href^="#/relatorio/"]', has_text='Tanque 1').first.click(); s.pg.wait_for_timeout(3000)
+    s.pg.get_by_text('Despesca', exact=True).first.click(); s.pg.wait_for_timeout(800); print('ABA DESPESCA:', L(s.texto('#view')[s.texto('#view').find('Despesca'):], 300))
+    s.pg.locator('[data-pdf-desp]').first.click(); paginas(s, 'despesca')
+    print('ERROS:', [e for e in s.erros if 'internal' not in e]); s.fechar()

@@ -40,7 +40,7 @@ Níveis: 🔴 vergonha na frente do dono · 🟡 incomoda · ⚪ detalhe. Prazo:
 | 30 | 🔴 | Mortalidade · número absurdo | Aceita 999.999 mortos num tanque de 20.000, sem aviso. A Início passa a mostrar "1.000.154 peixes mortos · 94% do plantel" e sobrevivência de 75,6% | Barrar mais mortos do que peixes vivos e pedir confirmação acima de ~5% do tanque num dia | **corrigido** |
 | 31 | ⚪ | Tanques · nome | Nome com mais de 60 letras é cortado sem avisar | Contador ou aviso | mantido (60 letras bastam) |
 | 32 | 🟡 | Sobrevivência (Início, tela do tanque, painel do Lançar) | Peixe despescado contava como perda: depois de despescar 500, a sobrevivência caiu de 99,8% para 99,2% | (entrada − mortos) ÷ entrada, como no relatório do lote | **corrigido** |
-| 33 | ⚪ | PDF geral · estoque | Soma o −1 saco do alevino (77 em vez de 78) e não usa o ritmo de hoje numa fazenda nova | Igual à Início | anotado |
+| 33 | ⚪ | PDF geral · estoque | Soma o −1 saco do alevino (77 em vez de 78) e não usa o ritmo de hoje numa fazenda nova | Igual à Início | **corrigido** (78 sacos; dura 3 dias no ritmo de hoje) |
 
 ## Conferido e OK
 - Contas: 12.465 × 1,54 kg = 19,2 t; total 22,3 t; despesca do Tanque 1 em 16/03 (0,3→1,54 kg em 162 dias = 7,7 g/dia; faltam 0,96 kg = 126 dias).
@@ -50,3 +50,20 @@ Níveis: 🔴 vergonha na frente do dono · 🟡 incomoda · ⚪ detalhe. Prazo:
 - Compra: 100 sacos × 25 kg, R$ 9.850 → estoque 100 − 18 = 82 sacos. Biometria alevino: 400 g ÷ 50 = 8 g; 50.000 × 8 g = 400 kg; pede para conferir (era 2 g). Mortalidade: 120 ÷ 82.465 = 0,15%. Relatório de ração: 12 + 6 = 18 sacos (450 kg).
 - Funcionário no campo sem sinal: ração e mortalidade salvas no celular ("1 pendente"), Início e reabertura sem sinal ok, envio sozinho quando o sinal volta; no banco, cada lançamento chegou uma vez só, com o nome de quem lançou. Permissões do funcionário certas (sem Tanques/Equipe/Plano/Histórico, sem toneladas).
 - Tentar quebrar: ração 9999, vazia, 0 e negativa são recusadas com mensagem clara; "0.5" vira 0,5; lançar de novo no mesmo dia pergunta "Isso já foi lançado?"; biometria com 0, letras ou amostra 0 é recusada; 50 kg/peixe pede para conferir; "3.5" vira 3,5 kg; nome de tanque repetido ou em branco é barrado; data no futuro não dá para escolher; toque duplo protegido (botão trava + código único). Excluir lançamento pelo relatório do lote funciona e os totais voltam (155 mortos = 120 + 35).
+
+## Grupo 2 (10/11/2026, banco real)
+Conferido e OK: funcionário pelo convite do começo ao fim (link do e-mail num celular limpo → login → "Entrar na Fazenda QA como Funcionário"); "Marcar todos" na Equipe; contagem por pilhas (3 × 5 × 5 + 1 = 76; ajuste −2); editar compra (76 + 20 = 96), nova compra (106) e excluir (96); PDF e CSV do lote (vivos 11.930 = 12.465 − 35 − 500); CSV de ração (300 + 25 + 150 + 100 = 575 kg); lixeira (apagar tanque pede o nome; restaurar volta); histórico com antes → depois; cópia de segurança completa (inclui despescas) e importar "nada para importar"; plano no modo piloto (12 meses de propósito, sql/19); fazenda grande: 16 tanques, 376.810 peixes, 268,3 t (61,3 + 6 × 30 + 3 × 9), Início em 1,5–2 s; importação em lote para no limite do pacote com mensagem clara.
+
+| # | Nível | Onde | O que acontecia | Status |
+|---|---|---|---|---|
+| G1 | 🔴 | Janelas compridas no iPhone (corrigir compra, corrigir lote) | A janela passava da altura da tela e não rolava: Salvar e Voltar ficavam inalcançáveis | **corrigido** (janela rola; testado no iPhone 13 e SE) |
+| G2 | 🟡 | Visualizador de PDF | Trocar de tela (gesto de voltar, menu) deixava o PDF por cima da tela nova | **corrigido** |
+| G3 | 🟡 | Ração fornecida (tela) | Pizza somava 19 sacos e o total 23: tanque com lote encerrado ficava de fora | **corrigido** ("Lote encerrado" na pizza) |
+| G4 | 🟡 | Tanques (lista) | Ordem 1, 10, 11… em vez de 1, 2, 3 | **corrigido** |
+| G5 | 🟡 | Corrigir compra | Lançada em sacos, corrigida em kg (100 sacos virava "2500") | **corrigido** (corrige em sacos) |
+| G6 | 🟡 | Mais | Com pacote contratado, continuava "Período de teste grátis, faltam 30 dias" | **corrigido** ("Plano ativo, pago até…") |
+| G7 | ⚪ | Excluir compra | Não dizia qual compra | **corrigido** (data, sacos e fornecedor) |
+| G8 | ⚪ | Contagem | "Você contou 76,0 sacos" | **corrigido** |
+| G9 | ⚪ | Plural | "1 sacos", "1 peixes", "−1 sacos" | **corrigido** |
+| G10 | ⚪ | Convite | Aviso dizia "Criar conta" e o botão é "Criar minha conta" | **corrigido** |
+| G11 | 🟡 | Conversão alimentar de lote "em andamento" | Lote cadastrado no meio do ciclo: CA 0,02 (ração só de hoje ÷ ganho desde junho) | **para o pente fino de números** |

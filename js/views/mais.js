@@ -195,7 +195,14 @@ export function renderMais(ctx, el) {
   });
   el.querySelector('#b-sair').addEventListener('click', () => ctx.sair());
   if (p.papel === 'dono' && navigator.onLine) {
-    ctx.api.testeAte().then((ate) => {
+    // com pacote contratado, o cartão é do plano (antes continuava "teste grátis, faltam 30 dias")
+    Promise.all([ctx.api.testeAte(), ctx.api.plano().catch(() => null)]).then(([ate, plano]) => {
+      if (plano && ['ativo', 'carencia', 'vencido'].includes(plano.estado)) {
+        const d = plano.valido_ate ? diasEntre(hojeISO(), plano.valido_ate) : null;
+        el.querySelector('#teste').innerHTML = `<a class="card" href="#/plano" style="display:block;color:inherit;text-decoration:none"><b>${plano.estado === 'ativo' ? 'Plano ativo' : 'Plano vencido'}</b>
+          <small style="display:block">${plano.valido_ate ? `${plano.estado === 'ativo' ? 'Pago até' : 'Venceu em'} ${fmtData(plano.valido_ate)}${d != null && d >= 0 ? ` (${d === 1 ? 'falta 1 dia' : `faltam ${d} dias`})` : ''}.` : ''}</small></a>`;
+        return;
+      }
       if (!ate) return;
       const falta = diasEntre(hojeISO(), ate);
       el.querySelector('#teste').innerHTML = `<div class="card"><b>${falta >= 0 ? 'Período de teste grátis' : 'Período de teste terminou'}</b>

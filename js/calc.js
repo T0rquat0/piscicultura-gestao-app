@@ -30,9 +30,12 @@ export function avisoPesoMedio({ quantidade, pesoTotalKg, lote, r, data }) {
   const pm = quantidade > 0 ? pesoTotalKg / quantidade : null;
   if (!(ref > 0) || !(pm > 0)) return null;
   const dias = Math.max(0, diasEntre((temBio && r.ultima_biometria) || lote.data_entrada, data)) || 0;
-  if (pm >= ref / 3 && pm <= ref * 3 + 0.02 * dias) return null;
+  const plausivel = (x) => x >= ref / 3 && x <= ref * 3 + 0.02 * dias;
+  if (plausivel(pm)) return null;
   const total = fmtNum(pesoTotalKg, Number.isInteger(pesoTotalKg) ? 0 : 3);
-  return `${fmtInt(quantidade)} ${quantidade === 1 ? 'peixe' : 'peixes'} em ${total} kg dá ${pesoMedioTxt(pm)} por peixe. ${temBio ? 'A última pesagem foi' : 'Na entrada eram'} ${pesoMedioTxt(ref)} por peixe. Está certo?`;
+  // 2.400 digitado em gramas num campo de kg vira 2.400 kg por peixe ("2.400.000 g" no relatório): avisa a unidade
+  const gramas = pm > ref && Math.abs(Math.log(pm / 1000 / ref)) < Math.abs(Math.log(pm / ref)) ? `Parece que o peso foi digitado em gramas: ${total} g = ${fmtNum(pesoTotalKg / 1000, 3)} kg. ` : '';
+  return `${gramas}${fmtInt(quantidade)} ${quantidade === 1 ? 'peixe' : 'peixes'} em ${total} kg dá ${pesoMedioTxt(pm)} por peixe. ${temBio ? 'A última pesagem foi' : 'Na entrada eram'} ${pesoMedioTxt(ref)} por peixe. Está certo?`;
 }
 
 export function pesoMedioKg(b) {
@@ -72,8 +75,26 @@ export function calcularLote(lote, bios, mort, rac, hoje, precoKg = null, desp =
   const ganhoBiomassa = biomassaAtual != null ? biomassaAtual + pesoDespescado - biomassaInicial : null;
 
   const racaoAteBio = fechado ? racaoTotal : ultima ? soma(rac.filter((r) => r.data <= ultima.data), 'quantidade_kg') : null;
+
+  // Lote cadastrado "em andamento" (peixe já estava no tanque): a ração só começou a ser lançada no app
+  // semanas depois da entrada. Comparar o ganho desde a entrada com a ração de poucos dias dava CA 0,02.
+  // Nesse caso a conta começa na pesagem que marcou o início no app (a última até a 1ª ração lançada).
+  const datasRac = rac.map((r) => r.data).filter(Boolean).sort();
+  const primeiraRacao = datasRac[0] || null;
+  const andamento = !fechado && primeiraRacao && diasEntre(lote.data_entrada, primeiraRacao) > 7;
+  const base = andamento ? [...bios].reverse().find((b) => b.data <= primeiraRacao) : null;
+  let ganhoCA = ganhoBiomassa, racaoCA = racaoAteBio;
+  if (andamento) {
+    if (base && ultima && ultima.data > base.data && pmAtual != null) {
+      const antes = (lista, campo) => soma(lista.filter((x) => x.data <= base.data), campo);
+      const vivosBase = Math.max(0, qtdInicial - antes(mort, 'quantidade') - antes(desp, 'quantidade'));
+      const despDepois = soma(desp.filter((d) => d.data > base.data), 'peso_bruto_kg');
+      ganhoCA = vivos * pmAtual + despDepois - vivosBase * pesoMedioKg(base);
+      racaoCA = soma(rac.filter((r) => r.data >= base.data && r.data <= ultima.data), 'quantidade_kg');
+    } else { ganhoCA = null; racaoCA = null; } // falta uma pesagem depois do início no app
+  }
   // sem ração lançada até a última biometria não há conversão para calcular (mostrar 0,00 enganava)
-  const ca = ganhoBiomassa != null && ganhoBiomassa > 0 && racaoAteBio > 0 ? racaoAteBio / ganhoBiomassa : null;
+  const ca = ganhoCA != null && ganhoCA > 0 && racaoCA > 0 ? racaoCA / ganhoCA : null;
 
   const diasCultivo = Math.max(0, diasEntre(lote.data_entrada, hoje));
   const diasAteBio = ultima ? diasEntre(lote.data_entrada, ultima.data) : null;
@@ -101,7 +122,9 @@ export function calcularLote(lote, bios, mort, rac, hoje, precoKg = null, desp =
     gpd,
     custoRacao: precoKg != null ? racaoTotal * precoKg : null,
     // custo da ração por kg de peixe produzido (ração até a última biometria ÷ ganho de biomassa)
-    custoKgProduzido: precoKg != null && ganhoBiomassa > 0 && racaoAteBio > 0 ? (racaoAteBio * precoKg) / ganhoBiomassa : null,
+    custoKgProduzido: precoKg != null && ganhoCA > 0 && racaoCA > 0 ? (racaoCA * precoKg) / ganhoCA : null,
+    // lote em andamento sem pesagem depois do início no app: a conversão aparece depois da próxima pesagem
+    caAguardaPesagem: andamento && ca == null,
   };
 }
 

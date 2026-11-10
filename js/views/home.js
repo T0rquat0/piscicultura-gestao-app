@@ -352,7 +352,7 @@ export async function renderHome(ctx, el) {
     const tomEst = { atencao: 'alerta', critico: 'erro', negativo: 'erro' }[sit.nivel] || '';
     const quando = sit.dias != null ? (() => { const f = new Date(`${hoje}T12:00:00`); f.setDate(f.getDate() + Math.floor(sit.dias)); return f.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }).replace('.', ''); })() : '';
     return `<div class="h-est-linha">
-      <div class="h-est-cab"><span>${esc(titulo || 'Ração')}</span><b>${saldo < 0 ? '−' : ''}${fmtNum(Math.abs(sacos(saldo)), 0)} <small>sacos</small></b></div>
+      <div class="h-est-cab"><span>${esc(titulo || 'Ração')}</span><b>${saldo < 0 ? '−' : ''}${fmtNum(Math.abs(sacos(saldo)), 0)} <small>${Math.round(Math.abs(sacos(saldo))) === 1 ? 'saco' : 'sacos'}</small></b></div>
       ${sit.dias != null || sit.nivel === 'negativo' ? progresso(((sit.dias || 0) / ESTOQUE_COBERTURA_DIAS) * 100, { fina: true, tom: tomEst, rotulo: `Estoque para ${fmtInt(Math.floor(sit.dias || 0))} de ${ESTOQUE_COBERTURA_DIAS} dias` }) : ''}
       <small class="h-est-sub">${sit.nivel === 'negativo' ? 'saldo negativo: confira no galpão' : sit.dias != null ? `dura ${fmtInt(Math.floor(sit.dias))} ${Math.floor(sit.dias) === 1 ? 'dia' : 'dias'}${peloDeHoje(s) ? ' no ritmo de hoje' : ''} · acaba por volta de ${esc(quando)}` : 'sem consumo para estimar'}</small>
       ${sit.nivel === 'critico' || sit.nivel === 'atencao' || sit.nivel === 'negativo' ? nota : ''}</div>`;
