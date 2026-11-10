@@ -3,6 +3,15 @@
 export const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+// Célula de planilha (CSV). Texto que começa com = + - @ vira fórmula no Excel/Planilhas: um nome de tanque como
+// =HIPERLINK("site-falso";"Clique") viraria um link no computador do dono. Põe um apóstrofo na frente (o Excel
+// mostra o texto como está). Números negativos ("-20,00") ficam como número.
+export function celulaCsv(c) {
+  let s = String(c ?? '');
+  if (/^[=+\-@\t\r]/.test(s) && !/^-?\d[\d.,]*$/.test(s)) s = "'" + s;
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
 export function hojeISO() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

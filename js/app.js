@@ -130,6 +130,8 @@ const ctx = {
   state,
   api: null,
   podeGerir: () => !!state.perfil && (state.perfil.papel === 'dono' || state.perfil.papel === 'gerente'),
+  // valores em R$ (preço da ração, custo, preço do peixe): só o dono (decisão de 10/11/2026)
+  verDinheiro: () => !!state.perfil && state.perfil.papel === 'dono',
   toast,
   atualizarRef,
   recarregarTopo: atualizarMarca,
@@ -282,15 +284,18 @@ async function abrirApp(user) {
   }
   // termos novos: quem ainda não aceitou esta versão aceita antes de entrar (só com internet, para não travar o campo)
   if (TERMOS_VERSAO && daRede && (user.user_metadata || {}).termos_versao !== TERMOS_VERSAO) { state.user = user; renderAceiteTermos(ctx, root, user); return; }
-  if (!perfil) { if (state.convite) renderAceitarConvite(ctx, root, user, state.convite); else renderCriarFazenda(ctx, root, user); return; }
+  // sem acesso (tirado da fazenda, desativado ou fazenda suspensa): apaga do aparelho a cópia dos números da fazenda.
+  // Sem isso, quem perdeu o acesso ainda via os dados guardados ao abrir o app sem internet.
+  const apagarCopias = async () => { for (const k of ['perfil', 'ref', 'resumo', 'racao14', 'admin']) await db.kvDel(k); };
+  if (!perfil) { if (daRede && guardado) await apagarCopias(); if (state.convite) renderAceitarConvite(ctx, root, user, state.convite); else renderCriarFazenda(ctx, root, user); return; }
   if (state.convite) { // conta já está numa fazenda: o convite não serve para ela
     descartarConvite();
     setTimeout(() => toast('Convite não usado: esta conta já faz parte de uma fazenda.', 'erro'), 600);
   }
-  if (perfil.ativo === false) { mostrarMensagem('Acesso desativado', 'Seu acesso a esta fazenda foi desativado. Fale com o dono.'); return; }
+  if (perfil.ativo === false) { if (daRede) await apagarCopias(); mostrarMensagem('Acesso desativado', 'Seu acesso a esta fazenda foi desativado. Fale com o dono.'); return; }
   // fazenda bloqueada pelo administrador (sql/15): o perfil vem, mas a fazenda não aparece
   if (daRede && perfil.fazenda_id && !perfil.fazendas) {
-    await db.kvDel('perfil');
+    await apagarCopias();
     mostrarMensagem('Acesso suspenso', 'O acesso desta fazenda ao sistema está suspenso. Os dados continuam guardados. Fale com o suporte para liberar.');
     return;
   }
