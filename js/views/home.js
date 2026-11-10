@@ -30,7 +30,7 @@ async function novoTanque(ctx, el) {
   try {
     await ctx.api.criarTanque(ctx.state.perfil.fazenda_id, nome);
     await ctx.atualizarRef();
-    ctx.toast(`Tanque ${nome} criado`, 'ok');
+    ctx.toast(`${/^(tanque|viveiro)/i.test(nome) ? nome : `Tanque ${nome}`} criado`, 'ok');
     renderHome(ctx, el);
   } catch (e) { ctx.toast(e.message || 'Não foi possível criar o tanque', 'erro'); }
 }
@@ -41,9 +41,9 @@ export async function renderHome(ctx, el) {
   const { tanques, lotes } = state.ref;
 
   if (!tanques.length) {
-    el.innerHTML = `<h1>Olá, ${esc(primeiro)}</h1>` + (ctx.podeGerir()
+    el.innerHTML = `<h1>Olá, ${esc(primeiro)}</h1>` + (state.perfil.papel === 'dono'
       ? `<div class="card vazio"><p>Nenhum tanque cadastrado ainda.</p><button class="btn primario" id="b-novo-tanque" type="button">Cadastrar o primeiro tanque</button></div>`
-      : `<div class="card vazio"><p>Nenhum tanque liberado para você ainda.<br>Peça ao gerente para liberar os seus tanques.</p></div>`);
+      : `<div class="card vazio"><p>Nenhum tanque liberado para você ainda.<br>Peça ao ${state.perfil.papel === 'gerente' ? 'dono' : 'dono ou ao gerente'} para liberar os seus tanques em Mais › Equipe.</p></div>`);
     const b0 = el.querySelector('#b-novo-tanque'); if (b0) b0.addEventListener('click', () => novoTanque(ctx, el));
     return;
   }
@@ -63,9 +63,12 @@ export async function renderHome(ctx, el) {
     ]);
     if (rs) for (const r of rs) resumo[r.lote_id] = r; else semDetalhe = true;
     saldos = sd; racao = rc; mortes = mt;
+    if (rc) db.kvSet('racao14', rc).catch(() => {}); // sem sinal, "ração dada hoje" continua com o que já foi enviado
   } else {
     const g = await ctx.api.resumoGuardado().catch(() => null);
     if (g) for (const r of g) resumo[r.lote_id] = r; else semDetalhe = true;
+    const rg = await db.kvGet('racao14').catch(() => null);
+    if (Array.isArray(rg)) racao = rg.filter((r) => r.data >= desde(13));
   }
   const numerosGuardados = !semDetalhe && (!navigator.onLine || !!ctx.state.semRede);
   // a ração de alevino só aparece na Início quando a fazenda usa (tem saldo, compra ou consumo)
@@ -80,7 +83,10 @@ export async function renderHome(ctx, el) {
   const kgS = state.ref.kgSaco || PESO_SACO_PADRAO_KG;
   const sacos = (kg) => kg / kgS;
   // sacos: inteiro a partir de 3 (ninguém conta 6,7 sacos no galpão); abaixo disso, uma casa
-  const nSacos = (n) => { const v = n >= 3 ? Math.round(n) : Math.round(n * 10) / 10; return `${fmtNum(v, Number.isInteger(v) ? 0 : 1)} ${v === 1 ? 'saco' : 'sacos'}`; };
+  // sugestão: arredonda em meio saco, igual à tela Lançar (as duas mostram o mesmo número)
+  const nSug = (kg) => { const n = sacos(kg); if (n < 0.95) return nSacos(n); const v = Math.round(n * 2) / 2; return `${fmtNum(v, Number.isInteger(v) ? 0 : 1)} ${v === 1 ? 'saco' : 'sacos'}`; };
+  // menos de 1 saco (alevino) vai em kg: ninguém pesa "0,2 saco" no galpão
+  const nSacos = (n) => { if (n > 0 && n < 0.95) return `${fmtNum(n * kgS, n * kgS < 10 ? 1 : 0)} kg`; const v = n >= 3 ? Math.round(n) : Math.round(n * 10) / 10; return `${fmtNum(v, Number.isInteger(v) ? 0 : 1)} ${v === 1 ? 'saco' : 'sacos'}`; };
 
   // ração por tanque: hoje (banco + o que ainda está no aparelho) e a média dos dias com ração na última semana
   const porTanque = {};
@@ -95,6 +101,16 @@ export async function renderHome(ctx, el) {
     else if (r.data >= desde(7)) t.semana[r.data] = (t.semana[r.data] || 0) + kg;
   }
   for (const i of pendHoje) { const kg = Number(i.payload.quantidade_kg) || 0; t0(i.payload.tanque_id).hojeKg += kg; porDia[hoje] += kg; }
+  const hojePorTipo = {};
+  for (const t of tanques) {
+    const kg = (porTanque[t.id] || {}).hojeKg || 0; if (!kg) continue;
+    const l = lotes.find((x) => x.tanque_id === t.id);
+    const tipoR = l && ['alevinagem', 'bercario'].includes(l.tipo) ? 'alevino' : 'engorda';
+    hojePorTipo[tipoR] = (hojePorTipo[tipoR] || 0) + kg;
+  }
+  // consumo da semana; sem histórico (fazenda nova), usa o ritmo de hoje: 82 sacos ÷ 18 por dia = ~4 dias
+  const consumo7d = (s) => (Number(s.consumo_7d_kg) > 0 ? Number(s.consumo_7d_kg) : (hojePorTipo[s.tipo_racao || 'engorda'] || 0) * 7);
+  const peloDeHoje = (s) => !(Number(s.consumo_7d_kg) > 0) && (hojePorTipo[s.tipo_racao || 'engorda'] || 0) > 0;
   const mediaKg = (id) => { const s = Object.values((porTanque[id] || {}).semana || {}); return s.length ? s.reduce((a, b) => a + b, 0) / s.length : null; };
 
   const status = {};
@@ -132,7 +148,7 @@ export async function renderHome(ctx, el) {
     if (status[t.id] === 'falta') {
       const m = mediaKg(t.id);
       return `<a class="tq falta" href="#/lancar?tipo=racao&tanque=${esc(t.id)}"><b>${esc(t.nome)}</b><span class="tq-fase">${esc(fase(t))}</span>
-        ${linhaTq(t)}<span class="tq-acao">${m ? `<span class="tq-verbo">Lançar </span><span class="tq-mais">+</span>${esc(nSacos(sacos(m)))}` : sugDe(t) ? `<span class="tq-verbo">Lançar </span><span class="tq-mais">+</span>~${esc(nSacos(sacos(sugDe(t).kg)))}` : 'Lançar ração'}</span></a>`;
+        ${linhaTq(t)}<span class="tq-acao">${m ? `<span class="tq-verbo">Lançar </span><span class="tq-mais">+</span>${esc(nSacos(sacos(m)))}` : sugDe(t) ? `<span class="tq-verbo">Lançar </span><span class="tq-mais">+</span>~${esc(nSug(sugDe(t).kg))}` : 'Lançar ração'}</span></a>`;
     }
     if (status[t.id] === 'ok') {
       const kg = (porTanque[t.id] || {}).hojeKg;
@@ -161,7 +177,7 @@ export async function renderHome(ctx, el) {
       <div class="h-col">
         ${seguro(blocoRacao, 'Tanques')}
         ${gerir ? seguro(blocoDespescas, 'Despescas e mudanças de fase') : ''}
-        ${gerir ? seguro(blocoMortes, 'Mortalidade') : ''}
+        ${gerir && lotes.length ? seguro(blocoMortes, 'Mortalidade') : ''}
       </div>
       <div class="h-col">
         <section class="h-bloco" aria-labelledby="h-tempo" id="b-tempo"><header><h2 id="h-tempo">Tempo na fazenda</h2></header><p class="h-calmo">Carregando a previsão…</p></section>
@@ -210,7 +226,7 @@ export async function renderHome(ctx, el) {
     const C = 2 * Math.PI * 54;
     const anel = `<div class="ag-anel" role="img" aria-label="${feitos.length} de ${comLote} tanques alimentados hoje"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" class="ag-trilho"/><circle cx="60" cy="60" r="54" class="ag-feito${pct >= 1 ? ' cheio' : ''}" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - pct)).toFixed(1)}"/></svg>
       <div><b>${fmtInt(feitos.length)}/${fmtInt(comLote)}</b><small>tanques<br>alimentados</small></div></div>`;
-    const dado = dadoKg > 0 ? ` · ${esc(nSacos(sacos(dadoKg)))} dados hoje` : '';
+    const dado = dadoKg > 0 ? ` · ${esc(nSacos(sacos(dadoKg)))} ${Math.round(sacos(dadoKg) * 10) === 10 ? 'dado' : 'dados'} hoje` : '';
     if (!faltam.length) {
       return `<section class="ag ok">${anel}<div class="ag-txt"><span class="ag-rot">Ração de hoje</span><h2>Todos os tanques comeram</h2><p>Bom trabalho${dado}.</p>
         ${gerir ? '<a class="btn" href="#/relatorio/racao">Ver ração de hoje</a>' : ''}</div></section>`;
@@ -219,7 +235,7 @@ export async function renderHome(ctx, el) {
     const ls = lotes.filter((l) => l.tanque_id === t.id);
     const peixes = ls.reduce((a, l) => a + vivosDoLote(l, resumo[l.id]), 0);
     const sg = m ? null : sugDe(t);
-    const det = [fase(t), peixes ? `${fmtInt(peixes)} peixes` : '', m ? `média de ${nSacos(sacos(m))}` : sg ? `sugestão de ~${nSacos(sacos(sg.kg))} (${fmtNum(sg.pct, 1)}% do peso vivo${sg.provisoria ? ', provisória' : ''})` : 'sem média ainda: conte os sacos dados'].filter(Boolean).join(' · ');
+    const det = [fase(t), peixes ? `${fmtInt(peixes)} peixes` : '', m ? `média de ${nSacos(sacos(m))}` : sg ? `sugestão de ~${nSug(sg.kg)} (${fmtNum(sg.pct, 1)}% do peso vivo${sg.provisoria ? ', provisória' : ''})` : 'sem média ainda: conte os sacos dados'].filter(Boolean).join(' · ');
     return `<section class="ag">${anel}<div class="ag-txt"><span class="ag-rot">Próxima tarefa</span><h2>Ração no ${esc(t.nome)}</h2><p>${esc(det)}${dado}</p>
       <a class="btn primario grande" href="#/lancar?tipo=racao&tanque=${esc(t.id)}">Lançar ração agora</a></div></section>`;
   }
@@ -241,10 +257,10 @@ export async function renderHome(ctx, el) {
       ks.push(`<div class="kp"><span>Ração dada hoje</span><b>${fmtNum(sacos(dadoKg), 0)}<em>${Math.round(sacos(dadoKg)) === 1 ? 'saco' : 'sacos'}</em></b><small>${fmtNum(dadoKg, 0)} kg</small></div>`);
     }
     if (usadas.length) {
-      const tot = usadas.reduce((a, x) => a + Math.max(0, Number(x.saldo_kg) || 0), 0);
-      const sit = situacaoEstoque(Number(usadas[0].saldo_kg) || 0, usadas[0].consumo_7d_kg, ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS);
+      const tot = usadas.reduce((a, x) => a + Math.max(0, Number(x.saldo_kg) || 0), 0), algumNeg = usadas.some((x) => Number(x.saldo_kg) < 0);
+      const sit = situacaoEstoque(Number(usadas[0].saldo_kg) || 0, consumo7d(usadas[0]), ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS);
       const tom = { atencao: 'alerta', critico: 'erro', negativo: 'erro' }[sit.nivel] || '';
-      ks.push(`<a class="kp" href="#/estoque"><span>Estoque de ração</span><b>${fmtNum(sacos(tot), 0)}<em>sacos</em></b>${sit.dias != null ? `${progresso((sit.dias / ESTOQUE_COBERTURA_DIAS) * 100, { fina: true, tom, rotulo: `Dura ${fmtInt(Math.floor(sit.dias))} dias` })}<small>dura ~${fmtInt(Math.floor(sit.dias))} dias${usadas.length > 1 ? ' (engorda)' : ''}</small>` : '<small>sem consumo na semana para estimar</small>'}</a>`);
+      ks.push(`<a class="kp" href="#/estoque"><span>Estoque de ração</span><b>${fmtNum(sacos(tot), 0)}<em>sacos</em></b>${algumNeg ? `<small>${usadas.length > 1 ? 'uma das rações ficou negativa' : 'saldo negativo'}: confira as compras</small>` : sit.dias != null ? `${progresso((sit.dias / ESTOQUE_COBERTURA_DIAS) * 100, { fina: true, tom, rotulo: `Dura ${fmtInt(Math.floor(sit.dias))} dias` })}<small>dura ~${fmtInt(Math.floor(sit.dias))} dias${usadas.length > 1 ? ' (engorda)' : ''}${peloDeHoje(usadas[0]) ? ', no ritmo de hoje' : ''}</small>` : '<small>sem consumo para estimar</small>'}</a>`);
     }
     return `<div class="h-kpis">${ks.join('')}</div>`;
   }
@@ -267,7 +283,7 @@ export async function renderHome(ctx, el) {
     return `<section class="h-bloco" aria-labelledby="h-desp">
       <header><h2 id="h-desp">Despescas e mudanças de fase</h2><span class="h-meta">pelo crescimento</span></header>
       ${comData.length ? `<ul class="h-desp">${comData.slice(0, 6).map(({ l, p }) => `<li><a href="#/t/${esc(l.tanque_id)}"><b>${esc(nomeT(l.tanque_id))}</b><span>${esc(ROTULO_TIPO[l.tipo] || l.tipo)}</span></a>${htmlPrevisao(p, l.tipo)}</li>`).join('')}</ul>` : ''}
-      ${sem ? `<p class="h-calmo">${comData.length ? `Mais ${fmtInt(sem)}` : fmtInt(sem)} ${sem === 1 ? 'lote' : 'lotes'} sem biometria depois da entrada: lance uma pesagem para prever.</p>` : ''}
+      ${sem ? `<p class="h-calmo">${comData.length ? `Mais ${fmtInt(sem)}` : fmtInt(sem)} ${sem === 1 ? 'lote' : 'lotes'} ainda sem crescimento medido: a previsão aparece com uma pesagem feita alguns dias depois da entrada.</p>` : ''}
     </section>`;
   }
 
@@ -281,7 +297,7 @@ export async function renderHome(ctx, el) {
            <p class="h-trilho-leg"><span>${fmtNum(dadoKg, 0)} kg dados</span><span>faltam ${esc(nSacos(sacos(previstoFaltaKg)))}</span></p>`
         : `<p class="h-lead"><span class="h-num">${fmtNum(sacos(dadoKg), dadoKg && dadoKg / kgS < 10 ? 1 : 0)}</span><span class="h-de">${Math.abs(sacos(dadoKg) - 1) < 0.05 ? 'saco dado' : 'sacos dados'} hoje</span></p>`;
     return `<section class="h-bloco" aria-labelledby="h-racao">
-      <header><h2 id="h-racao">Tanques</h2><span class="h-meta">${gerir && !semDetalhe ? 'peso médio ÷ meta de despesca' : 'ração de hoje'}</span></header>
+      <header><h2 id="h-racao">Tanques</h2><span class="h-meta">${gerir && !semDetalhe && lotes.length ? 'peso médio ÷ meta de despesca' : lotes.length ? 'ração de hoje' : ''}</span></header>
       ${comLote ? '' : lead}
       <div class="mapa" aria-label="Tanques">${[...faltam, ...feitos, ...vazios].map(tile).join('')}
         ${gerir ? `<button class="tq novo" id="b-novo-tanque" type="button">${icone('lancar', 20)}<b>Novo tanque</b></button>` : ''}</div>
@@ -303,20 +319,20 @@ export async function renderHome(ctx, el) {
     const top = tanques.filter((t) => porT[t.id] > 0).sort((a, b) => porT[b.id] - porT[a.id]).slice(0, 4);
     const t = kg >= 1000;
     return `<section class="h-bloco" aria-labelledby="h-peixe">
-      <header><h2 id="h-peixe">Peixe na água</h2><span class="h-meta">${fmtInt(comLote)} ${comLote === 1 ? 'tanque' : 'tanques'} com lote</span></header>
+      <header><h2 id="h-peixe">Peixe na água por fase</h2><span class="h-meta">${fmtInt(comLote)} ${comLote === 1 ? 'tanque' : 'tanques'} com lote</span></header>
       <dl class="h-pares">
         ${state.perfil.papel === 'dono' ? (preco
           ? `<div><dt>Valor estimado</dt><dd>${esc(valorCurto(kg * preco))}</dd></div><div><dt>Preço usado</dt><dd>R$ ${fmtNum(preco, 2)}/kg</dd></div>`
           : '<div><dt>Valor estimado</dt><dd><a href="#/mais">Informar preço do kg</a></dd></div>') : ''}
       </dl>
-      ${Object.keys(porFase).filter((f) => porFase[f] > 0).length > 1 ? pizza(ORDEM_FASE.filter((f) => porFase[f] > 0).map((f) => ({ nome: ROTULO_TIPO[f] || f, valor: porFase[f], cor: COR_FASE[f], txt: t ? fmtNum(porFase[f] / 1000, 1) + ' t' : fmtNum(porFase[f], 0) + ' kg' })), { centro: t ? fmtNum(kg / 1000, 0) + ' t' : fmtNum(kg, 0) + ' kg', sub: 'por fase', rotulo: 'Peixe na água por fase' }) : ''}
+      ${Object.keys(porFase).filter((f) => porFase[f] > 0).length > 1 ? pizza(ORDEM_FASE.filter((f) => porFase[f] > 0).map((f) => ({ nome: ROTULO_TIPO[f] || f, valor: porFase[f], cor: COR_FASE[f], txt: t ? fmtNum(porFase[f] / 1000, 1) + ' t' : fmtNum(porFase[f], 0) + ' kg' })), { centro: t ? fmtNum(kg / 1000, 1) + ' t' : fmtNum(kg, 0) + ' kg', sub: 'por fase', rotulo: 'Peixe na água por fase' }) : ''}
       ${top.length > 1 ? `<ul class="h-barras">${top.map((x) => `<li><span>${esc(x.nome)}</span><b>${t ? fmtNum(porT[x.id] / 1000, 1) + ' t' : fmtNum(porT[x.id], 0) + ' kg'}</b><i style="width:${((porT[x.id] / porT[top[0].id]) * 100).toFixed(1)}%"></i></li>`).join('')}</ul>` : ''}
     </section>`;
   }
 
   function linhaEstoque(s, titulo) {
     const saldo = Number(s.saldo_kg) || 0;
-    const sit = situacaoEstoque(saldo, s.consumo_7d_kg, ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS);
+    const sit = situacaoEstoque(saldo, consumo7d(s), ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS);
     let nota = '';
     if (sit.nivel === 'negativo') nota = '<p class="h-alerta">O saldo ficou negativo: confira o estoque no galpão.</p>';
     else if (sit.dias != null) {
@@ -324,13 +340,13 @@ export async function renderHome(ctx, el) {
       const quando = fim.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' });
       const txt = `No ritmo de ${esc(nSacos(sacos(sit.porDia)))} por dia, acaba em <b>${esc(quando)}</b>.`;
       nota = sit.nivel === 'ok' ? `<p class="h-nota">${txt}</p>` : `<p class="${sit.nivel === 'critico' ? 'h-alerta' : 'aviso'}">${sit.nivel === 'critico' ? 'Está acabando: compre ração já.' : 'Hora de planejar a compra.'} Gasta ~${esc(nSacos(sacos(sit.porDia)))} por dia.</p>`;
-    } else nota = '<p class="h-nota">Sem consumo na última semana para estimar a duração.</p>';
+    } else nota = '<p class="h-nota">Ainda sem ração lançada para estimar a duração.</p>';
     const tomEst = { atencao: 'alerta', critico: 'erro', negativo: 'erro' }[sit.nivel] || '';
     const quando = sit.dias != null ? (() => { const f = new Date(`${hoje}T12:00:00`); f.setDate(f.getDate() + Math.floor(sit.dias)); return f.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }).replace('.', ''); })() : '';
     return `<div class="h-est-linha">
       <div class="h-est-cab"><span>${esc(titulo || 'Ração')}</span><b>${saldo < 0 ? '−' : ''}${fmtNum(Math.abs(sacos(saldo)), 0)} <small>sacos</small></b></div>
       ${sit.dias != null || sit.nivel === 'negativo' ? progresso(((sit.dias || 0) / ESTOQUE_COBERTURA_DIAS) * 100, { fina: true, tom: tomEst, rotulo: `Estoque para ${fmtInt(Math.floor(sit.dias || 0))} de ${ESTOQUE_COBERTURA_DIAS} dias` }) : ''}
-      <small class="h-est-sub">${sit.nivel === 'negativo' ? 'saldo negativo: confira no galpão' : sit.dias != null ? `dura ${fmtInt(Math.floor(sit.dias))} ${Math.floor(sit.dias) === 1 ? 'dia' : 'dias'} · acaba por volta de ${esc(quando)}` : 'sem consumo na semana para estimar'}</small>
+      <small class="h-est-sub">${sit.nivel === 'negativo' ? 'saldo negativo: confira no galpão' : sit.dias != null ? `dura ${fmtInt(Math.floor(sit.dias))} ${Math.floor(sit.dias) === 1 ? 'dia' : 'dias'}${peloDeHoje(s) ? ' no ritmo de hoje' : ''} · acaba por volta de ${esc(quando)}` : 'sem consumo para estimar'}</small>
       ${sit.nivel === 'critico' || sit.nivel === 'atencao' || sit.nivel === 'negativo' ? nota : ''}</div>`;
   }
 

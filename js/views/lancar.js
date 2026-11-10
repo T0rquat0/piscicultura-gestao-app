@@ -44,7 +44,7 @@ function camposDoTipo(tipo, kgSaco) {
         <li>Pese todos juntos, de uma vez.</li>
         <li>Anote o peso total e quantos peixes foram pesados.</li>
       </ol></details>
-      <label>Peso total dos peixes (kg)
+      <label><span id="rot-peso">Peso total dos peixes (kg)</span>
         <input id="peso" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 2,4" required></label>
       <label>Quantos peixes foram pesados?
         <input id="amostra" type="number" inputmode="numeric" step="1" min="1" placeholder="Ex.: 10" required></label>
@@ -101,9 +101,9 @@ export async function renderLancar(ctx, el, params = {}) {
       <section class="passo">
         <h2 class="passo-t"><i>1</i> Tanque</h2>
         <div class="campo">
-          <div class="tanque-atual"><div><b id="tanque-nome">${esc((tanques.find((t) => t.id === tanqueInicial) || {}).nome || '')}</b></div>
+          <div class="tanque-atual"><div><b id="tanque-nome">${esc((tanques.find((t) => t.id === tanqueInicial) || {}).nome || '')}</b>${!params.tanque && tanqueInicial === ultimo ? '<small class="tq-ultimo" id="tq-ultimo">mesmo tanque do último lançamento · confira</small>' : ''}</div>
             ${tanques.length > 1 ? `<button type="button" class="btn mini" id="b-trocar">${params.escolher ? 'Fechar' : 'Trocar'}</button>` : ''}</div>
-          <div class="tiles compactos" id="tiles" role="radiogroup" aria-label="Escolha o tanque"${params.escolher ? '' : ' hidden'}>${[...tanques].sort(ordemNatural).map((t) => `<button type="button" class="tile${t.id === tanqueInicial ? ' on' : ''}" role="radio" aria-checked="${t.id === tanqueInicial}" data-tanque="${esc(t.id)}"><span>${esc(t.nome)}</span><i class="ponto"></i></button>`).join('')}</div>
+          <div class="tiles compactos" id="tiles" role="radiogroup" aria-label="Escolha o tanque"${params.escolher ? '' : ' hidden'}>${[...tanques].sort(ordemNatural).map((t) => `<button type="button" class="tile${t.id === tanqueInicial ? ' on' : ''}" role="radio" aria-checked="${t.id === tanqueInicial}" data-tanque="${esc(t.id)}"><span>${esc(t.nome)}</span>${((l) => (l ? `<small class="tile-fase">${esc(ROTULO_TIPO[l.tipo] || l.tipo)}</small>` : '<small class="tile-fase">sem lote</small>'))(lotes.find((l) => l.tanque_id === t.id))}<i class="ponto"></i></button>`).join('')}</div>
           <select id="tanque" hidden>${tanques.map((t) => `<option value="${esc(t.id)}"${t.id === tanqueInicial ? ' selected' : ''}>${esc(t.nome)}</option>`).join('')}</select>
         </div>
         <p id="lote-linha" class="lote-linha" hidden></p>
@@ -299,13 +299,24 @@ export async function renderLancar(ctx, el, params = {}) {
     info.hidden = false;
   }
   selTanque.addEventListener('change', pintarInfo);
+  selTanque.addEventListener('change', () => { const u = f.querySelector('#tq-ultimo'); if (u) u.remove(); });
   pintarInfo();
+  // biometria: peso da amostra em gramas no alevino e no berçário (o banco guarda sempre em kg)
+  const pesoEmGramas = () => { const l = lotes.find((x) => x.id === selLote.value); return !!l && ['alevinagem', 'bercario'].includes(l.tipo); };
+  const pesoAmostraKg = () => { const el = f.querySelector('#peso'); if (!el) return 0; const v = numDecimal(el.value); return v > 0 ? (pesoEmGramas() ? v / 1000 : v) : v; };
 
   if (tipo === 'biometria') {
     // mortos por lote (só com internet): permite estimar os peixes vivos e a biomassa na hora
     let mortos = null;
+    // alevino e berçário: a amostra se pesa em gramas no campo (50 alevinos = 400 g)
+    const ajustaUnidade = () => {
+      const g = pesoEmGramas();
+      f.querySelector('#rot-peso').textContent = `Peso total dos peixes (${g ? 'gramas' : 'kg'})`;
+      f.querySelector('#peso').placeholder = g ? 'Ex.: 400' : 'Ex.: 2,4';
+    };
+    selLote.addEventListener('change', ajustaUnidade); selTanque.addEventListener('change', ajustaUnidade); ajustaUnidade();
     const atualizaPm = () => {
-      const p = numDecimal(f.querySelector('#peso').value), q = num(f.querySelector('#amostra').value);
+      const p = pesoAmostraKg(), q = num(f.querySelector('#amostra').value);
       const pm = f.querySelector('#pm'), aviso = f.querySelector('#aviso-amostra');
       if (!(p > 0 && q > 0)) { pm.textContent = 'Peso médio: —'; aviso.hidden = true; return; }
       const medioG = (p / q) * 1000;
@@ -378,7 +389,7 @@ export async function renderLancar(ctx, el, params = {}) {
     const sacosSug = Math.max(0.5, Math.round((sug.kg / kgSaco) * 2) / 2);
     const bio = sug.biomassaKg >= 1000 ? `${fmtNum(sug.biomassaKg / 1000, 1)} t` : `${fmtNum(sug.biomassaKg, 0)} kg`;
     box.hidden = false;
-    box.innerHTML = `<button type="button" class="chip" id="b-sug">Sugestão: ${esc(sacosTxt(sacosSug))}</button>
+    box.innerHTML = `<button type="button" class="chip" id="b-sug">Sugestão: ${sug.kg / kgSaco < 0.95 ? `${fmtNum(sug.kg, sug.kg < 10 ? 1 : 0)} kg (${esc(sacosTxt(sacosSug))})` : esc(sacosTxt(sacosSug))}</button>
       <small>${fmtNum(sug.pct, 1)}% do peso vivo${ctx.podeGerir() ? ` (${bio} de peixe)` : ''}${sug.provisoria ? ' · taxa provisória, confirme com o técnico' : ''}</small>`;
     box.querySelector('#b-sug').onclick = () => { const q = f.querySelector('#qtd'); q.value = String(sacosSug); q.dispatchEvent(new Event('input')); q.focus(); };
   }
@@ -472,9 +483,9 @@ export async function renderLancar(ctx, el, params = {}) {
       if (q * kgSaco > 2000) return mostrarErro('Quantidade muito alta. Confira o número de sacos.');
       payload = { ...base, tanque_id: selTanque.value, quantidade_kg: Math.round(q * kgSaco * 100) / 100 };
     } else if (tipo === 'biometria') {
-      const pesoTxt = f.querySelector('#peso').value, p = numDecimal(pesoTxt), q = num(f.querySelector('#amostra').value);
+      const pesoTxt = f.querySelector('#peso').value, p = pesoAmostraKg(), q = num(f.querySelector('#amostra').value);
       if (pesoTxt.includes('.') && pesoTxt.includes(',')) return mostrarErro('Digite o peso sem ponto de milhar. Ex.: 1250,5');
-      if (!(p > 0)) return mostrarErro('Informe o peso total da amostra em kg.');
+      if (!(p > 0)) return mostrarErro(`Informe o peso total da amostra em ${pesoEmGramas() ? 'gramas' : 'kg'}.`);
       if (!(q >= 1) || !Number.isInteger(q)) return mostrarErro('Informe quantos peixes foram pesados (número inteiro).');
       payload = { ...base, peso_amostra_kg: p, quantidade_amostrada: q };
       if (!(await pesoConferido(lote_id, q, p, data, await dadosRapidos()))) return;
@@ -506,6 +517,14 @@ export async function renderLancar(ctx, el, params = {}) {
     } else {
       const q = num(f.querySelector('#qtd').value);
       if (!(q >= 1) || !Number.isInteger(q)) return mostrarErro('Informe a quantidade de peixes mortos (número inteiro).');
+      // um zero a mais vira "1 milhão de mortos" na Início: barra mais mortos do que peixes e confere perda grande
+      const lote = lotes.find((l) => l.id === lote_id), dados = await dadosRapidos();
+      const vivos = dados && lote ? vivosDoLote(lote, dados.res[lote.id]) : null;
+      if (vivos != null && q > vivos) return mostrarErro(`O tanque tem cerca de ${plural(vivos, 'peixe vivo', 'peixes vivos')}. Confira o número (um zero a mais?). Se a contagem do lote estiver errada, peça para corrigir em Tanques.`);
+      if (vivos != null && vivos > 0 && q > vivos * 0.05 && q > 50) {
+        const pct = fmtNum((q / vivos) * 100, 1);
+        if (!(await confirmar({ titulo: 'Confira a mortalidade', texto: `${plural(q, 'peixe morto', 'peixes mortos')} é ${pct}% do tanque (${plural(vivos, 'peixe', 'peixes')}) num dia só. Está certo?`, ok: 'Está certo', cancelar: 'Corrigir' }))) return;
+      }
       payload = { ...base, quantidade: q };
       const causa = causaEscolhida();
       if (causa) payload.causa = causa;
