@@ -1,0 +1,15 @@
+from base import *
+with sync_playwright() as pw:
+    s = Sessao(pw, 'p11')
+    entrar(s, 'dono'); s.ir('#/estoque'); s.pg.wait_for_timeout(1500)
+    s.pg.get_by_text('Registrar compra de ração de engorda').click(); s.pg.wait_for_timeout(1200)
+    print('kg por saco já vem:', s.pg.input_value('#kgsaco'))
+    s.pg.fill('#sacos', '100'); s.pg.wait_for_timeout(200)
+    if not s.pg.input_value('#kgsaco'): s.pg.fill('#kgsaco', '25')
+    s.pg.fill('#custo', '9850'); s.pg.fill('#forn', 'Agropecuária Boa Vista'); s.pg.wait_for_timeout(300)
+    s.shot('compra_preenchida')
+    sub = s.pg.locator('#sacos').locator('xpath=ancestor::form').locator('button[type=submit]')
+    print('BOTAO:', sub.inner_text()); sub.click(); s.pg.wait_for_timeout(3000); s.shot('apos_compra')
+    print('APOS:', s.texto('#view')[:500].replace('\n', ' | '))
+    s.ir('#/'); s.pg.wait_for_timeout(2500); print('INICIO estoque:', [l for l in s.texto('#view').split('\n') if 'saco' in l][:8])
+    print('ERROS:', s.erros); s.fechar()

@@ -1,5 +1,5 @@
 // Tela de um tanque (todos os papéis): números de cada lote, sobrevivência, previsão de despesca e atalhos para lançar.
-import { esc, fmtInt, fmtNum, fmtData, hojeISO, diasEntre, num, ROTULO_TIPO, faseCss, progresso, fmtPct } from '../util.js';
+import { esc, fmtInt, fmtNum, fmtData, hojeISO, diasEntre, num, ROTULO_TIPO, FASES, faseCss, progresso, fmtPct } from '../util.js';
 import * as db from '../db.js';
 import { previsaoDespesca, vivosDoLote } from '../calc.js';
 import { icone } from '../icons.js';
@@ -27,11 +27,17 @@ export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje, meta
             <div><span>Dias no tanque</span><b>${fmtInt(dias)}</b></div>
             <div><span>Peixes vivos (estim.)</span><b>${fmtInt(vivos ?? l.quantidade_inicial)}</b></div>
           </div>
-          ${vivos != null && l.quantidade_inicial > 0 ? `<div class="td-sobre">${progresso((vivos / l.quantidade_inicial) * 100, { tom: 'ok', rotulo: `Sobrevivência ${fmtPct((vivos / l.quantidade_inicial) * 100)}%` })}<p class="h-trilho-leg"><span>Sobrevivência: ${fmtInt(vivos)} de ${fmtInt(l.quantidade_inicial)} peixes</span><b>${fmtPct((vivos / l.quantidade_inicial) * 100)}%</b></p></div>` : ''}
+          ${vivos != null && l.quantidade_inicial > 0 ? ((sv) => `<div class="td-sobre">${progresso((sv / l.quantidade_inicial) * 100, { tom: 'ok', rotulo: `Sobrevivência ${fmtPct((sv / l.quantidade_inicial) * 100)}%` })}<p class="h-trilho-leg"><span>Sobrevivência: ${fmtInt(sv)} de ${fmtInt(l.quantidade_inicial)} peixes${Number(r.despescados) ? ` (${fmtInt(r.despescados)} já despescados)` : ''}</span><b>${fmtPct((sv / l.quantidade_inicial) * 100)}%</b></p></div>`)(Math.max(0, l.quantidade_inicial - (Number(r.mortos) || 0))) : ''}
           ${r ? `<div class="td-prev"><div class="td-prev-cab"><span>${PROXIMA_FASE[l.tipo] ? 'Mudança de fase' : 'Despesca'}</span><button class="link" type="button" data-meta="${esc(l.id)}">Mudar meta</button></div>${htmlPrevisao(previsaoDespesca(l, r, metaDe(l, metas), hoje), l.tipo)}</div>` : ''}
         </section>`;
       }).join('')
-    : '<div class="card vazio"><p>Sem lote ativo neste tanque.</p></div>';
+    : podeGerir
+      ? `<div class="card povoar">
+          <p class="povoar-tit">Tanque vazio. Que fase vai entrar?</p>
+          <div class="povoar-fases">${FASES.map(([v, r]) => `<a class="btn povoar-fase" href="#/tanque/${esc(tanque.id)}?fase=${v}"><span class="fase ${faseCss(v)}"></span>${r}</a>`).join('')}</div>
+          <p class="mudo pequeno">Depois você informa a espécie, a quantidade e o peso de entrada.</p>
+        </div>`
+      : '<div class="card vazio"><p>Sem lote ativo neste tanque.</p><p class="mudo pequeno">Peça ao dono ou ao gerente para cadastrar o lote de peixes.</p></div>';
 
   const comLote = lotes.length > 0;
   const lancouHoje = lotes.some((l) => resumo[l.id] && resumo[l.id].ultima_racao === hoje) || racaoHojeLocal.has(tanque.id);

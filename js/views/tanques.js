@@ -5,6 +5,7 @@ import { ESPECIES } from '../config.js';
 import { esc, fmtData, fmtInt, fmtNum, hojeISO, num, ROTULO_TIPO, FASES, areaHa, progresso, fmtPct, plural } from '../util.js';
 import { lerPlanilha } from '../planilha.js';
 import { vivosDoLote } from '../calc.js';
+import * as db from '../db.js';
 
 
 // 2,3 kg / 500 g; 5,5 ha
@@ -16,6 +17,8 @@ const avisoOffline = () => (navigator.onLine ? '' : '<p class="aviso">Sem intern
 export async function renderTanques(ctx, el) {
   if (!ctx.podeGerir()) return semPermissao(el);
   const { tanques, lotes } = ctx.state.ref;
+  // peixes vivos (entrada − mortos − despescados), igual à Início; sem o resumo, mostra a entrada
+  const resumo = Object.fromEntries((((await db.kvGet('resumo').catch(() => null)) || [])).map((r) => [r.lote_id, r]));
 
   el.innerHTML = `
     <h1>Tanques</h1>
@@ -23,10 +26,10 @@ export async function renderTanques(ctx, el) {
     <div class="card">
       ${tanques.length ? `<ul class="lista lista-grade">${tanques.map((t) => {
         const ls = lotes.filter((l) => l.tanque_id === t.id);
-        const peixes = ls.reduce((a, l) => a + (Number(l.quantidade_inicial) || 0), 0);
+        const peixes = ls.reduce((a, l) => a + (resumo[l.id] ? vivosDoLote(l, resumo[l.id]) : Number(l.quantidade_inicial) || 0), 0);
         const sub = ls.length > 1 ? `${ls.length} lotes ativos · ${fmtInt(peixes)} peixes` : ls.length ? `${ROTULO_TIPO[ls[0].tipo] || ls[0].tipo} · ${fmtInt(peixes)} peixes` : 'sem lote ativo';
         return `<li><a class="esq" href="#/tanque/${esc(t.id)}"><b>${esc(t.nome)}</b><small>${esc(sub)}${t.area_ha ? ` · ${haTxt(t.area_ha)}` : ''}</small></a><span class="seta">${icone('direita', 20)}</span></li>`;
-      }).join('')}</ul>` : '<p class="mudo" style="margin:0">Nenhum tanque cadastrado ainda.</p>'}
+      }).join('')}</ul>` : (ctx.state.perfil.papel === 'dono' ? '<p class="mudo" style="margin:0">Nenhum tanque cadastrado ainda.</p>' : '<p class="aviso" style="margin:0">Nenhum tanque liberado para você. Se a fazenda já tem tanques, peça ao dono para liberar em Mais › Equipe, em vez de cadastrar de novo.</p>')}
     </div>
     <div class="pc-duas">
     <form id="f-novo" class="card form" novalidate>
@@ -115,7 +118,7 @@ export async function renderTanques(ctx, el) {
   });
 }
 
-export async function renderTanque(ctx, el, id) {
+export async function renderTanque(ctx, el, id, params = {}) {
   if (!ctx.podeGerir()) return semPermissao(el);
   const tanque = ctx.state.ref.tanques.find((t) => t.id === id);
   if (!tanque) { el.innerHTML = '<div class="card vazio">Tanque não encontrado.<br></div>'; return; }
@@ -138,6 +141,9 @@ export async function renderTanque(ctx, el, id) {
   const temArea = 'area_ha' in tanque; // banco com o sql/17
   const dono = ctx.state.perfil.papel === 'dono';
   const hoje = hojeISO();
+  // veio do tanque vazio na Início ("Que fase vai entrar?"): fase já escolhida e formulário em foco
+  const doInicio = FASES.some(([v]) => v === params.fase);
+  const faseIni = doInicio ? params.fase : 'engorda';
 
   el.innerHTML = `
     <h1>${esc(tanque.nome)}</h1>
@@ -170,7 +176,7 @@ export async function renderTanque(ctx, el, id) {
       <h3>Novo lote de peixes</h3>
       <div class="duas">
         <label>Fase
-          <select id="tipo">${FASES.map(([v, r]) => `<option value="${v}"${v === 'engorda' ? ' selected' : ''}>${r}</option>`).join('')}</select></label>
+          <select id="tipo">${FASES.map(([v, r]) => `<option value="${v}"${v === faseIni ? ' selected' : ''}>${r}</option>`).join('')}</select></label>
         <label>Espécie
           <select id="especie">${ESPECIES.map((e) => `<option value="${esc(e)}">${esc(e)}</option>`).join('')}<option value="__outra">Outra…</option></select></label>
       </div>
@@ -216,11 +222,30 @@ export async function renderTanque(ctx, el, id) {
 
   // peso médio por peixe → peso total do lote (o banco guarda o total)
   const f = el.querySelector('#f-lote');
+  if (doInicio) {
+    f.querySelector('h3').textContent = `Povoar com ${ROTULO_TIPO[faseIni]}`;
+    requestAnimationFrame(() => f.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+  }
   const pmKg = (inp, un) => { const v = num(f.querySelector(inp).value); return v > 0 ? (f.querySelector(un).value === 'g' ? v / 1000 : v) : null; };
   const atualizaPm = () => {
     const q = num(f.querySelector('#qtd').value), pm = pmKg('#pm-in', '#pm-un');
     f.querySelector('#pm').textContent = q > 0 && pm ? `Peso total do lote: ${fmtNum(q * pm, q * pm < 100 ? 1 : 0)} kg (${fmtInt(q)} × ${pmTxt(pm)})` : 'Peso total do lote: —';
   };
+  // alevino e berçário se pesam em gramas no campo; recria e engorda em kg (recria chega a 1,5 kg). A unidade acompanha a fase
+  // escolhida (a pessoa ainda pode trocar). Só muda o que ela não mexeu.
+  const unidadeDaFase = () => {
+    const g = ['alevinagem', 'bercario'].includes(f.querySelector('#tipo').value);
+    for (const [inp, un] of [['#pm-in', '#pm-un'], ['#pmh-in', '#pmh-un']]) {
+      const sel = f.querySelector(un);
+      if (sel.dataset.mexeu) continue;
+      sel.value = g ? 'g' : 'kg';
+      f.querySelector(inp).placeholder = g ? 'Ex.: 2' : 'Ex.: 2,3';
+    }
+    atualizaPm();
+  };
+  f.querySelectorAll('#pm-un, #pmh-un').forEach((s) => s.addEventListener('change', () => { s.dataset.mexeu = '1'; }));
+  f.querySelector('#tipo').addEventListener('change', unidadeDaFase);
+  unidadeDaFase();
   f.addEventListener('input', atualizaPm); f.addEventListener('change', atualizaPm);
   const andamento = f.querySelector('#andamento');
   andamento.addEventListener('change', () => {
@@ -254,6 +279,7 @@ export async function renderTanque(ctx, el, id) {
       if (pmHoje) await ctx.api.biometriaInicial(loteId, pmHoje, ctx.state.perfil.id, hoje);
       await ctx.atualizarRef();
       ctx.toast('Lote cadastrado', 'ok');
+      if (doInicio) { location.hash = `#/t/${id}`; return; } // volta para a tela do tanque, já com o lote e os botões de lançar
       renderTanque(ctx, el, id);
     } catch (e) { falha(e.message); btn.disabled = false; }
   });

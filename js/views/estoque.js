@@ -12,7 +12,7 @@ const MENSAGEM = {
   critico: 'Estoque acabando. Compre já e conte o que sobrou.',
   atencao: 'Planeje a próxima compra. Com pouco estoque, contar é rápido: aproveite para contar.',
   negativo: 'O consumo lançado passou do que foi comprado. Confira as compras e faça uma contagem.',
-  'sem-dado': 'Sem consumo nos últimos 7 dias para estimar quanto dura.',
+  'sem-dado': 'Ainda sem ração lançada para estimar quanto dura.',
   ok: 'Estoque tranquilo.',
 };
 
@@ -42,7 +42,10 @@ export async function renderEstoque(ctx, el) {
   const ajustes = Number(saldo?.total_ajustes_kg || 0);
   const kg = Number(saldo?.saldo_kg || 0);
   const hoje = hojeISO();
-  const sit = situacaoEstoque(kg, saldo?.consumo_7d_kg, ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS);
+  // fazenda nova (sem 7 dias completos de histórico): estima pelo que foi dado hoje
+  const hojeKg = consumo.filter((c) => c.data === hoje).reduce((t, c) => t + Number(c.quantidade_kg || 0), 0);
+  const peloDeHoje = !(Number(saldo?.consumo_7d_kg) > 0) && hojeKg > 0;
+  const sit = situacaoEstoque(kg, peloDeHoje ? hojeKg * 7 : saldo?.consumo_7d_kg, ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS);
   const ult = contagens[0];
   const sugKg = sugestaoCompraKg(kg, sit.porDia, ESTOQUE_COBERTURA_DIAS);
   const diasSemContar = ult ? diasEntre(ult.data, hoje) : null;
@@ -58,14 +61,14 @@ export async function renderEstoque(ctx, el) {
 
   el.innerHTML = `
     <h1>Estoque de ração</h1>
-    ${porTipo ? `<div class="seg" style="--n:2" role="tablist">${Object.entries(NOME_RACAO).map(([k]) => `<button type="button" data-tipo-racao="${k}" class="${k === tipoAtual ? 'on' : ''}">${k === 'engorda' ? 'Engorda' : 'Alevino'} <small>${sc(Math.max(0, Number((saldos.linhas.find((x) => x.tipo_racao === k) || {}).saldo_kg || 0)), 0)} sacos</small></button>`).join('')}</div>` : ''}
+    ${porTipo ? `<div class="seg" style="--n:2" role="tablist">${Object.entries(NOME_RACAO).map(([k]) => `<button type="button" data-tipo-racao="${k}" class="${k === tipoAtual ? 'on' : ''}">${k === 'engorda' ? 'Engorda' : 'Alevino'} <small>${((v) => `${v < 0 ? '−' : ''}${sc(Math.abs(v), 0)}`)(Number((saldos.linhas.find((x) => x.tipo_racao === k) || {}).saldo_kg || 0))} sacos</small></button>`).join('')}</div>` : ''}
     <div class="pc-duas"><div>
     <div class="estoque-hero n-${sit.nivel}">
       <span>${porTipo ? `Ração de ${tipoAtual} em estoque` : 'Em estoque agora'}</span>
       <b>${kg < 0 ? '−' : ''}${sc(Math.abs(kg), 0)}<em>sacos</em></b>
       <small>${fmtNum(kg, 0)} kg${sit.dias != null ? ` · dura cerca de <strong>${fmtInt(Math.floor(sit.dias))} dias</strong>` : ''}</small>
-      ${sit.porDia > 0 ? `<small>Gasta ~${sc(sit.porDia)} sacos por dia (média dos últimos 7 dias)</small>` : ''}
-      ${sit.dias != null || sit.nivel === 'negativo' ? `<div class="hero-prog">${progresso(((sit.dias || 0) / ESTOQUE_COBERTURA_DIAS) * 100, { tom: { atencao: 'alerta', critico: 'erro', negativo: 'erro' }[sit.nivel] || '', rotulo: `Ração para ${fmtInt(Math.floor(sit.dias || 0))} de ${ESTOQUE_COBERTURA_DIAS} dias` })}<p class="h-trilho-leg"><span>${fmtInt(Math.floor(sit.dias || 0))} de ${ESTOQUE_COBERTURA_DIAS} dias de ração</span><span>meta: ${ESTOQUE_COBERTURA_DIAS} dias</span></p></div>` : ''}
+      ${sit.porDia > 0 ? `<small>Gasta ~${sc(sit.porDia)} sacos por dia (${peloDeHoje ? 'pelo que foi dado hoje' : 'média dos últimos 7 dias'})</small>` : ''}
+      ${sit.dias != null || sit.nivel === 'negativo' ? `<div class="hero-prog">${progresso(((sit.dias || 0) / ESTOQUE_COBERTURA_DIAS) * 100, { tom: { atencao: 'alerta', critico: 'erro', negativo: 'erro' }[sit.nivel] || '', rotulo: `Ração para ${fmtInt(Math.floor(sit.dias || 0))} de ${ESTOQUE_COBERTURA_DIAS} dias` })}<p class="h-trilho-leg"><span>${fmtInt(Math.floor(sit.dias || 0))} de ${ESTOQUE_COBERTURA_DIAS} dias de ração${peloDeHoje ? ' (no ritmo de hoje)' : ''}</span><span>meta: ${ESTOQUE_COBERTURA_DIAS} dias</span></p></div>` : ''}
       ${sit.nivel === 'ok' ? '' : `<p>${MENSAGEM[sit.nivel]}</p>`}
     </div>
     ${porTipo && saldos.linhas.length > 1 ? `<div class="card">${pizza(saldos.linhas.map((x) => { const v = Math.max(0, Number(x.saldo_kg || 0)) / kgS; return { nome: x.tipo_racao === 'alevino' ? 'Alevino' : 'Engorda', valor: v, cor: COR_RACAO[x.tipo_racao === 'alevino' ? 'alevino' : 'engorda'], txt: `${fmtNum(v, 0)} sacos` }; }), { centro: fmtNum(saldos.linhas.reduce((a, x) => a + Math.max(0, Number(x.saldo_kg || 0)), 0) / kgS, 0), sub: 'sacos', rotulo: 'Estoque por tipo de ração' })}</div>` : ''}

@@ -26,7 +26,7 @@ export async function renderEquipe(ctx, el) {
               ${['gerente', 'funcionario'].map((p) => `<option value="${p}"${u.papel === p ? ' selected' : ''}>${ROTULO_PAPEL[p]}</option>`).join('')}
               ${u.papel === 'dono' ? '<option value="dono" selected>Dono</option>' : ''}
             </select></label>
-          <div><b>Tanques liberados</b>
+          <div><b>Tanques liberados</b>${tanques.length > 3 ? ' <button class="link" type="button" data-todos>Marcar todos</button>' : ''}
             ${tanques.length ? tanques.map((t) => `<label class="linha-check"><input type="checkbox" name="tanque" value="${esc(t.id)}"${meus.has(t.id) ? ' checked' : ''}> ${esc(t.nome)}</label>`).join('') : '<p class="mudo">Nenhum tanque cadastrado.</p>'}
           </div>
           <label class="linha-check"><input type="checkbox" name="ativo"${u.ativo ? ' checked' : ''}> Acesso ativo</label>
@@ -61,6 +61,12 @@ export async function renderEquipe(ctx, el) {
       <button class="btn primario" type="submit">Vincular à fazenda</button>
     </form></details>`;
 
+  el.querySelectorAll('[data-todos]').forEach((b) => b.addEventListener('click', () => {
+    const caixas = [...b.closest('form').querySelectorAll('input[name=tanque]')];
+    const marcar = caixas.some((c) => !c.checked);
+    caixas.forEach((c) => { c.checked = marcar; });
+    b.textContent = marcar ? 'Desmarcar todos' : 'Marcar todos';
+  }));
   // ---- convite por link ----
   const copiar = async (texto) => {
     try { await navigator.clipboard.writeText(texto); ctx.toast('Link copiado', 'ok'); }

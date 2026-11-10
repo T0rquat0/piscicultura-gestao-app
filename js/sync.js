@@ -4,7 +4,36 @@
 // - Rede caiu, sinal ruim ou servidor instável (5xx): para e mantém tudo na fila; nada é descartado.
 //   O app tenta de novo sozinho (a cada 20 s com o app aberto, ao voltar a internet e ao reabrir).
 // - Só envia itens do usuário logado (o banco exige registrado_por = auth.uid()).
-import { filaList, filaPut, filaRemove } from './db.js';
+import { filaList, filaPut, filaRemove, kvGet, kvSet } from './db.js';
+
+// Depois de enviar, anota o lançamento na cópia dos números guardada no aparelho (kv 'resumo').
+// Sem isso, quem lança com sinal, fecha o app e abre no campo sem sinal via o tanque "sem ração":
+// a cópia só se renovava quando a Início abria com sinal. Quando a Início abre com sinal, a cópia
+// é trocada pelos números do banco, então uma diferença aqui dura pouco.
+export async function anotarNoResumo(tabela, p) {
+  try {
+    const linhas = await kvGet('resumo');
+    const r = Array.isArray(linhas) ? linhas.find((x) => x.lote_id === p.lote_id) : null;
+    if (!r) return;
+    const n = (v) => Number(v) || 0;
+    if (tabela === 'racao_consumo') {
+      r.racao_kg = n(r.racao_kg) + n(p.quantidade_kg);
+      if (!r.ultima_racao || p.data > r.ultima_racao) r.ultima_racao = p.data;
+    } else if (tabela === 'mortalidade') {
+      r.mortos = n(r.mortos) + n(p.quantidade);
+    } else if (tabela === 'despescas') {
+      r.despescados = n(r.despescados) + n(p.quantidade);
+    } else if (tabela === 'biometrias' && n(p.quantidade_amostrada) > 0 && (!r.ultima_biometria || p.data >= r.ultima_biometria)) {
+      r.ultima_biometria = p.data;
+      r.ultimo_peso_medio_kg = n(p.peso_amostra_kg) / n(p.quantidade_amostrada);
+    } else return;
+    await kvSet('resumo', linhas);
+    if (tabela === 'racao_consumo') { // a lista de ração dos últimos dias (Início sem sinal) também
+      const rac = await kvGet('racao14');
+      if (Array.isArray(rac)) { rac.push({ data: p.data, tanque_id: p.tanque_id, lote_id: p.lote_id, quantidade_kg: p.quantidade_kg }); await kvSet('racao14', rac); }
+    }
+  } catch { /* sem armazenamento: só deixa de atualizar a cópia */ }
+}
 import { ehErroDeRede, ehErroDeSessao, traduzErro } from './util.js';
 
 const TABELAS = new Set(['biometrias', 'mortalidade', 'racao_consumo', 'despescas', 'manejos']);
@@ -39,6 +68,7 @@ export async function sincronizar(client, userId) {
           error = { message: String((e && e.message) || e), code: '' };
         }
         if (!error || error.code === '23505') {
+          if (!error) await anotarNoResumo(it.tabela, it.payload); // 23505 = já tinha ido antes: não soma de novo
           await filaRemove(it.uuid_local);
           r.enviados++;
           continue;

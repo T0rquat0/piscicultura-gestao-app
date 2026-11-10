@@ -1,0 +1,20 @@
+from base import *
+with sync_playwright() as pw:
+    s = Sessao(pw, 'p03')
+    entrar(s, 'dono')
+    s.pg.get_by_text('Cadastrar o primeiro tanque').click(); s.pg.wait_for_timeout(1200); s.shot('dialogo_primeiro', inteira=False)
+    print('DIALOGO:', s.texto()[:400])
+    campo = s.pg.locator('dialog input, .dialogo input').first; campo.fill('Tanque 1'); s.pg.keyboard.press('Enter'); s.pg.wait_for_timeout(2500)
+    s.shot('apos_primeiro'); print('APOS 1o:', s.texto('#view')[:300])
+    s.ir('#/tanques', espera='#f-novo'); s.shot('tela_tanques')
+    for nome, area in [('Tanque 2', '0,5'), ('Tanque 3', '2,3'), ('Tanque 4', '')]:
+        s.pg.fill('#f-novo #nome', nome)
+        if area: s.pg.fill('#f-novo #area', area)
+        s.pg.locator('#f-novo button[type=submit]').click(); s.pg.wait_for_timeout(1800)
+    s.shot('quatro_tanques'); print('LISTA:', s.texto('#view')[:700])
+    # abre o Tanque 2 e povoa com alevinos (como o funcionário faz no campo: peso em gramas)
+    s.pg.get_by_text('Tanque 2').first.click(); s.pg.wait_for_selector('#f-lote', timeout=15000); s.pg.wait_for_timeout(600)
+    s.pg.select_option('#tipo', 'alevinagem'); s.pg.wait_for_timeout(300)
+    print('UNIDADE AO ESCOLHER ALEVINAGEM:', s.pg.input_value('#pm-un'))
+    s.pg.locator('#f-lote').screenshot(path=os.path.join(PRINTS, 'p03_form_alevino.png'))
+    print('ERROS:', s.erros); s.fechar()
