@@ -1,4 +1,4 @@
-# Manejo (aplicação de probiótico) na tela, com o Supabase SIMULADO: lançar, validar, funcionário, Registros, corrigir, CSV, 5 abas no celular.
+# Manejo (aplicação de probiótico) na tela, com o Supabase SIMULADO: lançar, validar, funcionário, Registros, corrigir, CSV, abas roláveis no celular.
 import os
 _ARQ = os.path.abspath(__file__)
 _PRE = open(os.path.join(os.path.dirname(_ARQ), 'teste_despesca.py'), encoding='utf-8').read().split('with sync_playwright() as pw:')[0]
@@ -28,9 +28,9 @@ posts_m = lambda: [x for t, x in est['posts'] if t == 'manejos']
 with sync_playwright() as pw:
     b = pw.chromium.launch(**LANCAR)
 
-    # funcionário lança; dono com 5 abas no celular estreito
+    # funcionário lança; dono com 6 abas no celular estreito
     preparar('funcionario'); pg = abrir_em(b, 390); form(pg)
-    checa(pg.locator('.seg button').count() == 4 and pg.locator('.seg button[data-tipo=manejo]').count() == 1, 'funcionário: 4 abas, com Manejo')
+    checa(pg.locator('.seg button').count() == 5 and pg.locator('.seg button[data-tipo=manejo]').count() == 1, 'funcionário: 5 abas, com Manejo')
     pg.fill('#man-produto', 'Bac Forte'); pg.fill('#man-dose', '200'); pg.click('#man-via [data-via=agua]'); pg.fill('#man-obs', 'após a ração')
     pg.click('#f button[type=submit]'); pg.wait_for_selector('.sucesso', timeout=10000); pg.wait_for_timeout(1200)
     m = posts_m()
@@ -43,7 +43,7 @@ with sync_playwright() as pw:
 
     preparar('dono'); pg = abrir_em(b, 320); form(pg)
     n = pg.evaluate("document.documentElement.scrollWidth > document.documentElement.clientWidth + 1")
-    checa(not n and pg.locator('.seg button').count() == 5, '320 px: 5 abas sem transbordar a página')
+    checa(not n and pg.locator('.seg button').count() == 6, '320 px: 6 abas sem transbordar a página')
     corta = pg.evaluate("[...document.querySelectorAll('.seg button')].some(b => b.scrollWidth > b.clientWidth + 1)")
     checa(not corta, '320 px: nenhum nome de aba cortado')
     r = pg.evaluate("(() => { const b = document.querySelector('.seg button.on').getBoundingClientRect(); return [b.left, b.right, innerWidth]; })()")

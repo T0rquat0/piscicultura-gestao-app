@@ -60,7 +60,7 @@ async ({ N }) => {
       state: { perfil: { id: 'U', nome: 'Ana', papel, fazenda_id: 'F', fazendas: { nome: 'Fazenda' } }, ref: { tanques: f.tanques, lotes: f.lotes, kgSaco: um([25, 20, 40]), precoKg: um([null, 9.5]) } },
       api: {
         resumoLotes: async () => f.resumo, saldosRacao: async () => { if (!f.saldos) throw new Error('rpc'); return f.saldos; },
-        racaoPeriodo: async () => f.racao, mortalidadePeriodo: async () => f.mortes, plano: async () => ({ estado: um(['ativo', 'teste', 'vencido']), valido_ate: iso(-5), em_uso: 1, limite: 5 }),
+        racaoPeriodo: async () => f.racao, mortalidadePeriodo: async () => f.mortes, aguaPeriodo: async () => [], plano: async () => ({ estado: um(['ativo', 'teste', 'vencido']), valido_ate: iso(-5), em_uso: 1, limite: 5 }),
         criarTanque: async () => {},
       },
       podeGerir: () => papel !== 'funcionario', toast: () => {}, atualizarRef: async () => true,
