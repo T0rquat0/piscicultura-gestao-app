@@ -51,7 +51,7 @@ with sync_playwright() as pw:
     checa('Amônia' in tenta({'#ag-am': '1.000,5'}), 'ponto e vírgula juntos: recusa')
     pg.click('#b-data'); pg.fill('#data', '2030-01-01'); checa('futuro' in tenta({'#ag-od': '5'}), 'data futura: recusa')
     pg.fill('#data', HOJE)
-    SEM['sim'] = True; checa('sql/26' in tenta({'#ag-od': '5'}), 'sem o sql/26: avisa e não salva'); SEM['sim'] = False
+    SEM['sim'] = True; checa('sql/27' in tenta({'#ag-od': '5'}), 'sem o sql/27: avisa e não salva'); SEM['sim'] = False
     checa(not env(), 'nada enviado com erro')
     pg.close()
 

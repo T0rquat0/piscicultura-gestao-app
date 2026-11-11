@@ -18,7 +18,7 @@ await db.exec(`grant usage on schema public to anon, authenticated;
   create table despesas_gerais (id uuid primary key default gen_random_uuid(), fazenda_id uuid, data date, categoria text, valor numeric, descricao text, registrado_por uuid, criado_em timestamptz default now());
   alter table despesas_gerais enable row level security; grant select, insert, update, delete on despesas_gerais to authenticated;`); // como no banco real
 for (const f of arquivos.filter((f) => f >= '22')) await db.exec(readFileSync(DIR + f, 'utf8'));
-await db.exec(readFileSync(new URL('./compat_cadastro.sql', import.meta.url), 'utf8')); // sql/30: cadastro com CPF (atalho só de teste)
+await db.exec(readFileSync(new URL('./compat_cadastro.sql', import.meta.url), 'utf8')); // sql/31: cadastro com CPF (atalho só de teste)
 await db.exec(readFileSync(DIR + '22_seguranca.sql', 'utf8')); // de novo: pode repetir
 await db.exec(readFileSync(DIR + '23_dinheiro_so_dono.sql', 'utf8'));
 await db.exec(readFileSync(DIR + '24_desconectar_aparelhos.sql', 'utf8'));
@@ -120,7 +120,7 @@ checa(!r.erro, 'dono registra contagem normalmente' + (r.erro ? ': ' + r.erro : 
 
 // 8) teste grátis travado em 30 dias
 const N = id('a6'); await db.exec(`insert into auth.users values ('${N}','n@x')`);
-// (desde o sql/29 o pedido de dias nem existe mais: é recusado; se existisse, o máximo seria 30)
+// (desde o sql/30 o pedido de dias nem existe mais: é recusado; se existisse, o máximo seria 30)
 const pedido = await como(N, `select criar_fazenda('Esperta', 'Fulano', 365)`);
 const dias = (await db.query(`select teste_ate - hoje_local() d from fazendas where nome = 'Esperta'`)).rows[0]?.d;
 checa(pedido.erro ? dias === undefined : dias === 30, `pedir 365 dias de teste pela API: recusado ou só 30 (deu ${pedido.erro ? 'recusado' : dias})`);

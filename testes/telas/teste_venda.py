@@ -1,4 +1,4 @@
-# Venda na despesca (só o dono; tabela despesca_vendas, sql/27), com o Supabase SIMULADO:
+# Venda na despesca (só o dono; tabela despesca_vendas, sql/28), com o Supabase SIMULADO:
 # preço, comprador, receita, validações, envio, relatório, PDF, correção, e gerente/funcionário sem dinheiro.
 import os
 _ARQ = os.path.abspath(__file__)
@@ -41,17 +41,17 @@ VENDA = {'despesca_uuid': UL, 'preco_kg': 9.5, 'comprador': 'Peixaria Rio'}
 
 with sync_playwright() as pw:
     b = pw.chromium.launch(**LANCAR)
-    # dono: conta da receita, validações, e banco sem o sql/27
+    # dono: conta da receita, validações, e banco sem o sql/28
     pg = abrir_em(b, 'dono'); form(pg)
     pg.fill('#desp-qtd', '500'); pg.fill('#desp-bruto', '2000'); pg.fill('#desp-preco', '9,50'); pg.wait_for_timeout(200)
     checa('19.000' in pg.inner_text('#desp-calc') and 'Receita' in pg.inner_text('#desp-calc'), f'dono: receita ao digitar: {pg.inner_text("#desp-calc")!r}')
     for v, m in [('abc', 'letras'), ('0', 'zero'), ('2000', 'absurdo')]:
         pg.fill('#desp-preco', v); pg.click('#f button[type=submit]'); pg.wait_for_timeout(250); checa('preço de venda' in pg.inner_text('#erro'), f'preço {m}: recusa')
     pg.fill('#desp-preco', '1.000,50'); pg.click('#f button[type=submit]'); pg.wait_for_timeout(250); checa('ponto de milhar' in pg.inner_text('#erro'), 'preço com ponto e vírgula: recusa')
-    SEM['tabela'] = True; pg.fill('#desp-preco', '9,50'); pg.click('#f button[type=submit]'); pg.wait_for_timeout(700); checa('sql/27' in pg.inner_text('#erro'), 'sem o sql/27: avisa e não salva')
+    SEM['tabela'] = True; pg.fill('#desp-preco', '9,50'); pg.click('#f button[type=submit]'); pg.wait_for_timeout(700); checa('sql/28' in pg.inner_text('#erro'), 'sem o sql/28: avisa e não salva')
     checa(not desp() and not vend(), 'nada enviado nas validações')
     pg.fill('#desp-preco', ''); pg.click('#f button[type=submit]'); pg.wait_for_selector('.sucesso', timeout=10000); pg.wait_for_timeout(1200)
-    x = desp(); checa(len(x) == 1 and '_venda' not in x[0] and not vend(), f'sem o sql/27 e sem preço: salva só a despesca {x}'); SEM['tabela'] = False; pg.close()
+    x = desp(); checa(len(x) == 1 and '_venda' not in x[0] and not vend(), f'sem o sql/28 e sem preço: salva só a despesca {x}'); SEM['tabela'] = False; pg.close()
 
     # dono: grava a despesca e a venda separadas (a venda na tabela só do dono, ligada pela uuid_local)
     pg = abrir_em(b, 'dono'); form(pg)

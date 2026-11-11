@@ -1,4 +1,4 @@
-// Testa o sql/29: o cliente não consegue mais pedir teste grátis maior que 30 dias.
+// Testa o sql/29 (custos e lucro) num Postgres de verdade (PGlite): valores em R$ só para o dono (como o sql/23).
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -7,25 +7,50 @@ let ok = true; const checa = (c, m) => { console.log((c ? 'OK    ' : 'FALHA ') +
 const db = new PGlite();
 await db.exec(`create role anon; create role authenticated; create schema auth; create table auth.users (id uuid primary key, email text);
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('teste.uid', true), '')::uuid $$; grant usage on schema auth to anon, authenticated;`);
-for (const f of readdirSync(DIR).filter((f) => /^\d\d_.*\.sql$/.test(f) && !f.startsWith('05_') && f < '30').sort()) await db.exec(readFileSync(DIR + f, 'utf8')); // o 30 substitui o 29
-await db.exec(readFileSync(DIR + '29_trava_dias_do_teste.sql', 'utf8')); // de novo: pode repetir
+for (const f of readdirSync(DIR).filter((f) => /^\d\d_.*\.sql$/.test(f) && !f.startsWith('05_')).sort()) await db.exec(readFileSync(DIR + f, 'utf8'));
+await db.exec(readFileSync(new URL('./compat_cadastro.sql', import.meta.url), 'utf8')); // sql/31: cadastro com CPF (atalho só de teste)
+await db.exec(readFileSync(DIR + '29_custos_e_lucro.sql', 'utf8')); // de novo: pode repetir
 await db.exec(`grant usage on schema public to anon, authenticated; grant select, insert, update, delete on all tables in schema public to anon, authenticated;`);
-const A = '00000000-0000-4000-8000-0000000000a1', B = '00000000-0000-4000-8000-0000000000a2';
-await db.exec(`insert into auth.users values ('${A}','a@x'), ('${B}','b@x');`);
-const como = async (uid, sql) => { await db.exec(`set role authenticated; set teste.uid = '${uid}';`); try { const r = await db.query(sql); return { rows: r.rows }; } catch (e) { return { erro: e.message, rows: [] }; } finally { await db.exec(`reset role; set teste.uid = '';`); } };
+const D = '00000000-0000-4000-8000-0000000000a1', G = '00000000-0000-4000-8000-0000000000a2', W = '00000000-0000-4000-8000-0000000000a3', O = '00000000-0000-4000-8000-0000000000a4';
+const T = '00000000-0000-4000-8000-0000000000b1', L = '00000000-0000-4000-8000-0000000000c1';
+await db.exec(`insert into auth.users values ('${D}','d@x'), ('${G}','g@x'), ('${W}','w@x'), ('${O}','o@x');`);
+const como = async (uid, sql) => { await db.exec(`set role authenticated; set teste.uid = '${uid}';`); try { const r = await db.query(sql); return { rows: r.rows }; } catch (e) { return { erro: e.message, rows: [] }; } finally { await db.exec('reset role;'); } };
+await como(D, `select criar_fazenda('Fazenda X', 'Dono')`); await como(O, `select criar_fazenda('Outra', 'Outro')`);
+const F = (await db.query(`select fazenda_id f from usuarios where id='${D}'`)).rows[0].f;
+const F2 = (await db.query(`select fazenda_id f from usuarios where id='${O}'`)).rows[0].f;
+await db.exec(`insert into usuarios (id,fazenda_id,nome,papel) values ('${G}','${F}','Ger','gerente'), ('${W}','${F}','Func','funcionario');
+  insert into tanques (id,fazenda_id,nome) values ('${T}','${F}','T');
+  insert into usuario_tanques (usuario_id,tanque_id) values ('${W}','${T}'), ('${G}','${T}') on conflict do nothing;
+  insert into lotes (id,tanque_id,tipo,especie,data_entrada,quantidade_inicial,peso_inicial_kg) values ('${L}','${T}','engorda','Tambaqui','2026-01-01',100,10);`);
+const desp = (uid, f, v = 100, cat = 'energia') => como(uid, `insert into despesas_gerais (fazenda_id,data,categoria,valor,registrado_por) values ('${f}','2026-11-01','${cat}',${v},'${uid}')`);
+const custo = (uid, v = 500) => como(uid, `insert into custos_lote (lote_id,custo_alevino) values ('${L}',${v}) on conflict (lote_id) do update set custo_alevino = excluded.custo_alevino`);
+const nD = async () => (await db.query(`select count(*)::int n from despesas_gerais`)).rows[0].n;
 
-let r = await como(A, `select criar_fazenda('Fazenda A', 'Ana', 90) f`);
-checa(!!r.erro, 'pedir 90 dias por fora: recusado');
-r = await como(A, `select criar_fazenda(p_fazenda => 'Fazenda A', p_nome => 'Ana', p_teste_dias => 90) f`);
-checa(!!r.erro, 'pedir 90 dias por nome do parâmetro: recusado');
-r = await como(A, `select criar_fazenda('Fazenda A', 'Ana') f`);
-checa(!r.erro && r.rows[0]?.f, `cadastro normal do app funciona ${r.erro || ''}`);
-const dias = (await db.query(`select (teste_ate - hoje_local())::int d from fazendas where id = '${r.rows[0]?.f}'`)).rows[0]?.d;
-checa(dias === 30, `teste grátis de 30 dias (veio ${dias})`);
-checa(!!(await como(A, `select criar_fazenda('Outra', 'Ana')`)).erro, 'mesma conta não cria segunda fazenda');
-checa(!!(await como(A, `update fazendas set teste_ate = '2099-01-01'`)).erro || (await db.query(`select teste_ate::text t from fazendas`)).rows[0].t !== '2099-01-01', 'dono não aumenta o próprio teste');
-await db.exec(`set role anon;`); let e = null; try { await db.query(`select criar_fazenda('X', 'Y')`); } catch (x) { e = x; } await db.exec('reset role;');
-checa(!!e, 'sem login: não cria fazenda');
-const n = (await db.query(`select count(*)::int n from pg_proc where proname = 'criar_fazenda'`)).rows[0].n;
-checa(n === 1, `só existe uma versão da função (${n})`);
+checa(!(await desp(D, F)).erro, 'dono lança despesa');
+checa(!!(await desp(G, F)).erro, 'gerente NÃO lança despesa (R$ só para o dono)');
+checa(!(await desp(D, F, 50, 'outros')).erro, 'dono lança outra despesa');
+checa((await como(G, `select * from despesas_gerais`)).rows.length === 0, 'gerente NÃO vê despesas');
+checa(!!(await desp(W, F)).erro, 'funcionário NÃO lança despesa');
+checa(!!(await desp(O, F)).erro, 'outra fazenda NÃO lança');
+checa((await como(W, `select * from despesas_gerais`)).rows.length === 0, 'funcionário NÃO vê despesas');
+checa((await como(O, `select * from despesas_gerais`)).rows.length === 0, 'outra fazenda NÃO vê despesas');
+checa(!!(await desp(D, F, 0)).erro, 'valor zero recusado'); checa(!!(await desp(D, F, 10, 'festa')).erro, 'tipo inválido recusado');
+checa(!(await custo(D)).erro, 'dono informa custo do alevino');
+await custo(G, 999);
+checa((await db.query(`select max(custo_alevino)::int v from custos_lote`)).rows[0].v === 500, 'gerente NÃO altera o custo do alevino');
+checa((await como(G, `select * from custos_lote`)).rows.length === 0, 'gerente NÃO vê o custo do alevino');
+checa(!(await custo(D, 600)).erro, 'dono corrige (não duplica)');
+checa((await db.query(`select count(*)::int n, max(custo_alevino)::int v from custos_lote`)).rows[0].v === 600, 'guardou o valor corrigido');
+checa(!!(await custo(W)).erro, 'funcionário NÃO informa custo');
+checa((await como(W, `select * from custos_lote`)).rows.length === 0, 'funcionário NÃO vê custo do alevino');
+checa((await como(O, `select * from custos_lote`)).rows.length === 0, 'outra fazenda NÃO vê custo');
+checa(!!(await custo(D, -1)).erro, 'custo negativo recusado');
+await como(D, `delete from despesas_gerais where categoria='outros'`);
+const op = (await db.query(`select operacao from historico where tabela='despesas_gerais' and acao='excluiu'`)).rows[0]?.operacao;
+let r = await como(D, `select restaurar_exclusao(${op}) n`);
+checa(r.rows[0]?.n === 1 && await nD() === 2, `despesa excluída volta da lixeira ${r.erro || ''}`);
+const j1 = (await db.query(`select to_jsonb(d) j from despesas_gerais d limit 1`)).rows[0].j, j2 = (await db.query(`select to_jsonb(c) j from custos_lote c`)).rows[0].j;
+await como(D, `delete from despesas_gerais`); await como(D, `delete from custos_lote`);
+r = await como(D, `select importar_copia('${JSON.stringify({ tabelas: { fazendas: [{ id: F }], despesas_gerais: [j1], custos_lote: [j2] } })}'::jsonb) x`);
+checa(r.rows[0]?.x?.despesas_gerais === 1 && r.rows[0]?.x?.custos_lote === 1, `cópia de segurança devolve ${r.erro || ''}`);
 console.log(ok ? 'RESULTADO: TUDO OK' : 'RESULTADO: FALHOU'); process.exit(ok ? 0 : 1);

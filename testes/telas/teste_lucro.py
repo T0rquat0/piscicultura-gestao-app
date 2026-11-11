@@ -18,7 +18,7 @@ def preparar(papel, fechado=True, alevino=True, preco=10):
     est['racao_consumo'] = [{'id': 'r1', 'data': '2026-03-01', 'tanque_id': T, 'quantidade_kg': 2000, 'registrado_por': U}]
     est['racao_estoque'] = [{'id': 'c1', 'data_compra': '2026-01-05', 'quantidade_kg': 2000, 'custo_total': 8000, 'fornecedor': 'X'}]
     est['despescas'] = [{'id': 'd1', 'uuid_local': 'u-d1', 'data': '2026-06-01', 'tipo': 'total' if fechado else 'parcial', 'quantidade': 950, 'peso_bruto_kg': 2000, 'peso_liquido_kg': None, 'registrado_por': U}]
-    est['despesca_vendas'] = [{'despesca_uuid': 'u-d1', 'preco_kg': preco, 'comprador': None}] if preco else []  # venda só do dono (sql/27)
+    est['despesca_vendas'] = [{'despesca_uuid': 'u-d1', 'preco_kg': preco, 'comprador': None}] if preco else []  # venda só do dono (sql/28)
     est['despesas_gerais'] = [{'id': 'g1', 'data': '2026-02-01', 'categoria': 'energia', 'valor': 2500, 'descricao': 'Luz', 'fazenda_id': F}]
     est['custos_lote'] = [{'lote_id': L1, 'custo_alevino': 1500}] if alevino else []
 def abrir(b, w=390):
@@ -68,8 +68,8 @@ with sync_playwright() as pw:
     x = [p2 for tb, p2 in est['posts'] if tb == 'despesas_gerais']; checa(len(x) == 1 and x[0]['valor'] == 1250.5 and x[0]['categoria'] == 'mao_de_obra' and x[0]['fazenda_id'] == F, f'grava uma vez: {x}')
     pg.close()
 
-    # banco sem o sql/28, gerente e funcionário
-    preparar('dono'); SEM['sim'] = True; pg = abrir(b); vai(pg, '#/lucro', '.card.vazio'); checa('sql/28' in pg.inner_text('#view'), 'sem o sql/28: avisa'); SEM['sim'] = False; pg.close()
+    # banco sem o sql/29, gerente e funcionário
+    preparar('dono'); SEM['sim'] = True; pg = abrir(b); vai(pg, '#/lucro', '.card.vazio'); checa('sql/29' in pg.inner_text('#view'), 'sem o sql/29: avisa'); SEM['sim'] = False; pg.close()
     X = '<img src=x onerror="window.__xss=1">'
     preparar('funcionario'); est['despesas_gerais'][0]['descricao'] = X; pg = abrir(b); vai(pg, '#/lucro', '.card.vazio'); checa('só para o dono' in pg.inner_text('#view'), 'funcionário: Lucro bloqueado')
     vai(pg, '#/despesas', '.card.vazio'); checa('só para o dono' in pg.inner_text('#view'), 'funcionário: Despesas bloqueado')
