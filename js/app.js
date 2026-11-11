@@ -2,7 +2,7 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY, TIMEOUT_REDE_MS, TIMEOUT_LEITURA_MS, LIMITE_ABERTURA_MS, JANELA_SEM_REDE_MS, TERMOS_VERSAO } from './config.js';
 import { iniciarSeg } from './seg.js';
 import { DEV_LOGIN, loginAutomaticoAtivo } from './dev-login.js';
-import { esc, parseHash, ROTULO_PAPEL, traduzErro, ehErroDeRede, plural } from './util.js';
+import { esc, parseHash, ROTULO_PAPEL, traduzErro, ehErroDeRede, plural, ligarMascaraMoeda } from './util.js';
 import { criarApi } from './api.js';
 import * as db from './db.js';
 import { sincronizar } from './sync.js';
@@ -572,6 +572,7 @@ async function iniciar() {
 }
 
 olhoNasSenhas(document.body); // olho para mostrar/esconder a senha em todos os campos de senha
+ligarMascaraMoeda(document.body); // campos de R$: números entram pela direita, como no caixa eletrônico
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }

@@ -123,7 +123,7 @@ export async function renderEstoque(ctx, el) {
         </section>
         <section class="passo tipo-estoque">
           <h2 class="passo-t"><i>2</i> Nota da compra <small class="mudo">(opcional)</small></h2>
-          ${ctx.verDinheiro() ? '<label>Valor total pago <span class="com-prefixo"><em>R$</em><input id="custo" type="text" inputmode="decimal" autocomplete="off" maxlength="16" placeholder="Ex.: 3.940,00"></span></label>' : ''}
+          ${ctx.verDinheiro() ? '<label>Valor total pago <span class="com-prefixo"><em>R$</em><input id="custo" type="text" inputmode="numeric" autocomplete="off" maxlength="16" placeholder="0,00"></span></label>' : ''}
           <label>Fornecedor <input id="forn" maxlength="80" placeholder="Ex.: Agropecuária Boa Vista"></label>
         </section>
         <p id="erro" class="erro" hidden></p>

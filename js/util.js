@@ -76,6 +76,23 @@ export function numMoeda(v) {
   if (/^\d{1,3}(\.\d{3})+$/.test(s)) return Number(s.replace(/\./g, ''));
   return /^\d+(\.\d{1,2})?$/.test(s) ? Number(s) : NaN;
 }
+// Máscara de caixa eletrônico nos campos de reais: os números entram pela direita.
+// Digitar 1, 2, 5, 0, 5, 0 mostra 0,01 → 0,12 → 1,25 → 12,50 → 125,05 → 1.250,50. Letras, ponto e vírgula digitados
+// são ignorados (a vírgula sempre fica nos centavos); apagar tira o último número. Até 999.999.999,99.
+export function mascaraMoeda(el) {
+  const d = String(el.value || '').replace(/\D/g, '').replace(/^0+/, '').slice(0, 11);
+  const novo = d ? fmtNum(Number(d) / 100, 2) : '';
+  if (el.value !== novo) {
+    el.value = novo;
+    try { el.setSelectionRange(novo.length, novo.length); } catch { /* campo sem cursor */ }
+  }
+}
+// Liga a máscara em todo campo com "R$" na frente (span.com-prefixo), inclusive nos que aparecem depois (janelas).
+// Fica na fase de captura: formata antes de qualquer outra conta da tela ler o valor.
+export function ligarMascaraMoeda(raiz) {
+  raiz.addEventListener('input', (e) => { const t = e.target; if (t && t.matches && t.matches('.com-prefixo input')) mascaraMoeda(t); }, true);
+}
+
 // Valor para preencher um campo de reais: 1250.5 → "1.250,50" (lido de volta por numMoeda)
 export const moedaCampo = (v) => (v == null || v === '' || Number.isNaN(Number(v)) ? '' : fmtNum(Number(v), 2));
 
