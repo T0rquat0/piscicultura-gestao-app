@@ -1,4 +1,4 @@
-import { esc, fmtInt, fmtNum, fmtData, hojeISO, diasEntre, num, ROTULO_TIPO, progresso, fmtPct } from '../util.js';
+import { esc, fmtInt, fmtNum, fmtData, hojeISO, diasEntre, num, ROTULO_TIPO, ROTULO_PAPEL, progresso, fmtPct } from '../util.js';
 import * as db from '../db.js';
 import { situacaoEstoque, previsaoDespesca, alertasManejo, sugestaoRacao, vivosDoLote } from '../calc.js';
 import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, ESTOQUE_COBERTURA_DIAS, PESO_SACO_PADRAO_KG, CONTAGEM_LEMBRETE_DIAS, PLANO_AVISO_DIAS, ALERTAS, TAXA_RACAO } from '../config.js';
@@ -189,6 +189,7 @@ export async function renderHome(ctx, el) {
     </div>`;
   const bn = el.querySelector('#b-novo-tanque'); if (bn) bn.addEventListener('click', () => novoTanque(ctx, el));
   avisoPlano(ctx, el.querySelector('#avisos'));
+  avisoConviteUsado(ctx, el.querySelector('#avisos'));
   pintarTempo(el.querySelector('#b-tempo'), ctx, hoje);
 
   // alertas de manejo: biometria vencida, ração fora da média, mortes repetidas (dono/gerente)
@@ -431,6 +432,31 @@ function avisoContagem(ctx, saldo, hoje) {
   const dias = saldo.ultima_contagem ? diasEntre(saldo.ultima_contagem, hoje) : null;
   if (dias != null && dias < CONTAGEM_LEMBRETE_DIAS) return '';
   return `<a class="aviso aviso-link" href="#/estoque" id="aviso-contagem">${dias == null ? 'O estoque de ração ainda não foi contado.' : `Faz ${fmtInt(dias)} dias sem contar o estoque de ração.`} Toque para contar: deixa o saldo confiável.</a>`;
+}
+
+// Quem entrou pelo link de convite (só o dono). Se o link foi repassado e entrou outra pessoa, o dono fica sabendo
+// na hora e desativa em Equipe. Na primeira vez só marca a data (não avisa convites antigos).
+async function avisoConviteUsado(ctx, caixa) {
+  if (!caixa || ctx.state.perfil.papel !== 'dono' || !navigator.onLine) return;
+  const meu = ctx.state.perfil.id;
+  const visto = await db.kvGet('convitesVistos').catch(() => null);
+  if (!visto || visto.id !== meu) { await db.kvSet('convitesVistos', { id: meu, em: new Date().toISOString() }).catch(() => {}); return; }
+  let usados = [];
+  try { usados = (await ctx.api.convitesUsadosDesde(visto.em)) || []; } catch { return; }
+  usados = usados.filter((c) => c && c.usado_em && c.usado_em > visto.em);
+  if (!usados.length) return;
+  const nomes = await ctx.api.nomesUsuarios().catch(() => ({}));
+  // a Início pode ter sido redesenhada enquanto buscava: usa a caixa de avisos que está na tela agora
+  caixa = caixa.isConnected ? caixa : document.getElementById('avisos');
+  if (!caixa || caixa.querySelector('#aviso-convite')) return;
+  const quando = (iso) => { const d = new Date(iso); return `${fmtData(iso.slice(0, 10))} às ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  const linhas = usados.map((c) => `<b>${esc(nomes[c.usado_por] || 'Uma pessoa')}</b> entrou como ${esc(ROTULO_PAPEL[c.papel] || c.papel)} pelo link de convite (${quando(c.usado_em)}).`).join('<br>');
+  caixa.insertAdjacentHTML('afterbegin', `<div class="aviso" id="aviso-convite">${linhas} Não reconhece? <a href="#/equipe">Desative em Equipe</a>.
+    <button class="btn mini" type="button" id="b-conheco">Conheço</button></div>`);
+  caixa.querySelector('#b-conheco').addEventListener('click', async () => {
+    await db.kvSet('convitesVistos', { id: meu, em: usados[0].usado_em }).catch(() => {});
+    const a = caixa.querySelector('#aviso-convite'); if (a) a.remove();
+  });
 }
 
 // aviso de teste/plano perto de vencer ou vencido (só o dono)

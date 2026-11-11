@@ -1,6 +1,6 @@
 -- ============================================================
 -- QUALIDADE DA ÁGUA: medições por tanque
--- Rode no SQL Editor do Supabase (depois do 01 a 21). Pode rodar de novo sem estragar nada.
+-- Rode no SQL Editor do Supabase (depois do 01 a 24). Pode rodar de novo sem estragar nada.
 -- Toda a equipe lança nos tanques liberados; só dono e gerente corrigem ou excluem.
 -- ============================================================
 
@@ -138,3 +138,6 @@ begin
 
   return out;
 end $$;
+
+-- duas travas, como no sql/22: visitante sem login nem chega à tabela
+revoke all on qualidade_agua from anon;

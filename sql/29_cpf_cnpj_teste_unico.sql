@@ -1,6 +1,6 @@
 -- ============================================================
--- 26. CPF/CNPJ NO CADASTRO: TESTE GRÁTIS UMA VEZ POR DOCUMENTO
--- Rode no SQL Editor do Supabase DEPOIS do 25, e SÓ JUNTO com a versão do app que pede o CPF/CNPJ
+-- 29. CPF/CNPJ NO CADASTRO: TESTE GRÁTIS UMA VEZ POR DOCUMENTO
+-- Rode no SQL Editor do Supabase DEPOIS do 28, e SÓ JUNTO com a versão do app que pede o CPF/CNPJ
 -- (o cadastro de fazenda passa a exigir o documento; o app antigo não manda).
 -- Pode rodar de novo sem estragar nada.
 --
@@ -60,7 +60,7 @@ begin
   return false;
 end $$;
 
--- a versão de 2 parâmetros (sql/25) sai: sem documento não se cria fazenda
+-- a versão de 2 parâmetros (sql/28) sai: sem documento não se cria fazenda
 drop function if exists criar_fazenda(text, text);
 drop function if exists criar_fazenda(text, text, int);
 
@@ -133,3 +133,7 @@ begin
 end $$;
 revoke execute on function admin_fazendas() from public, anon;
 grant execute on function admin_fazendas() to authenticated;
+
+-- duas travas, como no sql/22: visitante sem login nem chega a estas tabelas
+revoke all on fazenda_documentos, testes_usados from anon;
+grant select on fazenda_documentos to authenticated;

@@ -1,4 +1,4 @@
-// Lucro por ciclo e despesas gerais (dono e gerente; precisam de internet).
+// Lucro por ciclo e despesas gerais (só o dono: valores em R$; precisam de internet).
 import { esc, fmtData, fmtInt, fmtNum, fmtBRL, hojeISO, numDecimal, ROTULO_TIPO, nomeArquivo, dataArquivo } from '../util.js';
 import { calcularLote, fimDoLote, precoMedioKg, pesoProduzido, ratearDespesas, fecharCiclo } from '../calc.js';
 import { CATEGORIAS_DESPESA } from '../config.js';
@@ -6,14 +6,14 @@ import { confirmar, formulario } from '../dialogo.js';
 import { carregarGerador, carregarFontes, abrirVisualizador } from '../pdf_ui.js';
 import { gerarPdfLucro } from '../pdf_lucro.js';
 
-const semAcesso = (el, t) => { el.innerHTML = `<h1>${t}</h1><div class="card vazio"><p>Esta tela é só para dono e gerente.</p></div>`; };
+const semAcesso = (el, t) => { el.innerHTML = `<h1>${t}</h1><div class="card vazio"><p>Esta tela é só para o dono (valores em R$).</p></div>`; };
 const semRede = (el, t) => { el.innerHTML = `<h1>${t}</h1><div class="card vazio"><p>Esta tela precisa de internet.</p></div>`; };
-const faltaSql = (el, t) => { el.innerHTML = `<h1>${t}</h1><div class="card vazio"><p>Este recurso ainda não foi ativado neste sistema (falta rodar o sql/24 no Supabase).</p></div>`; };
+const faltaSql = (el, t) => { el.innerHTML = `<h1>${t}</h1><div class="card vazio"><p>Este recurso ainda não foi ativado neste sistema (falta rodar o sql/27 no Supabase).</p></div>`; };
 const rotuloCat = (k) => (CATEGORIAS_DESPESA.find(([v]) => v === k) || [k, k])[1];
 
 export async function renderLucro(ctx, el) {
   const T = 'Lucro por ciclo';
-  if (!ctx.podeGerir()) return semAcesso(el, T);
+  if (!ctx.verDinheiro()) return semAcesso(el, T);
   if (!navigator.onLine) return semRede(el, T);
   el.innerHTML = `<h1>${T}</h1><p class="carregando">Calculando…</p>`;
   const [lotes, compras, despesas, custos] = await Promise.all([ctx.api.lotes(), ctx.api.compras(true).catch(() => []), ctx.api.despesasGerais(), ctx.api.custosLote()]);
@@ -24,7 +24,7 @@ export async function renderLucro(ctx, el) {
   const nomeDe = (tid) => (tanques.find((t) => t.id === tid) || {}).nome || 'Tanque';
   const custoDe = Object.fromEntries(custos.map((x) => [x.lote_id, Number(x.custo_alevino)]));
   const dados = await Promise.all(lotes.map(async (l) => {
-    const d = await ctx.api.dadosLote(l.id);
+    const d = await ctx.api.dadosLote(l.id, { venda: true });
     const temReg = d.bios.length || d.mort.length || d.rac.length || d.desp.length;
     const fim = l.ativo || !temReg ? hoje : fimDoLote(l, d.bios, d.mort, d.rac, hoje, d.desp);
     return { l, d, fim, c: calcularLote(l, d.bios, d.mort, d.rac, fim, precoKg, d.desp) };
@@ -99,7 +99,7 @@ export async function renderLucro(ctx, el) {
 
 export async function renderDespesas(ctx, el) {
   const T = 'Despesas gerais';
-  if (!ctx.podeGerir()) return semAcesso(el, T);
+  if (!ctx.verDinheiro()) return semAcesso(el, T);
   if (!navigator.onLine) return semRede(el, T);
   el.innerHTML = `<h1>${T}</h1><p class="carregando">Carregando…</p>`;
   const lista = await ctx.api.despesasGerais();

@@ -13,6 +13,7 @@ const MSG = {
 
 export function gerarPdfFazenda(jsPDF, d) {
   const { fazenda, geradoEm, kgSaco, gerir, fontes, saldo, sit, lotes, racaoDia, racaoTanque, precoKg, ultimaContagem } = d;
+  const dinheiro = d.dinheiro ?? gerir; // valores em R$ só para o dono
   const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
   const { cor, txt, caps, linha, largura, quebra } = ferramentas(doc, fontes);
   doc.setProperties({ title: `Relatório geral - ${fazenda}`, author: fazenda, creator: 'Gestão de Piscicultura' });
@@ -106,7 +107,7 @@ export function gerarPdfFazenda(jsPDF, d) {
     corpoT.push(['Total', n(racao30, 0), n(racao30 / kgSaco, 1), n(racao30 / 30, 1), '100%']);
     tabela(doc, y, [['TANQUE', 'RAÇÃO (kg)', `SACOS DE ${n(kgSaco, 0)} kg`, 'MÉDIA (kg/dia)', '% DO TOTAL']], corpoT, ['left', 'right', 'right', 'right', 'right']);
     y = doc.lastAutoTable.finalY + 4;
-    if (gerir && precoKg != null) { txt(`Custo estimado de ração no período: ${fmtBRL(racao30 * precoKg)} (preço médio pago por kg: ${fmtBRL(precoKg)}).`, M, y + 2, { size: 8.5 }); y += 8; }
+    if (dinheiro && precoKg != null) { txt(`Custo estimado de ração no período: ${fmtBRL(racao30 * precoKg)} (preço médio pago por kg: ${fmtBRL(precoKg)}).`, M, y + 2, { size: 8.5 }); y += 8; }
     y += 4;
   } else { txt('Nenhuma ração lançada nos últimos 30 dias.', M, y + 1, { size: 9, color: COR.mudo }); y += 10; }
 

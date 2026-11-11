@@ -1,4 +1,4 @@
-// Testa o sql/26: cadastro exige CPF/CNPJ válido e o teste grátis vale uma vez por documento.
+// Testa o sql/26 (venda na despesca, só do dono) num Postgres de verdade (PGlite).
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -8,73 +8,57 @@ const db = new PGlite();
 await db.exec(`create role anon; create role authenticated; create schema auth; create table auth.users (id uuid primary key, email text);
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('teste.uid', true), '')::uuid $$; grant usage on schema auth to anon, authenticated;`);
 for (const f of readdirSync(DIR).filter((f) => /^\d\d_.*\.sql$/.test(f) && !f.startsWith('05_')).sort()) await db.exec(readFileSync(DIR + f, 'utf8'));
-await db.exec(readFileSync(DIR + '26_cpf_cnpj_teste_unico.sql', 'utf8')); // de novo: pode repetir
-await db.exec(`grant usage on schema public to anon, authenticated; grant select, insert, update, delete on all tables in schema public to anon, authenticated;`);
-const id = (n) => `00000000-0000-4000-8000-0000000000${String(n).padStart(2, '0')}`;
-const [A, B, C, D, E, W, ADM] = [1, 2, 3, 4, 5, 6, 7].map(id);
-await db.exec(`insert into auth.users values ${[A, B, C, D, E, W, ADM].map((u, i) => `('${u}','u${i}@x')`).join(',')}; insert into administradores values ('${ADM}');`);
-const como = async (uid, sql) => { await db.exec(`set role authenticated; set teste.uid = '${uid}';`); try { const r = await db.query(sql); return { rows: r.rows }; } catch (e) { return { erro: e.message, rows: [] }; } finally { await db.exec(`reset role; set teste.uid = '';`); } };
-const plano = async (f) => (await db.query(`select plano_da_fazenda('${f}') p`)).rows[0].p;
-const CPF = '529.982.247-25', CNPJ = '11.222.333/0001-81';
+await db.exec(readFileSync(new URL('./compat_cadastro.sql', import.meta.url), 'utf8')); // sql/29: cadastro com CPF (atalho só de teste)
+await db.exec(readFileSync(DIR + '26_venda_na_despesca.sql', 'utf8')); // de novo: pode repetir
+await db.exec(`grant usage on schema public to anon, authenticated; grant select, insert, update, delete on all tables in schema public to authenticated;`); // como no banco real: logado tem as tabelas (o RLS filtra), visitante não
+const id = (s) => `00000000-0000-4000-8000-${s.padStart(12, '0')}`;
+const [D, G, W, O] = ['a1', 'a2', 'a3', 'a4'].map(id);
+const T = id('b1'), L = id('c1'), T2 = id('b2'), L2 = id('c2');
+await db.exec(`insert into auth.users values ('${D}','d@x'), ('${G}','g@x'), ('${W}','w@x'), ('${O}','o@x');`);
+const como = async (uid, sql) => { await db.exec(`set role ${uid ? 'authenticated' : 'anon'}; set teste.uid = '${uid || ''}';`); try { const r = await db.query(sql); return { rows: r.rows }; } catch (e) { return { erro: e.message, rows: [] }; } finally { await db.exec(`reset role; set teste.uid = '';`); } };
+await como(D, `select criar_fazenda('Fazenda X', 'Dono')`); await como(O, `select criar_fazenda('Outra', 'Outro')`);
+const F = (await db.query(`select fazenda_id f from usuarios where id='${D}'`)).rows[0].f;
+const F2 = (await db.query(`select fazenda_id f from usuarios where id='${O}'`)).rows[0].f;
+await db.exec(`insert into usuarios (id,fazenda_id,nome,papel) values ('${G}','${F}','Ger','gerente'), ('${W}','${F}','Func','funcionario');
+  insert into tanques (id,fazenda_id,nome) values ('${T}','${F}','T'), ('${T2}','${F2}','T2');
+  insert into usuario_tanques (usuario_id,tanque_id) values ('${G}','${T}'), ('${W}','${T}') on conflict do nothing;
+  insert into lotes (id,tanque_id,tipo,especie,data_entrada,quantidade_inicial,peso_inicial_kg) values ('${L}','${T}','engorda','Tambaqui','2026-01-01',100,10), ('${L2}','${T2}','engorda','Tambaqui','2026-01-01',100,10);`);
+const U1 = id('d1'), U2 = id('d2'), UO = id('d9');
+checa(!(await como(G, `insert into despescas (uuid_local,lote_id,data,tipo,quantidade,peso_bruto_kg,registrado_por) values ('${U1}','${L}','2026-11-01','parcial',50,100,'${G}')`)).erro, 'gerente lança a despesca (sem preço)');
+await db.exec(`insert into despescas (uuid_local,lote_id,data,tipo,quantidade,peso_bruto_kg,registrado_por) values ('${U2}','${L}','2026-11-02','parcial',10,20,'${D}'), ('${UO}','${L2}','2026-11-02','parcial',10,20,'${O}')`);
+checa(!!(await como(D, `select preco_kg from despescas`)).erro, 'a despesca não tem mais preço/comprador (ficam na tabela do dono)');
 
-// validação dos números
-const val = async (d) => (await db.query(`select documento_valido('${d}') v`)).rows[0].v;
-checa(await val(CPF) && await val('52998224725') && await val(CNPJ), 'CPF e CNPJ válidos aceitos (com ou sem pontuação)');
-for (const d of ['529.982.247-24', '111.111.111-11', '11.222.333/0001-82', '00000000000000', '1234', '', 'abc']) checa(!(await val(d)), `inválido recusado: "${d}"`);
+const venda = (uid, u, preco = '9.5', comp = "'Peixaria'") => como(uid, `insert into despesca_vendas (despesca_uuid, preco_kg, comprador) values ('${u}', ${preco}, ${comp})
+  on conflict (despesca_uuid) do update set preco_kg = excluded.preco_kg, comprador = excluded.comprador`);
+let r = await venda(D, U1); checa(!r.erro, `dono informa a venda ${r.erro || ''}`);
+checa((await db.query(`select fazenda_id f, registrado_por q from despesca_vendas where despesca_uuid='${U1}'`)).rows[0]?.f === F, 'a fazenda da venda vem da própria despesca');
+r = await venda(D, U1, '10'); checa(!r.erro && Number((await db.query(`select preco_kg p from despesca_vendas where despesca_uuid='${U1}'`)).rows[0].p) === 10, 'dono corrige o preço (não duplica)');
+checa((await como(D, `select preco_kg from despesca_vendas`)).rows.length === 1, 'dono lê a venda');
+checa((await como(G, `select * from despesca_vendas`)).rows.length === 0, 'gerente NÃO vê o preço');
+checa((await como(W, `select * from despesca_vendas`)).rows.length === 0, 'funcionário NÃO vê o preço');
+checa((await como(O, `select * from despesca_vendas`)).rows.length === 0, 'outra fazenda NÃO vê');
+checa(!!(await venda(G, U2)).erro, 'gerente NÃO grava preço');
+checa(!!(await venda(W, U2)).erro, 'funcionário NÃO grava preço');
+checa(!!(await venda(D, UO)).erro, 'dono NÃO grava venda em despesca de outra fazenda');
+checa(!!(await venda(D, id('ee'))).erro, 'venda de despesca que não existe: recusada');
+checa(!!(await como(null, `select * from despesca_vendas`)).erro, 'visitante sem login: nem chega à tabela');
+await como(G, `update despesca_vendas set preco_kg = 1`); await como(G, `delete from despesca_vendas`);
+checa(Number((await db.query(`select preco_kg p from despesca_vendas where despesca_uuid='${U1}'`)).rows[0].p) === 10, 'gerente não altera nem apaga a venda');
+for (const [p, c, m] of [['0', 'null', 'preço zero'], ['1001', 'null', 'preço absurdo'], ['5', `'${'x'.repeat(81)}'`, 'comprador longo'], ['null', 'null', 'venda vazia']])
+  checa(!!(await venda(D, U2, p, c)).erro, `recusa ${m}`);
+checa(!(await venda(D, U2, 'null', "'Só o comprador'")).erro, 'só o comprador, sem preço: aceito');
 
-// cadastro
-checa(!!(await como(A, `select criar_fazenda('Fazenda A', 'Ana')`)).erro, 'sem documento: não cria (versão antiga não existe)');
-checa(!!(await como(A, `select criar_fazenda('Fazenda A', 'Ana', 90)`)).erro, 'pedir 90 dias: não existe');
-let r = await como(A, `select criar_fazenda('Fazenda A', 'Ana', '529.982.247-24') f`);
-checa(/CPF ou CNPJ inválido/.test(r.erro || ''), 'CPF com dígito errado: recusa com mensagem clara');
-checa((await db.query(`select count(*)::int n from fazendas`)).rows[0].n === 0, 'cadastro recusado não deixa fazenda pela metade');
-r = await como(A, `select criar_fazenda('Fazenda A', 'Ana', '${CPF}') f`); const FA = r.rows[0]?.f;
-checa(!r.erro && FA, `1º cadastro do CPF funciona ${r.erro || ''}`);
-let p = await plano(FA); checa(p.estado === 'teste' && p.limite == null, `1º cadastro: teste grátis sem limite (${p.estado})`);
-checa((await db.query(`select (teste_ate - hoje_local())::int d from fazendas where id = '${FA}'`)).rows[0].d === 30, '1º cadastro: 30 dias');
+// lixeira: a despesca vai e volta, e o preço volta junto
+await como(D, `delete from despescas where uuid_local='${U1}'`);
+checa((await db.query(`select count(*)::int n from despesca_vendas where despesca_uuid='${U1}'`)).rows[0].n === 1, 'despesca excluída: a venda fica guardada');
+const op = (await db.query(`select operacao from historico where tabela='despescas' and acao='excluiu'`)).rows[0]?.operacao;
+r = await como(D, `select restaurar_exclusao(${op}) n`);
+checa(r.rows[0]?.n === 1 && (await como(D, `select v.preco_kg from despesca_vendas v join despescas d on d.uuid_local = v.despesca_uuid`)).rows.length >= 1, `despesca restaurada: o preço aparece de novo ${r.erro || ''}`);
+checa((await db.query(`select count(*)::int n from historico where tabela='despesca_vendas'`)).rows[0].n === 0, 'preço não vai para o histórico geral (que o gerente lê)');
 
-// mesmo CPF (escrito de outro jeito), outra conta: cria, mas sem teste
-r = await como(B, `select criar_fazenda('Fazenda B', 'Ana', '52998224725') f`); const FB = r.rows[0]?.f;
-checa(!r.erro && FB, 'mesmo CPF pode abrir 2ª fazenda (produtor com 2 propriedades)');
-p = await plano(FB); checa(p.estado === 'teste_acabou', `2ª fazenda do mesmo CPF: sem teste grátis (${p.estado})`);
-const TB = id(91);
-await db.exec(`insert into tanques (id, fazenda_id, nome) values ('${TB}', '${FB}', 'T1')`);
-r = await como(B, `insert into lotes (tanque_id, tipo, especie, data_entrada, quantidade_inicial, peso_inicial_kg) values ('${TB}', 'engorda', 'Tambaqui', hoje_local(), 100, 10)`);
-checa(/LIMITE_PACOTE/.test(r.erro || ''), '2ª fazenda: não abre lote sem contratar');
-await db.exec(`update config_sistema set valor = 'false' where chave = 'modo_piloto'`);
-r = await como(B, `select contratar_pacote(5) x`); const cob = r.rows[0]?.x?.cobranca;
-await db.exec(`select confirmar_pagamento('${cob}', 1)`);
-r = await como(B, `insert into lotes (tanque_id, tipo, especie, data_entrada, quantidade_inicial, peso_inicial_kg) values ('${TB}', 'engorda', 'Tambaqui', hoje_local(), 100, 10)`);
-checa(!r.erro, `2ª fazenda: depois de pagar, abre lote ${r.erro || ''}`);
-
-// CNPJ diferente ganha teste próprio
-r = await como(C, `select criar_fazenda('Fazenda C', 'Caio', '${CNPJ}') f`);
-checa(!r.erro && (await plano(r.rows[0].f)).estado === 'teste', 'CNPJ novo: ganha o seu teste');
-
-// privacidade e travas
-await db.exec(`insert into usuarios (id, fazenda_id, nome, papel) values ('${W}', '${FA}', 'Func', 'funcionario'), ('${E}', '${FA}', 'Ger', 'gerente')`);
-checa((await como(A, `select documento from fazenda_documentos`)).rows.map((x) => x.documento).join() === '52998224725', 'dono vê só o próprio documento');
-checa((await como(W, `select * from fazenda_documentos`)).rows.length === 0, 'funcionário NÃO vê o CPF do dono');
-checa((await como(E, `select * from fazenda_documentos`)).rows.length === 0, 'gerente NÃO vê o CPF do dono');
-checa((await como(C, `select * from fazenda_documentos where fazenda_id = '${FA}'`)).rows.length === 0, 'outra fazenda NÃO vê');
-checa((await como(A, `select * from testes_usados`)).rows.length === 0, 'lista de CPFs que usaram teste: ninguém lê pelo app');
-await como(A, `update fazenda_documentos set documento = '11144477735'`); await como(A, `delete from fazenda_documentos`);
-await como(A, `insert into fazenda_documentos values ('${FB}', '11144477735')`);
-checa((await db.query(`select documento from fazenda_documentos where fazenda_id = '${FA}'`)).rows[0]?.documento === '52998224725', 'dono não troca nem apaga o documento');
-await como(A, `delete from testes_usados`);
-checa((await db.query(`select count(*)::int n from testes_usados`)).rows[0].n === 2, 'dono não apaga o registro de teste usado');
-checa(!!(await como(A, `select documento_ja_usou_teste('${CPF}')`)).erro, 'sem função para consultar CPF alheio');
-await db.exec(`set role anon;`); let e = null; try { await db.query(`select criar_fazenda('X', 'Y', '${CPF}')`); } catch (x) { e = x; } await db.exec('reset role;');
-checa(!!e, 'sem login: não cria fazenda');
-
-// administrador: informa documento de fazenda antiga e vê no painel
-const FV = (await db.query(`insert into fazendas (nome) values ('Antiga') returning id`)).rows[0].id;
-checa(!!(await como(A, `select admin_definir_documento('${FV}', '111.444.777-35')`)).erro, 'dono comum NÃO usa a função do administrador');
-checa(!!(await como(ADM, `select admin_definir_documento('${FV}', '111.444.777-36')`)).erro, 'administrador: documento inválido recusado');
-r = await como(ADM, `select admin_definir_documento('${FV}', '111.444.777-35')`); checa(!r.erro, `administrador informa o documento ${r.erro || ''}`);
-r = await como(ADM, `select nome, documento from admin_fazendas()`);
-checa(r.rows.find((x) => x.nome === 'Antiga')?.documento === '11144477735' && r.rows.find((x) => x.nome === 'Fazenda A')?.documento === '52998224725', 'painel mostra o documento de cada fazenda');
-r = await como(D, `select criar_fazenda('Nova', 'Davi', '111.444.777-35') f`);
-checa((await plano(r.rows[0].f)).estado === 'teste_acabou', 'documento informado pelo administrador conta como teste usado');
-checa((await db.query(`select count(*)::int n from pg_proc where proname = 'criar_fazenda'`)).rows[0].n === 1, 'só existe uma versão do cadastro');
+// cópia de segurança devolve a venda
+const jd = (await db.query(`select to_jsonb(d) j from despescas d where uuid_local='${U2}'`)).rows[0].j, jv = (await db.query(`select to_jsonb(v) j from despesca_vendas v where despesca_uuid='${U2}'`)).rows[0].j;
+await db.exec(`delete from despesca_vendas where despesca_uuid='${U2}'; delete from despescas where uuid_local='${U2}';`);
+r = await como(D, `select importar_copia('${JSON.stringify({ tabelas: { fazendas: [{ id: F }], despescas: [jd], despesca_vendas: [jv] } }).replace(/'/g, "''")}'::jsonb) x`);
+checa(r.rows[0]?.x?.despescas === 1 && r.rows[0]?.x?.despesca_vendas === 1, `cópia de segurança devolve despesca e venda ${r.erro || JSON.stringify(r.rows[0]?.x || {})}`);
 console.log(ok ? 'RESULTADO: TUDO OK' : 'RESULTADO: FALHOU'); process.exit(ok ? 0 : 1);

@@ -85,7 +85,7 @@ with sync_playwright() as pw:
 
     b, pg, est = abrir_fin(pw, fin=None)
     pg.goto(BASE + '#/admin'); pg.wait_for_selector('.adm-faz', timeout=20000); pg.click('[data-aba="financeiro"]'); pg.wait_for_selector('.card.vazio', timeout=15000)
-    checa('sql/27' in pg.inner_text('#view'), 'sem o sql/27: avisa em vez de quebrar')
+    checa('sql/30' in pg.inner_text('#view'), 'sem o sql/30: avisa em vez de quebrar')
     errs += est['erros'] + est['fora']; b.close()
 
     # cadastro de fazenda: CPF/CNPJ obrigatório e conferido

@@ -1,4 +1,4 @@
-// Testa o sql/27: financeiro do sistema, só para administradores.
+// Testa o sql/27 (custos e lucro) num Postgres de verdade (PGlite): valores em R$ só para o dono (como o sql/23).
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -8,64 +8,49 @@ const db = new PGlite();
 await db.exec(`create role anon; create role authenticated; create schema auth; create table auth.users (id uuid primary key, email text);
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('teste.uid', true), '')::uuid $$; grant usage on schema auth to anon, authenticated;`);
 for (const f of readdirSync(DIR).filter((f) => /^\d\d_.*\.sql$/.test(f) && !f.startsWith('05_')).sort()) await db.exec(readFileSync(DIR + f, 'utf8'));
-await db.exec(readFileSync(DIR + '27_financeiro_do_sistema.sql', 'utf8')); // de novo: pode repetir
+await db.exec(readFileSync(new URL('./compat_cadastro.sql', import.meta.url), 'utf8')); // sql/26: cadastro com CPF (atalho só de teste)
+await db.exec(readFileSync(DIR + '27_custos_e_lucro.sql', 'utf8')); // de novo: pode repetir
 await db.exec(`grant usage on schema public to anon, authenticated; grant select, insert, update, delete on all tables in schema public to anon, authenticated;`);
-const ADM = '00000000-0000-4000-8000-0000000000a1', D = '00000000-0000-4000-8000-0000000000a2', P = '00000000-0000-4000-8000-0000000000a3';
-await db.exec(`insert into auth.users values ('${ADM}','adm@x'), ('${D}','d@x'), ('${P}','p@x'); insert into administradores values ('${ADM}');`);
-const como = async (uid, sql) => { await db.exec(`set role authenticated; set teste.uid = '${uid}';`); try { const r = await db.query(sql); return { rows: r.rows }; } catch (e) { return { erro: e.message, rows: [] }; } finally { await db.exec(`reset role; set teste.uid = '';`); } };
-const fin = async () => (await como(ADM, `select admin_financeiro() x`)).rows[0].x;
-const lanc = (uid, o) => como(uid, `select admin_salvar_lancamento('${JSON.stringify(o)}'::jsonb) id`);
+const D = '00000000-0000-4000-8000-0000000000a1', G = '00000000-0000-4000-8000-0000000000a2', W = '00000000-0000-4000-8000-0000000000a3', O = '00000000-0000-4000-8000-0000000000a4';
+const T = '00000000-0000-4000-8000-0000000000b1', L = '00000000-0000-4000-8000-0000000000c1';
+await db.exec(`insert into auth.users values ('${D}','d@x'), ('${G}','g@x'), ('${W}','w@x'), ('${O}','o@x');`);
+const como = async (uid, sql) => { await db.exec(`set role authenticated; set teste.uid = '${uid}';`); try { const r = await db.query(sql); return { rows: r.rows }; } catch (e) { return { erro: e.message, rows: [] }; } finally { await db.exec('reset role;'); } };
+await como(D, `select criar_fazenda('Fazenda X', 'Dono')`); await como(O, `select criar_fazenda('Outra', 'Outro')`);
+const F = (await db.query(`select fazenda_id f from usuarios where id='${D}'`)).rows[0].f;
+const F2 = (await db.query(`select fazenda_id f from usuarios where id='${O}'`)).rows[0].f;
+await db.exec(`insert into usuarios (id,fazenda_id,nome,papel) values ('${G}','${F}','Ger','gerente'), ('${W}','${F}','Func','funcionario');
+  insert into tanques (id,fazenda_id,nome) values ('${T}','${F}','T');
+  insert into usuario_tanques (usuario_id,tanque_id) values ('${W}','${T}'), ('${G}','${T}') on conflict do nothing;
+  insert into lotes (id,tanque_id,tipo,especie,data_entrada,quantidade_inicial,peso_inicial_kg) values ('${L}','${T}','engorda','Tambaqui','2026-01-01',100,10);`);
+const desp = (uid, f, v = 100, cat = 'energia') => como(uid, `insert into despesas_gerais (fazenda_id,data,categoria,valor,registrado_por) values ('${f}','2026-11-01','${cat}',${v},'${uid}')`);
+const custo = (uid, v = 500) => como(uid, `insert into custos_lote (lote_id,custo_alevino) values ('${L}',${v}) on conflict (lote_id) do update set custo_alevino = excluded.custo_alevino`);
+const nD = async () => (await db.query(`select count(*)::int n from despesas_gerais`)).rows[0].n;
 
-checa((await db.query(`select count(*)::int n, sum(percentual)::int s from socios`)).rows[0].s === 100, 'começa com Hugo e Guilherme, 50% cada');
-await db.exec(readFileSync(DIR + '27_financeiro_do_sistema.sql', 'utf8'));
-checa((await db.query(`select count(*)::int n from socios`)).rows[0].n === 2, 'rodar de novo não duplica os sócios');
-
-// cliente que pagou de verdade e cliente do piloto
-const FD = (await como(D, `select criar_fazenda('Pagante', 'Dono', '529.982.247-25') f`)).rows[0].f;
-const FP = (await como(P, `select criar_fazenda('Piloto', 'Pil', '111.444.777-35') f`)).rows[0].f;
-await como(P, `select contratar_pacote(5)`); // modo piloto ligado: grátis, não é receita
-await db.exec(`update config_sistema set valor = 'false' where chave = 'modo_piloto'`);
-const cob = (await como(D, `select contratar_pacote(10) x`)).rows[0].x.cobranca;
-await db.exec(`select confirmar_pagamento('${cob}', 3)`);
-
-// segurança
-checa(!!(await como(D, `select admin_financeiro()`)).erro, 'dono de fazenda NÃO vê o financeiro do sistema');
-checa((await como(D, `select * from sistema_lancamentos`)).rows.length === 0 && (await como(D, `select * from socios`)).rows.length === 0, 'tabelas do financeiro: ninguém lê direto');
-checa(!!(await lanc(D, { tipo: 'retirada', valor: 1000, data: '2026-11-01', socio_id: null })).erro, 'dono de fazenda NÃO lança');
-await como(D, `insert into sistema_lancamentos (data, tipo, valor) values ('2026-11-01', 'receita', 1)`);
-checa((await db.query(`select count(*)::int n from sistema_lancamentos`)).rows[0].n === 0, 'ninguém grava direto na tabela');
-await db.exec(`set role anon;`); let e = null; try { await db.query(`select admin_financeiro()`); } catch (x) { e = x; } await db.exec('reset role;');
-checa(!!e, 'sem login: nada');
-
-let x = await fin();
-checa(x.recebimentos.length === 1 && Number(x.recebimentos[0].valor) === 1350 && x.recebimentos[0].fazenda === 'Pagante', `receita = 450 x 3 meses, sem a do piloto (${JSON.stringify(x.recebimentos.map((r) => r.valor))})`);
-checa(x.clientes.length === 1 && Number(x.clientes[0].mensal) === 450 && x.clientes[0].documento === '52998224725', 'clientes pagantes: só quem pagou, com mensalidade e documento');
-checa(x.modo_piloto === false, 'mostra se o modo piloto está ligado');
-await db.exec(`insert into fazendas (nome) values ('Antiga sem limite')`);
-checa((await fin()).sem_limite === 1, 'conta as fazendas sem limite nenhum');
-
-// lançamentos
-const [H, G] = x.socios.map((s) => s.id);
-let r = await lanc(ADM, { tipo: 'despesa', valor: 100, data: '2026-11-05', socio_id: H, categoria: 'servidor', descricao: 'Supabase' });
-checa(!r.erro && r.rows[0].id, `despesa paga pelo Hugo ${r.erro || ''}`); const idDesp = r.rows[0].id;
-checa(!(await lanc(ADM, { tipo: 'retirada', valor: 200, data: '2026-11-06', socio_id: G })).erro, 'retirada do Guilherme');
-checa(!(await lanc(ADM, { tipo: 'receita', valor: 300, data: '2026-11-07', socio_id: H, fazenda_id: FD })).erro, 'receita manual (sócio é ignorado)');
-for (const [o, m] of [[{ tipo: 'retirada', valor: 10, data: '2026-11-01' }, 'retirada sem sócio'], [{ tipo: 'despesa', valor: 0, data: '2026-11-01' }, 'valor zero'],
-  [{ tipo: 'despesa', valor: -5, data: '2026-11-01' }, 'valor negativo'], [{ tipo: 'despesa', valor: 5, data: '2099-01-01' }, 'data no futuro'], [{ tipo: 'festa', valor: 5, data: '2026-11-01' }, 'tipo inválido'],
-  [{ tipo: 'despesa', valor: 5, data: '2026-11-01', socio_id: '00000000-0000-4000-8000-0000000000ff' }, 'sócio que não existe']])
-  checa(!!(await lanc(ADM, o)).erro, `recusa: ${m}`);
-x = await fin();
-checa(x.lancamentos.length === 3 && x.lancamentos.find((l) => l.tipo === 'receita').socio_id === null && x.lancamentos.find((l) => l.tipo === 'receita').fazenda === 'Pagante', 'lançamentos voltam com o nome do cliente');
-r = await lanc(ADM, { id: idDesp, tipo: 'despesa', valor: 120, data: '2026-11-05', socio_id: H });
-checa(!r.erro && Number((await fin()).lancamentos.find((l) => l.id === idDesp).valor) === 120, 'editar não duplica');
-checa(!(await como(ADM, `select admin_excluir_lancamento('${idDesp}')`)).erro && (await fin()).lancamentos.length === 2, 'excluir funciona');
-checa((await db.query(`select count(*)::int n from admin_acoes where acao = 'excluiu lançamento financeiro' and detalhe->>'valor' = '120.00'`)).rows[0].n === 1, 'o excluído fica registrado nas ações do administrador');
-
-// sócios
-r = await como(ADM, `select admin_salvar_socios('${JSON.stringify([{ id: H, nome: 'Hugo', percentual: 60 }, { id: G, nome: 'Guilherme', percentual: 30 }])}'::jsonb)`);
-checa(/somar 100%\. Hoje somam 90%/.test(r.erro || ''), `percentuais que não somam 100: recusa com a soma (${r.erro})`);
-checa((await db.query(`select sum(percentual)::int s from socios`)).rows[0].s === 100, 'recusado: nada mudou');
-r = await como(ADM, `select admin_salvar_socios('${JSON.stringify([{ id: H, nome: 'Hugo', percentual: 60 }, { id: G, nome: 'Guilherme', percentual: 40 }])}'::jsonb)`);
-checa(!r.erro && (await fin()).socios.find((s) => s.id === H).percentual == 60, `60/40 salvo ${r.erro || ''}`);
-checa(!!(await como(D, `select admin_salvar_socios('[]'::jsonb)`)).erro, 'dono de fazenda NÃO mexe nos sócios');
+checa(!(await desp(D, F)).erro, 'dono lança despesa');
+checa(!!(await desp(G, F)).erro, 'gerente NÃO lança despesa (R$ só para o dono)');
+checa(!(await desp(D, F, 50, 'outros')).erro, 'dono lança outra despesa');
+checa((await como(G, `select * from despesas_gerais`)).rows.length === 0, 'gerente NÃO vê despesas');
+checa(!!(await desp(W, F)).erro, 'funcionário NÃO lança despesa');
+checa(!!(await desp(O, F)).erro, 'outra fazenda NÃO lança');
+checa((await como(W, `select * from despesas_gerais`)).rows.length === 0, 'funcionário NÃO vê despesas');
+checa((await como(O, `select * from despesas_gerais`)).rows.length === 0, 'outra fazenda NÃO vê despesas');
+checa(!!(await desp(D, F, 0)).erro, 'valor zero recusado'); checa(!!(await desp(D, F, 10, 'festa')).erro, 'tipo inválido recusado');
+checa(!(await custo(D)).erro, 'dono informa custo do alevino');
+await custo(G, 999);
+checa((await db.query(`select max(custo_alevino)::int v from custos_lote`)).rows[0].v === 500, 'gerente NÃO altera o custo do alevino');
+checa((await como(G, `select * from custos_lote`)).rows.length === 0, 'gerente NÃO vê o custo do alevino');
+checa(!(await custo(D, 600)).erro, 'dono corrige (não duplica)');
+checa((await db.query(`select count(*)::int n, max(custo_alevino)::int v from custos_lote`)).rows[0].v === 600, 'guardou o valor corrigido');
+checa(!!(await custo(W)).erro, 'funcionário NÃO informa custo');
+checa((await como(W, `select * from custos_lote`)).rows.length === 0, 'funcionário NÃO vê custo do alevino');
+checa((await como(O, `select * from custos_lote`)).rows.length === 0, 'outra fazenda NÃO vê custo');
+checa(!!(await custo(D, -1)).erro, 'custo negativo recusado');
+await como(D, `delete from despesas_gerais where categoria='outros'`);
+const op = (await db.query(`select operacao from historico where tabela='despesas_gerais' and acao='excluiu'`)).rows[0]?.operacao;
+let r = await como(D, `select restaurar_exclusao(${op}) n`);
+checa(r.rows[0]?.n === 1 && await nD() === 2, `despesa excluída volta da lixeira ${r.erro || ''}`);
+const j1 = (await db.query(`select to_jsonb(d) j from despesas_gerais d limit 1`)).rows[0].j, j2 = (await db.query(`select to_jsonb(c) j from custos_lote c`)).rows[0].j;
+await como(D, `delete from despesas_gerais`); await como(D, `delete from custos_lote`);
+r = await como(D, `select importar_copia('${JSON.stringify({ tabelas: { fazendas: [{ id: F }], despesas_gerais: [j1], custos_lote: [j2] } })}'::jsonb) x`);
+checa(r.rows[0]?.x?.despesas_gerais === 1 && r.rows[0]?.x?.custos_lote === 1, `cópia de segurança devolve ${r.erro || ''}`);
 console.log(ok ? 'RESULTADO: TUDO OK' : 'RESULTADO: FALHOU'); process.exit(ok ? 0 : 1);

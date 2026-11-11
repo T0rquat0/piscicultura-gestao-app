@@ -63,6 +63,7 @@ export async function renderAdmin(ctx, el, aba = 'fazendas', estado = { filtro: 
             <button class="btn mini" data-documento="${esc(f.id)}" type="button">${f.documento ? 'Corrigir CPF/CNPJ' : 'Informar CPF/CNPJ'}</button>
             ${f.bloqueada ? `<button class="btn mini" data-liberar="${esc(f.id)}" type="button">Liberar</button>`
               : `<button class="btn mini perigo" data-bloquear="${esc(f.id)}" type="button">Bloquear</button>`}
+            <button class="btn mini" data-desconectar-dono="${esc(f.id)}" type="button">Desconectar celular do dono</button>
           </div>
         </article>`;
       }).join('') : '<div class="card vazio">Nenhuma fazenda neste filtro.</div>'}`;
@@ -94,7 +95,7 @@ export async function renderAdmin(ctx, el, aba = 'fazendas', estado = { filtro: 
     <p class="mudo nota">Pacote inativo não aparece para os donos, mas quem já tem continua com ele.</p>`;
 
   const abaFinanceiro = () => {
-    if (fin === null) return '<div class="card vazio">O financeiro precisa do <b>sql/27</b> rodado no banco.</div>';
+    if (fin === null) return '<div class="card vazio">O financeiro precisa do <b>sql/30</b> rodado no banco.</div>';
     const { ini, fim } = limitesMes(estado.mes);
     const mes = resumoPeriodo({ lancamentos: fin.lancamentos, recebimentos: fin.recebimentos, ini, fim });
     const ac = acertoSocios({ lancamentos: fin.lancamentos, recebimentos: fin.recebimentos, socios: fin.socios });
@@ -192,6 +193,12 @@ export async function renderAdmin(ctx, el, aba = 'fazendas', estado = { filtro: 
       const f = fazPor(b.dataset.bloquear);
       if (!(await confirmar({ titulo: `Bloquear ${f.nome}?`, texto: 'Ninguém desta fazenda consegue ver nem lançar nada até você liberar. Os dados continuam guardados.', ok: 'Bloquear', perigo: true, digitar: f.nome }))) return;
       acao(() => ctx.api.adminBloquear(f.id, true), 'Fazenda bloqueada');
+    }));
+    // o dono perdeu o celular e ligou para o suporte: tira a conta dele de todos os aparelhos
+    el.querySelectorAll('[data-desconectar-dono]').forEach((b) => b.addEventListener('click', async () => {
+      const f = fazPor(b.dataset.desconectarDono);
+      if (!(await confirmar({ titulo: `Desconectar o celular do dono de ${f.nome}?`, texto: `${f.dono_nome || 'O dono'} sai da conta em todos os aparelhos (o perdido apaga os números quando pegar sinal). Ele entra de novo no celular novo com o e-mail e a senha; se esqueceu a senha, usa "Esqueci a senha".`, ok: 'Desconectar', perigo: true }))) return;
+      acao(() => ctx.api.adminDesconectarDono(f.id), (n) => (n ? `${n === 1 ? '1 aparelho desconectado' : `${n} aparelhos desconectados`}` : 'Nenhum aparelho do dono estava conectado'));
     }));
     el.querySelectorAll('[data-liberar]').forEach((b) => b.addEventListener('click', async () => {
       const f = fazPor(b.dataset.liberar);

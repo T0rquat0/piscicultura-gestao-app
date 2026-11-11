@@ -25,7 +25,7 @@ const sacosTxt = (n) => `${fmtNum(n, casas(n))} ${n === 1 ? 'saco' : 'sacos'}`;
 
 const TITULO2 = { racao: 'Quantidade de ração', biometria: 'Pesagem dos peixes', mortalidade: 'Peixes mortos', despesca: 'Dados da despesca', manejo: 'Aplicação de probiótico', agua: 'Medição da água' };
 
-function camposDoTipo(tipo, kgSaco) {
+function camposDoTipo(tipo, kgSaco, verDinheiro = false) {
   if (tipo === 'racao') {
     return `<label>Quantos sacos de ração?
       <input id="qtd" class="grande" type="number" inputmode="decimal" step="0.5" min="0" placeholder="0" required></label>
@@ -95,12 +95,12 @@ function camposDoTipo(tipo, kgSaco) {
         <input id="desp-bruto" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 9547" required></label>
       <label>Peso total líquido (kg) <small class="mudo">(opcional)</small>
         <input id="desp-liquido" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 9356"></label>
-      <div class="man-dose desp-venda">
+      ${verDinheiro ? `<div class="man-dose desp-venda">
         <label>Preço de venda (R$/kg) <small class="mudo">(opcional)</small>
           <input id="desp-preco" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 9,50"></label>
         <label>Comprador <small class="mudo">(opcional)</small>
           <input id="desp-comprador" type="text" maxlength="80" autocomplete="off"></label>
-      </div>
+      </div>` : ''}
       <div class="calc resultado" id="desp-calc" hidden></div>`;
   }
   return `<label>Quantos peixes morreram?
@@ -151,7 +151,7 @@ export async function renderLancar(ctx, el, params = {}) {
       </section>
       <section class="passo tipo-${tipo}">
         <h2 class="passo-t"><i>2</i> ${TITULO2[tipo]}</h2>
-        ${camposDoTipo(tipo, kgSaco)}
+        ${camposDoTipo(tipo, kgSaco, ctx.verDinheiro && ctx.verDinheiro())}
         <div class="data-linha"><span>Data: <b id="data-txt">hoje</b></span><button type="button" class="link" id="b-data">Mudar</button></div>
         <label id="data-wrap" hidden>Data <input id="data" type="date" value="${hoje}" max="${hoje}" required></label>
       </section>
@@ -426,7 +426,7 @@ export async function renderLancar(ctx, el, params = {}) {
       const L = [`Peso médio bruto: ${pesoMedioTxt(i.medioBrutoKg)} por peixe`];
       if (i.medioLiquidoKg != null) L.push(`Peso médio líquido: ${pesoMedioTxt(i.medioLiquidoKg)} por peixe`, `Diferença: ${fmtNum(i.difKg, 0)} kg (${fmtNum(i.difPct, 1)}% do bruto)`);
       if (i.peixesHa != null) L.push(`${fmtInt(i.peixesHa)} peixes por hectare`);
-      const prTxt = f.querySelector('#desp-preco').value.trim(), pr = prTxt ? numDecimal(prTxt) : null;
+      const prTxt = (f.querySelector('#desp-preco') || { value: '' }).value.trim(), pr = prTxt ? numDecimal(prTxt) : null;
       if (pr > 0) L.push(`Receita: ${fmtBRL(b * pr)} (sobre o peso bruto)`);
       box.textContent = L.join('\n'); box.hidden = false;
     };
@@ -435,7 +435,7 @@ export async function renderLancar(ctx, el, params = {}) {
       f.querySelectorAll('#desp-tipo .tile').forEach((x) => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', String(on)); });
       pintarDica();
     }));
-    ['#desp-qtd', '#desp-bruto', '#desp-liquido', '#desp-preco'].forEach((s) => f.querySelector(s).addEventListener('input', contas));
+    ['#desp-qtd', '#desp-bruto', '#desp-liquido', '#desp-preco'].forEach((s) => { const c = f.querySelector(s); if (c) c.addEventListener('input', contas); });
     selTanque.addEventListener('change', contas);
     pintarDica();
   }
@@ -585,12 +585,13 @@ export async function renderLancar(ctx, el, params = {}) {
         dadosRapidos(),
       ]);
       if (!despescaLigada) return mostrarErro('A despesca ainda não foi ativada neste sistema (falta rodar o sql/20 no Supabase).');
-      const precoTxt = f.querySelector('#desp-preco').value.trim(), preco = precoTxt ? numDecimal(precoTxt) : null;
+      // preço e comprador: só o dono vê e informa (valores em R$ só para o dono, sql/23 e sql/26)
+      const precoTxt = (f.querySelector('#desp-preco') || { value: '' }).value.trim(), preco = precoTxt ? numDecimal(precoTxt) : null;
       if (precoTxt.includes('.') && precoTxt.includes(',')) return mostrarErro('Digite o preço sem ponto de milhar. Ex.: 9,50');
       if (precoTxt && !(preco > 0 && preco <= 1000)) return mostrarErro('Confira o preço de venda por kg (até R$ 1.000), ou deixe em branco.');
-      const comprador = f.querySelector('#desp-comprador').value.trim();
-      if ((precoTxt || comprador) && navigator.onLine && !(await Promise.race([ctx.api.vendaAtiva().catch(() => true), new Promise((r) => setTimeout(() => r(true), 2500))]))) return mostrarErro('A venda na despesca ainda não foi ativada neste sistema (falta rodar o sql/23 no Supabase). Deixe preço e comprador em branco para salvar só a despesca.');
-      payload = { ...base, tipo: despTipo, quantidade: q, peso_bruto_kg: b, peso_liquido_kg: lq, ...(preco ? { preco_kg: preco } : {}), ...(comprador ? { comprador } : {}) };
+      const comprador = (f.querySelector('#desp-comprador') || { value: '' }).value.trim();
+      if ((precoTxt || comprador) && navigator.onLine && !(await Promise.race([ctx.api.vendaAtiva().catch(() => true), new Promise((r) => setTimeout(() => r(true), 2500))]))) return mostrarErro('A venda na despesca ainda não foi ativada neste sistema (falta rodar o sql/26 no Supabase). Deixe preço e comprador em branco para salvar só a despesca.');
+      payload = { ...base, tipo: despTipo, quantidade: q, peso_bruto_kg: b, peso_liquido_kg: lq, ...(preco || comprador ? { _venda: { preco_kg: preco || null, comprador: comprador || null } } : {}) };
       if (!(await pesoConferido(lote_id, q, b, data, dados))) return;
       // confere com o que o app estimava (só com internet); nunca bloqueia, porque a contagem da despesca é a real
       const vivos = dados && lote ? vivosDoLote(lote, dados.res[lote.id]) : null;
@@ -610,7 +611,7 @@ export async function renderLancar(ctx, el, params = {}) {
         m[k] = v;
       }
       if (Object.values(m).every((v) => v == null)) return mostrarErro('Preencha pelo menos uma medição.');
-      if (navigator.onLine && !(await Promise.race([ctx.api.aguaAtiva().catch(() => true), new Promise((r) => setTimeout(() => r(true), 2500))]))) return mostrarErro('A qualidade da água ainda não foi ativada neste sistema (falta rodar o sql/22 no Supabase).');
+      if (navigator.onLine && !(await Promise.race([ctx.api.aguaAtiva().catch(() => true), new Promise((r) => setTimeout(() => r(true), 2500))]))) return mostrarErro('A qualidade da água ainda não foi ativada neste sistema (falta rodar o sql/25 no Supabase).');
       const { lote_id: _semLote, ...semLote } = base;
       const agora = new Date();
       payload = { ...semLote, tanque_id: selTanque.value, ...m, hora: data === hoje ? `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}` : null, obs: f.querySelector('#ag-obs').value.trim() || null };

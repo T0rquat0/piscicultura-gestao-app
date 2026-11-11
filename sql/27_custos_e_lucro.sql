@@ -1,7 +1,7 @@
 -- ============================================================
 -- CUSTO COMPLETO E LUCRO POR CICLO
--- Rode no SQL Editor do Supabase (depois do 01 a 23). Pode rodar de novo sem estragar nada.
--- Só dono e gerente veem e alteram valores em dinheiro.
+-- Rode no SQL Editor do Supabase (depois do 01 a 26). Pode rodar de novo sem estragar nada.
+-- Valores em R$ só para o dono (como no sql/23): o gerente não vê custo do alevino nem despesas gerais.
 -- ============================================================
 
 create table if not exists custos_lote (
@@ -13,8 +13,8 @@ create table if not exists custos_lote (
 alter table custos_lote enable row level security;
 drop policy if exists custos_lote_todas on custos_lote;
 create policy custos_lote_todas on custos_lote for all
-  using (current_papel() in ('dono','gerente') and exists (select 1 from lotes l where l.id = lote_id and tem_acesso_tanque(l.tanque_id)))
-  with check (current_papel() in ('dono','gerente') and exists (select 1 from lotes l where l.id = lote_id and tem_acesso_tanque(l.tanque_id)));
+  using (current_papel() = 'dono' and exists (select 1 from lotes l where l.id = lote_id and tem_acesso_tanque(l.tanque_id)))
+  with check (current_papel() = 'dono' and exists (select 1 from lotes l where l.id = lote_id and tem_acesso_tanque(l.tanque_id)));
 
 create table if not exists despesas_gerais (
   id uuid primary key default gen_random_uuid(),
@@ -30,8 +30,8 @@ create index if not exists idx_despesas_gerais_fazenda_data on despesas_gerais(f
 alter table despesas_gerais enable row level security;
 drop policy if exists despesas_gerais_todas on despesas_gerais;
 create policy despesas_gerais_todas on despesas_gerais for all
-  using (current_papel() in ('dono','gerente') and fazenda_id = current_fazenda())
-  with check (current_papel() in ('dono','gerente') and fazenda_id = current_fazenda());
+  using (current_papel() = 'dono' and fazenda_id = current_fazenda())
+  with check (current_papel() = 'dono' and fazenda_id = current_fazenda());
 
 -- histórico e lixeira
 drop trigger if exists historico_custos_lote on custos_lote;
@@ -116,6 +116,13 @@ begin
       and exists (select 1 from usuarios u where u.id = r.registrado_por and u.fazenda_id = v_f) on conflict do nothing;
   get diagnostics n = row_count; out := out || jsonb_build_object('despescas', n);
 
+  -- venda na despesca (sql/26): só da própria fazenda; a fazenda é conferida de novo pelo gatilho da tabela
+  if to_regclass('public.despesca_vendas') is not null then
+    insert into despesca_vendas select r.* from jsonb_populate_recordset(null::despesca_vendas, coalesce(t->'despesca_vendas', '[]')) r
+      where r.fazenda_id = v_f and exists (select 1 from despescas d where d.uuid_local = r.despesca_uuid) on conflict do nothing;
+    get diagnostics n = row_count; out := out || jsonb_build_object('despesca_vendas', n);
+  end if;
+
   insert into manejos select r.* from jsonb_populate_recordset(null::manejos, coalesce(t->'manejos', '[]')) r
     where exists (select 1 from lotes l join tanques x on x.id = l.tanque_id where l.id = r.lote_id and x.fazenda_id = v_f)
       and exists (select 1 from usuarios u where u.id = r.registrado_por and u.fazenda_id = v_f) on conflict do nothing;
@@ -150,3 +157,6 @@ begin
 
   return out;
 end $$;
+
+-- duas travas, como no sql/22: visitante sem login nem chega às tabelas de dinheiro
+revoke all on custos_lote, despesas_gerais from anon;
