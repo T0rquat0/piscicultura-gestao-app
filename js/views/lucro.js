@@ -111,7 +111,7 @@ export async function renderDespesas(ctx, el) {
     <form class="form card" id="f-desp" novalidate>
       <label>Data <input id="d-data" type="date" value="${hoje}" max="${hoje}" required></label>
       <label>Tipo <select id="d-cat">${CATEGORIAS_DESPESA.map(([v, r]) => `<option value="${v}">${esc(r)}</option>`).join('')}</select></label>
-      <label>Valor <span class="com-prefixo"><em>R$</em><input id="d-valor" type="text" inputmode="decimal" autocomplete="off" maxlength="16" placeholder="Ex.: 1.250,50" required></span></label>
+      <label>Valor <span class="com-prefixo"><em>R$</em><input id="d-valor" type="text" inputmode="numeric" autocomplete="off" maxlength="16" placeholder="0,00" required></span></label>
       <label>Descrição <small class="mudo">(opcional)</small> <input id="d-desc" type="text" maxlength="120" autocomplete="off"></label>
       <p id="d-erro" class="erro" hidden></p>
       <button class="btn primario" type="submit">Salvar despesa</button>

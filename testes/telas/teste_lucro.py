@@ -46,8 +46,8 @@ with sync_playwright() as pw:
     for x in ['FECHAMENTO', '20.000,00', '12.000,00', '8.000,00', '40,0%']: checa(x in p.upper(), f'PDF mostra {x}')
     pg.click('[data-fechar]'); pg.wait_for_timeout(300)
     # custo do alevino: valor inválido barrado, válido grava
-    pg.click('[data-alevino]'); pg.wait_for_selector('.dialogo form'); pg.fill('.dialogo [name=valor]', '1.50,00'); pg.click('.dialogo button[type=submit]'); pg.wait_for_timeout(200)
-    checa('Confira o valor' in pg.inner_text('.dialogo [data-erro]'), 'alevino: recusa milhar errado (1.50,00)')
+    pg.click('[data-alevino]'); pg.wait_for_selector('.dialogo form'); pg.fill('.dialogo [name=valor]', ''); pg.click('.dialogo [name=valor]'); pg.keyboard.type('160050', delay=40)
+    checa(pg.input_value('.dialogo [name=valor]') == '1.600,50', 'alevino: máscara mostra 1.600,50 ao digitar 160050')
     pg.fill('.dialogo [name=valor]', '1.600,50'); pg.click('.dialogo button[type=submit]'); pg.wait_for_timeout(900)
     x = [p2 for tb, p2 in est['posts'] if tb == 'custos_lote']; checa(x and x[0]['custo_alevino'] == 1600.5 and x[0]['lote_id'] == L1, f'alevino grava {x}'); pg.close()
 
@@ -60,7 +60,7 @@ with sync_playwright() as pw:
 
     # despesas gerais: validações, gravação, exclusão, e toque duplo
     preparar('dono'); pg = abrir(b); vai(pg, '#/despesas', '#f-desp')
-    for v, m in [('abc', 'letras'), ('0', 'zero'), ('12,345', 'três casas de centavo'), ('', 'vazio')]:
+    for v, m in [('abc', 'letras'), ('0', 'zero'), ('99999999999', 'acima do limite'), ('', 'vazio')]:
         pg.fill('#d-valor', v); pg.click('#f-desp button[type=submit]'); pg.wait_for_timeout(200); checa('Confira o valor' in pg.inner_text('#d-erro'), f'despesa {m}: recusa')
     pg.fill('#d-data', '2030-01-01'); pg.fill('#d-valor', '10'); pg.click('#f-desp button[type=submit]'); pg.wait_for_timeout(200); checa('futuro' in pg.inner_text('#d-erro'), 'data futura: recusa')
     pg.fill('#d-data', '2026-11-01'); pg.fill('#d-valor', '1.250,50'); pg.select_option('#d-cat', 'mao_de_obra'); pg.fill('#d-desc', 'Diária')

@@ -102,7 +102,7 @@ function camposDoTipo(tipo, kgSaco, verDinheiro = false) {
         <input id="desp-liquido" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 9356"></label>
       ${verDinheiro ? `<div class="man-dose desp-venda">
         <label>Preço de venda por kg <small class="mudo">(opcional)</small>
-          <span class="com-prefixo"><em>R$</em><input id="desp-preco" type="text" inputmode="decimal" autocomplete="off" maxlength="10" placeholder="Ex.: 9,50"></span></label>
+          <span class="com-prefixo"><em>R$</em><input id="desp-preco" type="text" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="0,00"></span></label>
         <label>Comprador <small class="mudo">(opcional)</small>
           <input id="desp-comprador" type="text" maxlength="80" autocomplete="off"></label>
       </div>` : ''}
