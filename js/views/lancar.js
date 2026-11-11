@@ -1,4 +1,4 @@
-// Lançamento de ração, biometria, mortalidade e despesca. Funciona sem internet:
+// Lançamento de ração, biometria, mortalidade, despesca e manejo (probiótico). Funciona sem internet:
 // o item é gravado na fila local (IndexedDB) e enviado quando houver conexão.
 import { icone } from '../icons.js';
 import { esc, hojeISO, fmtData, fmtNum, fmtInt, num, uuid, ROTULO_TIPO, progresso, fmtPct, plural, numDecimal, pesoMedioTxt } from '../util.js';
@@ -13,6 +13,7 @@ const TIPOS = {
   biometria: { rotulo: 'Biometria', tabela: 'biometrias' },
   mortalidade: { rotulo: 'Mortalidade', tabela: 'mortalidade' },
   despesca: { rotulo: 'Despesca', tabela: 'despescas', gerir: true }, // peso total da fazenda: só dono e gerente
+  manejo: { rotulo: 'Manejo', tabela: 'manejos' },
 };
 
 const casas = (x) => (Number.isInteger(x) ? 0 : Number.isInteger(Math.round(x * 100) / 10) ? 1 : 2);
@@ -20,7 +21,7 @@ const kgTxt = (v) => fmtNum(Number(v), casas(Number(v)));
 
 const sacosTxt = (n) => `${fmtNum(n, casas(n))} ${n === 1 ? 'saco' : 'sacos'}`;
 
-const TITULO2 = { racao: 'Quantidade de ração', biometria: 'Pesagem dos peixes', mortalidade: 'Peixes mortos', despesca: 'Dados da despesca' };
+const TITULO2 = { racao: 'Quantidade de ração', biometria: 'Pesagem dos peixes', mortalidade: 'Peixes mortos', despesca: 'Dados da despesca', manejo: 'Aplicação de probiótico' };
 
 function camposDoTipo(tipo, kgSaco) {
   if (tipo === 'racao') {
@@ -50,6 +51,23 @@ function camposDoTipo(tipo, kgSaco) {
         <input id="amostra" type="number" inputmode="numeric" step="1" min="1" placeholder="Ex.: 10" required></label>
       <div class="calc resultado" id="pm">Peso médio: —</div>
       <p id="aviso-amostra" class="aviso" hidden>Poucos peixes pesados: com menos de 30 o peso médio fica pouco confiável.</p>`;
+  }
+  if (tipo === 'manejo') {
+    return `<div class="tiles compactos" id="man-via" role="radiogroup" aria-label="Como foi aplicado">
+        <button type="button" class="tile on" role="radio" aria-checked="true" data-via="racao"><span>Na ração</span></button>
+        <button type="button" class="tile" role="radio" aria-checked="false" data-via="agua"><span>Na água</span></button>
+      </div>
+      <label>Produto
+        <input id="man-produto" type="text" maxlength="80" autocomplete="off" list="man-produtos" placeholder="Nome do probiótico" required></label>
+      <datalist id="man-produtos"></datalist>
+      <div class="man-dose">
+        <label>Dose
+          <input id="man-dose" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 200" required></label>
+        <label>Unidade
+          <select id="man-unidade"><option value="g">g</option><option value="kg">kg</option><option value="mL">mL</option><option value="L">L</option></select></label>
+      </div>
+      <label>Observação <small class="mudo">(opcional)</small>
+        <input id="man-obs" type="text" maxlength="200" autocomplete="off"></label>`;
   }
   if (tipo === 'despesca') {
     return `<div class="tiles compactos" id="desp-tipo" role="radiogroup" aria-label="Tipo de despesca">
@@ -132,6 +150,8 @@ export async function renderLancar(ctx, el, params = {}) {
     </form></div>
     <aside class="lc-painel" id="painel-tq" aria-label="Resumo do tanque escolhido"></aside></div>`;
 
+  // com 5 abas no celular estreito, a aba escolhida fica à vista
+  { const sg = el.querySelector('.seg'), on = sg && sg.querySelector('button.on'); if (on && sg.scrollWidth > sg.clientWidth) sg.scrollLeft = on.offsetLeft - (sg.clientWidth - on.offsetWidth) / 2; }
   if (params.de !== undefined) { const sg = el.querySelector('.seg'); if (sg) sg.dataset.de = params.de; }
   el.querySelectorAll('.seg button').forEach((b) =>
     b.addEventListener('click', () => renderLancar(ctx, el, { tipo: b.dataset.tipo, tanque: el.querySelector('#tanque').value, de: tiposVisiveis.findIndex(([k]) => k === tipo) })));
@@ -338,6 +358,21 @@ export async function renderLancar(ctx, el, params = {}) {
     }
   }
 
+  // manejo: na ração ou na água; o último produto já vem preenchido
+  let manVia = 'racao';
+  if (tipo === 'manejo') {
+    f.querySelectorAll('#man-via .tile').forEach((b) => b.addEventListener('click', () => {
+      manVia = b.dataset.via;
+      f.querySelectorAll('#man-via .tile').forEach((x) => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', String(on)); });
+    }));
+    db.kvGet('produtosManejo').then((l) => {
+      if (!Array.isArray(l) || !l.length) return;
+      const entrada = f.querySelector('#man-produto'), lista = f.querySelector('#man-produtos');
+      if (lista) lista.innerHTML = l.map((p) => `<option value="${esc(p)}"></option>`).join('');
+      if (entrada && !entrada.value) entrada.value = l[0];
+    }).catch(() => {});
+  }
+
   // despesca: parcial mantém o lote; total encerra. Mostra as contas enquanto digita.
   let despTipo = 'parcial';
   if (tipo === 'despesca') {
@@ -421,10 +456,10 @@ export async function renderLancar(ctx, el, params = {}) {
     try {
       const tab = TIPOS[tp].tabela;
       const locais = (await db.filaList()).filter((i) => i.tabela === tab && i.payload.data === pl.data && (tp === 'racao' ? i.payload.tanque_id === pl.tanque_id : i.payload.lote_id === pl.lote_id));
-      let regs = locais.map((i) => ({ q: tp === 'racao' ? i.payload.quantidade_kg : i.payload.quantidade, em: i.criado_em }));
+      let regs = locais.map((i) => ({ q: tp === 'racao' ? i.payload.quantidade_kg : i.payload.quantidade, p: i.payload.produto, em: i.criado_em }));
       if (navigator.onLine) {
         const rem = await Promise.race([ctx.api.registrosDoDia(tp, pl), new Promise((r) => setTimeout(() => r([]), 2500))]).catch(() => []);
-        regs = regs.concat(rem.map((r) => ({ q: tp === 'racao' ? r.quantidade_kg : r.quantidade, em: r.criado_em })));
+        regs = regs.concat(rem.map((r) => ({ q: tp === 'racao' ? r.quantidade_kg : r.quantidade, p: r.produto, em: r.criado_em })));
       }
       const agora = Date.now();
       const hora = (em) => new Date(em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -434,6 +469,7 @@ export async function renderLancar(ctx, el, params = {}) {
         const r = igual || recente; if (!r) return null;
         return `Este tanque já recebeu ${sacosTxt(Number(r.q) / kgSaco)} neste dia${r.em ? ` (às ${hora(r.em)})` : ''}.`;
       }
+      if (tp === 'manejo') { const r = regs.find((x) => x.p === pl.produto); return r ? `${pl.produto} já foi lançado neste lote nesta data${r.em ? ` (às ${hora(r.em)})` : ''}.` : null; }
       if (tp === 'despesca') { const r = regs.find((x) => Number(x.q) === pl.quantidade); return r ? `Já há uma despesca de ${plural(pl.quantidade, 'peixe', 'peixes')} neste lote nesta data${r.em ? ` (às ${hora(r.em)})` : ''}.` : null; }
       if (tp === 'mortalidade') { const r = regs.find((x) => Number(x.q) === pl.quantidade); return r ? `Já há ${plural(pl.quantidade, 'peixe morto lançado', 'peixes mortos lançados')} neste lote nesta data${r.em ? ` (às ${hora(r.em)})` : ''}.` : null; }
       return regs.length ? 'Já existe uma biometria deste lote nesta data.' : null;
@@ -466,13 +502,13 @@ export async function renderLancar(ctx, el, params = {}) {
     return !texto || confirmar({ titulo: 'Confira o peso', texto, ok: 'Está certo', cancelar: 'Corrigir' });
   }
 
-  f.addEventListener('submit', async (ev) => {
-    ev.preventDefault();
+  const aoSalvar = async () => {
     erro.hidden = true;
     const lote_id = selLote.value;
     const data = f.querySelector('#data').value;
     if (!lote_id) return mostrarErro('Selecione um tanque com lote ativo.');
     if (!data) return mostrarErro('Informe a data.');
+    if (data > hojeISO()) return mostrarErro('A data não pode ser no futuro.');
     // nenhum lançamento antes de o lote existir (antes só a despesca conferia: dava para lançar mortos em julho num lote de agosto)
     const loteSel = lotes.find((l) => l.id === lote_id);
     if (loteSel && data < loteSel.data_entrada) return mostrarErro(`A data não pode ser antes da entrada do lote (${fmtData(loteSel.data_entrada)}).`);
@@ -518,6 +554,16 @@ export async function renderLancar(ctx, el, params = {}) {
         const texto = despTipo === 'total' ? `Serão registrados ${plural(q, 'peixe', 'peixes')} e o lote será encerrado.${conta}` : `Você informou ${plural(q, 'peixe', 'peixes')}, mais do que o estimado.${conta}`;
         if (!(await confirmar({ titulo: despTipo === 'total' ? 'Encerrar o lote com esta despesca?' : 'Conferir a quantidade', texto, ok: despTipo === 'total' ? 'Registrar e encerrar' : 'Registrar assim', cancelar: 'Voltar' }))) return;
       }
+    } else if (tipo === 'manejo') {
+      const produto = f.querySelector('#man-produto').value.trim(), doseTxt = f.querySelector('#man-dose').value.trim(), dose = numDecimal(doseTxt);
+      const obs = f.querySelector('#man-obs').value.trim();
+      if (!produto) return mostrarErro('Informe o nome do produto.');
+      if (doseTxt.includes('.') && doseTxt.includes(',')) return mostrarErro('Digite a dose sem ponto de milhar. Ex.: 1250,5');
+      if (!(dose > 0) || dose > 1000000) return mostrarErro('Informe a dose aplicada (até 1.000.000).');
+      const lote = lotes.find((l) => l.id === lote_id);
+      if (lote && data < lote.data_entrada) return mostrarErro(`A data não pode ser antes da entrada do lote (${fmtData(lote.data_entrada)}).`);
+      if (navigator.onLine && !(await Promise.race([ctx.api.manejoAtivo().catch(() => true), new Promise((r) => setTimeout(() => r(true), 2500))]))) return mostrarErro('O manejo ainda não foi ativado neste sistema (falta rodar o sql/21 no Supabase).');
+      payload = { ...base, tipo: 'probiotico', produto, dose, unidade: f.querySelector('#man-unidade').value, via: manVia, obs: obs || null };
     } else {
       const q = num(f.querySelector('#qtd').value);
       if (!(q >= 1) || !Number.isInteger(q)) return mostrarErro('Informe a quantidade de peixes mortos (número inteiro).');
@@ -552,6 +598,9 @@ export async function renderLancar(ctx, el, params = {}) {
       btn.disabled = false;
       return mostrarErro('Não foi possível salvar no aparelho: ' + (e && e.message ? e.message : 'armazenamento indisponível'));
     }
+    if (tipo === 'manejo') { // últimos produtos usados, para não digitar de novo
+      try { const l = (await db.kvGet('produtosManejo')) || []; await db.kvSet('produtosManejo', [payload.produto, ...l.filter((p) => p !== payload.produto)].slice(0, 8)); } catch { /* opcional */ }
+    }
     if (tipo === 'despesca' && payload.tipo === 'total') { // o lote já some daqui, mesmo antes de enviar
       state.ref.lotes = state.ref.lotes.filter((l) => l.id !== lote_id);
       try { await db.kvSet('ref', state.ref); } catch { /* opcional */ }
@@ -564,6 +613,7 @@ export async function renderLancar(ctx, el, params = {}) {
     const nomeTanque = (tanques.find((t) => t.id === selTanque.value) || {}).nome || '';
     const resumo = tipo === 'racao' ? `${sacosTxt(num(f.querySelector('#qtd').value))} de ração (${kgTxt(payload.quantidade_kg)} kg)`
       : tipo === 'biometria' ? `${pesoMedioTxt(payload.peso_amostra_kg / payload.quantidade_amostrada)} de peso médio (${fmtInt(payload.quantidade_amostrada)} peixes pesados)`
+      : tipo === 'manejo' ? `${payload.produto}: ${String(payload.dose).replace('.', ',')} ${payload.unidade} ${payload.via === 'agua' ? 'na água' : 'na ração'}`
       : tipo === 'despesca' ? `despesca ${payload.tipo}: ${plural(payload.quantidade, 'peixe', 'peixes')}, ${fmtNum(payload.peso_bruto_kg, 0)} kg bruto`
       : `${plural(payload.quantidade, 'peixe morto', 'peixes mortos')}`;
     ctx.toast(navigator.onLine ? 'Salvo. Enviando…' : 'Salvo no celular. Será enviado quando houver internet.', 'ok');
@@ -579,7 +629,7 @@ export async function renderLancar(ctx, el, params = {}) {
     f.outerHTML = `
       <div class="sucesso card" role="status">
         <div class="sucesso-ic">${icone('check', 34)}</div>
-        <h2>${TIPOS[tipo].rotulo} salva</h2>
+        <h2>${tipo === 'manejo' ? 'Probiótico salvo' : `${TIPOS[tipo].rotulo} salva`}</h2>
         <p class="sucesso-res"><b>${esc(nomeTanque)}</b> · ${esc(resumo)}</p>
         ${navigator.onLine ? '' : '<p class="mudo nota">Sem internet: guardado no celular. Será enviado sozinho quando a internet voltar.</p>'}
         <div class="sucesso-acoes">
@@ -590,5 +640,13 @@ export async function renderLancar(ctx, el, params = {}) {
     el.querySelector('#b-outro').addEventListener('click', () => renderLancar(ctx, el, { tipo, escolher: '1' }));
     const bp = el.querySelector('#b-proximo');
     if (bp) bp.addEventListener('click', () => renderLancar(ctx, el, { tipo, tanque: proximo.id }));
+  };
+  // toque duplo: enquanto um salvamento está em andamento, o segundo é ignorado
+  let salvando = false;
+  f.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    if (salvando) return;
+    salvando = true;
+    try { await aoSalvar(); } finally { salvando = false; }
   });
 }

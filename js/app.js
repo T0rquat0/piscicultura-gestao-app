@@ -130,6 +130,8 @@ const ctx = {
   state,
   api: null,
   podeGerir: () => !!state.perfil && (state.perfil.papel === 'dono' || state.perfil.papel === 'gerente'),
+  // valores em R$ (preço da ração, custo, preço do peixe): só o dono (decisão de 10/11/2026)
+  verDinheiro: () => !!state.perfil && state.perfil.papel === 'dono',
   toast,
   atualizarRef,
   recarregarTopo: atualizarMarca,
@@ -150,6 +152,15 @@ const ctx = {
 };
 
 // ---------- login / sessão ----------
+// Aparelho desconectado (celular perdido: o dono ou o suporte tirou a conta deste aparelho) ou sessão encerrada:
+// apaga a cópia dos números da fazenda e a sessão guardada, e volta para a tela de entrar.
+async function aparelhoDesconectado(aviso = 'Este aparelho foi desconectado da conta (pelo dono da fazenda ou pelo suporte). Entre de novo com seu e-mail e senha.') {
+  for (const k of ['perfil', 'ref', 'resumo', 'racao14', 'admin']) { try { await db.kvDel(k); } catch { /* ignora */ } }
+  try { Object.keys(localStorage).filter((k) => k.startsWith('sb-')).forEach((k) => localStorage.removeItem(k)); } catch { /* ignora */ }
+  state.user = null; state.perfil = null; state.ref = { tanques: [], lotes: [] };
+  mostrarLogin(aviso);
+}
+
 function mostrarLogin(aviso) {
   state.user = null;
   if (!aviso && state.convite) aviso = 'Você recebeu um convite para entrar numa fazenda. Se já tem conta, entre. Se não tem, toque em "Criar minha conta" abaixo.';
@@ -282,15 +293,20 @@ async function abrirApp(user) {
   }
   // termos novos: quem ainda não aceitou esta versão aceita antes de entrar (só com internet, para não travar o campo)
   if (TERMOS_VERSAO && daRede && (user.user_metadata || {}).termos_versao !== TERMOS_VERSAO) { state.user = user; renderAceiteTermos(ctx, root, user); return; }
-  if (!perfil) { if (state.convite) renderAceitarConvite(ctx, root, user, state.convite); else renderCriarFazenda(ctx, root, user); return; }
+  // sem acesso (tirado da fazenda, desativado ou fazenda suspensa): apaga do aparelho a cópia dos números da fazenda.
+  // Sem isso, quem perdeu o acesso ainda via os dados guardados ao abrir o app sem internet.
+  const apagarCopias = async () => { for (const k of ['perfil', 'ref', 'resumo', 'racao14', 'admin']) await db.kvDel(k); };
+  if (!perfil) { if (daRede && guardado) await apagarCopias(); if (state.convite) renderAceitarConvite(ctx, root, user, state.convite); else renderCriarFazenda(ctx, root, user); return; }
   if (state.convite) { // conta já está numa fazenda: o convite não serve para ela
     descartarConvite();
     setTimeout(() => toast('Convite não usado: esta conta já faz parte de uma fazenda.', 'erro'), 600);
   }
-  if (perfil.ativo === false) { mostrarMensagem('Acesso desativado', 'Seu acesso a esta fazenda foi desativado. Fale com o dono.'); return; }
+  if (perfil.ativo === false) { if (daRede) await apagarCopias(); mostrarMensagem('Acesso desativado', 'Seu acesso a esta fazenda foi desativado. Fale com o dono.'); return; }
   // fazenda bloqueada pelo administrador (sql/15): o perfil vem, mas a fazenda não aparece
   if (daRede && perfil.fazenda_id && !perfil.fazendas) {
-    await db.kvDel('perfil');
+    // ou este aparelho foi desconectado (celular perdido, sql/24): o banco já não reconhece a sessão
+    if (!(await api.sessaoAindaValida().catch(() => true))) return aparelhoDesconectado();
+    await apagarCopias();
     mostrarMensagem('Acesso suspenso', 'O acesso desta fazenda ao sistema está suspenso. Os dados continuam guardados. Fale com o suporte para liberar.');
     return;
   }
@@ -512,7 +528,9 @@ async function iniciar() {
   ctx.api = api;
 
   client.auth.onAuthStateChange((evento) => {
-    if (evento === 'SIGNED_OUT' && !saindo && state.user) mostrarLogin('Sua sessão expirou. Entre novamente.');
+    // a sessão acabou sem a pessoa tocar em Sair (venceu, ou o aparelho foi desconectado pelo dono/suporte):
+    // apaga também a cópia dos números guardada no aparelho
+    if (evento === 'SIGNED_OUT' && !saindo && state.user) aparelhoDesconectado('Este aparelho saiu da conta. Entre novamente com seu e-mail e senha.');
   });
 
   window.addEventListener('hashchange', rotear);

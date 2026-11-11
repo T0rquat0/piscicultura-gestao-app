@@ -67,7 +67,7 @@ export function renderMais(ctx, el) {
 
     ${p.papel === 'dono' ? `<div class="card">
       <b>Cópia de segurança dos dados</b>
-      <small style="display:block">Um arquivo com tudo da fazenda: tanques, lotes, lançamentos, compras, contagens e equipe.</small>
+      <small style="display:block">Um arquivo com tudo da fazenda: tanques, lotes, lançamentos, compras, contagens e equipe. Inclui os valores pagos e o preço do peixe: guarde só com você e não mande para a equipe.</small>
       <div class="cfg-lista">
         <button class="hub-card" id="b-copia" type="button"><span class="item-ic">${icone('baixar')}</span><span class="esq"><b>Baixar cópia</b><small>Salva um arquivo para guardar no Drive ou mandar por e-mail</small></span><span class="seta">${icone('direita', 20)}</span></button>
         <button class="hub-card" id="b-importar" type="button"><span class="item-ic">${icone('subir')}</span><span class="esq"><b>Importar cópia</b><small>Devolve o que faltar, sem alterar o que existe</small></span><span class="seta">${icone('direita', 20)}</span></button>
@@ -175,7 +175,7 @@ export function renderMais(ctx, el) {
     try { copia = JSON.parse(await arq.text()); } catch { return ctx.toast('Este arquivo não é uma cópia do app.', 'erro'); }
     if (!copia || typeof copia.tabelas !== 'object' || Array.isArray(copia.tabelas)) return ctx.toast('Este arquivo não é uma cópia do app.', 'erro');
     const qtd = (t) => (Array.isArray(copia.tabelas[t]) ? copia.tabelas[t].length : 0);
-    const resumo = `${plural(qtd('tanques'), 'tanque', 'tanques')}, ${plural(qtd('lotes'), 'lote', 'lotes')}, ${plural(qtd('racao_consumo') + qtd('biometrias') + qtd('mortalidade') + qtd('despescas'), 'lançamento', 'lançamentos')} e ${plural(qtd('racao_estoque'), 'compra', 'compras')}`;
+    const resumo = `${plural(qtd('tanques'), 'tanque', 'tanques')}, ${plural(qtd('lotes'), 'lote', 'lotes')}, ${plural(qtd('racao_consumo') + qtd('biometrias') + qtd('mortalidade') + qtd('despescas') + qtd('manejos'), 'lançamento', 'lançamentos')} e ${plural(qtd('racao_estoque'), 'compra', 'compras')}`;
     if (!(await confirmar({ titulo: 'Importar esta cópia?', texto: `Cópia de ${copia.gerado_em ? fmtData(copia.gerado_em) : 'data desconhecida'} com ${resumo}. Só volta o que estiver faltando; nada que já existe é alterado.`, ok: 'Importar' }))) return;
     bimp.disabled = true;
     try {

@@ -5,7 +5,8 @@ import { confirmar } from '../dialogo.js';
 export async function renderEquipe(ctx, el) {
   if (ctx.state.perfil.papel !== 'dono') { el.innerHTML = '<div class="card vazio">Somente o dono gerencia a equipe.</div>'; return; }
   el.innerHTML = '<h1>Equipe</h1><p class="carregando">Carregando…</p>';
-  const [{ usuarios, vinculos }, tanques, convites] = await Promise.all([ctx.api.equipe(), ctx.api.tanques(), ctx.api.convitesAbertos()]);
+  const [{ usuarios, vinculos }, tanques, convites, aparelhos] = await Promise.all([ctx.api.equipe(), ctx.api.tanques(), ctx.api.convitesAbertos(),
+    ctx.api.aparelhosConectados ? ctx.api.aparelhosConectados().catch(() => null) : null]);
   const linkDe = (token) => `${location.origin}${location.pathname}#/convite/${token}`;
   const meuId = ctx.state.perfil.id;
 
@@ -32,6 +33,9 @@ export async function renderEquipe(ctx, el) {
           <label class="linha-check"><input type="checkbox" name="ativo"${u.ativo ? ' checked' : ''}> Acesso ativo</label>
           <p class="erro" data-erro hidden></p>
           <button class="btn primario" type="submit">Salvar</button>
+          ${aparelhos ? `<div class="aparelhos"><b>Celular perdido?</b>
+            <small class="mudo">${aparelhoTxt(aparelhos[u.id])}. Desconectar tira a conta de todos os aparelhos; a pessoa continua na equipe e entra de novo no celular novo com o e-mail e a senha dela.</small>
+            <button class="btn perigo" type="button" data-desconectar="${esc(u.id)}">Desconectar aparelhos</button></div>` : ''}
         </form>`}
       </details>`;
     }).join('')}
@@ -97,6 +101,13 @@ export async function renderEquipe(ctx, el) {
     catch (e) { ctx.toast(e.message, 'erro'); }
   }));
 
+  el.querySelectorAll('[data-desconectar]').forEach((b) => b.addEventListener('click', async () => {
+    const u = usuarios.find((x) => x.id === b.dataset.desconectar);
+    if (!(await confirmar({ titulo: `Desconectar os aparelhos de ${u ? u.nome : 'esta pessoa'}?`, texto: 'O celular perdido sai da conta e apaga os números da fazenda assim que pegar sinal. A pessoa continua na equipe e entra de novo no celular novo.', ok: 'Desconectar', cancelar: 'Voltar', perigo: true }))) return;
+    try { const n = await ctx.api.desconectarAparelhos(b.dataset.desconectar); ctx.toast(n ? `${n === 1 ? '1 aparelho desconectado' : `${n} aparelhos desconectados`}` : 'Nenhum aparelho estava conectado', 'ok'); renderEquipe(ctx, el); }
+    catch (e) { ctx.toast(e.message, 'erro'); }
+  }));
+
   el.querySelectorAll('form[data-form]').forEach((f) =>
     f.addEventListener('submit', async (ev) => {
       ev.preventDefault();
@@ -136,4 +147,13 @@ export async function renderEquipe(ctx, el) {
       erroNovo.hidden = false; btn.disabled = false;
     }
   });
+}
+
+// "2 aparelhos conectados · último uso hoje"
+function aparelhoTxt(a) {
+  const n = a ? Number(a.aparelhos) || 0 : 0;
+  if (!n) return 'Nenhum aparelho conectado agora';
+  const dias = a.ultimo_uso ? Math.floor((Date.now() - new Date(a.ultimo_uso).getTime()) / 864e5) : null;
+  const quando = dias == null ? '' : dias <= 0 ? ' · último uso hoje' : dias === 1 ? ' · último uso ontem' : ` · último uso há ${dias} dias`;
+  return `${n === 1 ? '1 aparelho conectado' : `${n} aparelhos conectados`}${quando}`;
 }

@@ -66,6 +66,7 @@ export { rodape, TOPO, BASE };
 
 export function gerarPdfLote(jsPDF, d) {
   const { fazenda, lote, nomeTanque, c, bios, mort, evo, semanas, kgSaco, gerir, geradoEm, fontes } = d;
+  const dinheiro = d.dinheiro ?? gerir; // valores em R$ só para o dono
   const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
   prepararFontes(doc, fontes);
   doc.setProperties({ title: `Relatório do lote - ${nomeTanque} - ${lote.especie}`, author: fazenda, creator: 'Gestão de Piscicultura' });
@@ -122,7 +123,7 @@ export function gerarPdfLote(jsPDF, d) {
     ['Conversão alimentar', c.ca != null ? n(c.ca, 2) : '-', '', c.ca != null ? 'kg de ração por kg ganho' : c.caAguardaPesagem ? 'aparece após a próxima pesagem' : 'precisa de biometria'],
     ['Ganho diário', c.gpd != null ? n(c.gpd, 1) : '-', c.gpd != null ? 'g/dia' : '', 'por peixe desde a entrada'],
   ];
-  if (gerir) {
+  if (dinheiro) {
     ind.push(['Custo de ração', c.custoRacao != null ? fmtBRL(c.custoRacao) : '-', '', c.custoRacao != null ? 'preço médio pago por kg' : 'sem valor nas compras']);
     ind.push(['Custo por kg produzido', c.custoKgProduzido != null ? fmtBRL(c.custoKgProduzido) : '-', '', c.custoKgProduzido != null ? 'ração até a biometria / peso ganho' : 'precisa de preço e biometria com ganho']);
   }
@@ -152,7 +153,7 @@ export function gerarPdfLote(jsPDF, d) {
   if (c.despescados) obs.push(['Despesca', `${plural(c.despescados, 'peixe retirado', 'peixes retirados')}, ${n(c.pesoDespescado, 0)} kg de peso bruto.`]);
   obs.push(['Ração', `${n(c.racaoTotal, 0)} kg fornecidos (${n(c.racaoTotal / kgSaco, 1)} sacos de ${n(kgSaco, 0)} kg)${c.racaoMediaDia != null ? `, média de ${n(c.racaoMediaDia, 1)} kg por dia` : ''}.`]);
   if (c.ca != null) obs.push(['Conversão', `${n(c.ca, 2)} kg de ração por kg de peixe ganho até a última biometria. Referência usual: 1,2 a 2,0, conforme espécie e fase.`]);
-  if (gerir && c.custoRacao != null) obs.push(['Custo', `${fmtBRL(c.custoRacao)} em ração, calculado pelo preço médio das compras com valor informado.`]);
+  if (dinheiro && c.custoRacao != null) obs.push(['Custo', `${fmtBRL(c.custoRacao)} em ração, calculado pelo preço médio das compras com valor informado.`]);
   const alertas = [];
   if (bios.length < 2) alertas.push('Menos de duas biometrias: ganho de peso e conversão alimentar ficam pouco confiáveis. O ideal é pesar a cada 15 dias.');
   if (bios.some((b) => Number(b.quantidade_amostrada) < 30)) alertas.push('Há biometria com menos de 30 peixes pesados. Amostras pequenas dão peso médio menos preciso; o ideal é 5% a 10% do lote.');
