@@ -1108,3 +1108,8 @@ table.cmp td b { font-weight: 600; }
 /* manejo: na ração ou na água lado a lado; dose e unidade na mesma linha */
 #man-via { grid-template-columns: 1fr 1fr; }
 .man-dose { display: grid; grid-template-columns: 1fr 6.5rem; gap: .6rem; }
+
+/* Equipe: celular perdido (área própria, abaixo do Salvar) */
+.aparelhos { display: grid; gap: .45rem; margin-top: .6rem; padding-top: 1rem; border-top: 1px solid var(--linha); }
+.aparelhos small { display: block; line-height: 1.45; }
+.aparelhos .btn { width: 100%; }
