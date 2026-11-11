@@ -175,8 +175,12 @@ export async function renderRelatorioLote(ctx, el, id) {
   const pesoUnid = (g) => (g >= 1000 ? unid(fmtNum(g / 1000, 2), 'kg') : unid(fmtNum(g, 0), 'g')); // 2,30 kg, não 2.300 g
   const destaque = (rotulo, valor, sub) => `<div class="destaque"><span>${rotulo}</span><b>${valor}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
   const linhaNum = (rotulo, valor, sub) => `<li><div class="esq"><b>${rotulo}</b>${sub ? `<small>${sub}</small>` : ''}</div><span class="valor">${valor}</span></li>`;
-  const excluir = (tab, rid) => (gerir ? `<span class="acoes-reg no-print"><button class="btn mini no-print" data-edit="${tab}:${esc(rid)}" type="button">Editar</button><button class="btn mini perigo no-print" data-del="${tab}:${esc(rid)}" type="button">Excluir</button></span>` : '');
-  const registro = (data, quemId, valor, tab, rid) => `<li><div class="esq"><b>${fmtData(data)}</b><small>${esc(quem(quemId))}</small></div><span class="valor">${valor}</span>${excluir(tab, rid)}</li>`;
+  // funcionário: corrige ou apaga só o que ELE lançou HOJE (sql/33). Dono e gerente: tudo.
+  const meuId = ctx.state.perfil.id;
+  const diaLocal = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const meuDeHoje = (r) => !!r && r.registrado_por === meuId && !!r.criado_em && diaLocal(r.criado_em) === hoje;
+  const excluir = (tab, rid, r) => (gerir || (tab !== 'despescas' && meuDeHoje(r)) ? `<span class="acoes-reg no-print"><button class="btn mini no-print" data-edit="${tab}:${esc(rid)}" type="button">Editar</button><button class="btn mini perigo no-print" data-del="${tab}:${esc(rid)}" type="button">Excluir</button></span>` : '');
+  const registro = (data, quemId, valor, tab, rid, r) => `<li><div class="esq"><b>${fmtData(data)}</b><small>${esc(quem(quemId))}</small></div><span class="valor">${valor}</span>${excluir(tab, rid, r)}</li>`;
   const secao = (titulo, itens, vazio) => `
     <section class="bloco"><h2>${titulo} <span class="contagem">${itens.length}</span></h2>
       <div class="card">${itens.length ? `<ul class="lista registros">${itens.join('')}</ul>` : `<p class="mudo" style="margin:0">${vazio}</p>`}</div></section>`;
@@ -246,8 +250,9 @@ export async function renderRelatorioLote(ctx, el, id) {
   const pintarCmp = (h) => { cmpHtml = h; const box = el.querySelector('#cmp-ciclos'); if (box) box.innerHTML = `<h2>Comparação com ciclos anteriores</h2>${h}`; };
   compararCiclos().then(pintarCmp).catch(() => pintarCmp('<div class="card"><p class="mudo" style="margin:0">Não foi possível buscar os ciclos anteriores agora.</p></div>'));
 
-  const abas = [['resumo', 'Resumo'], ['peso', 'Peso'], ['racao', 'Ração'], ['agua', 'Água'], ...(gerir && desp.length ? [['despesca', 'Despesca']] : []), ...(gerir ? [['registros', 'Registros']] : [])];
-  let aba = 'resumo';
+  const abas = [['resumo', 'Resumo'], ['peso', 'Peso'], ['racao', 'Ração'], ['agua', 'Água'], ...(gerir && desp.length ? [['despesca', 'Despesca']] : []), ['registros', gerir ? 'Registros' : 'Lançamentos']];
+  // ?aba=registros: atalho "Lançou errado?" da tela do tanque abre direto a lista de lançamentos
+  let aba = /[?&]aba=registros(&|$)/.test(location.hash) ? 'registros' : 'resumo';
 
   const painelResumo = () => `
     <div class="card destaques3">
@@ -345,12 +350,13 @@ export async function renderRelatorioLote(ctx, el, id) {
   };
 
   const painelRegistros = () => `
-    ${secao('Ração lançada', [...rac].reverse().map((r) => registro(r.data, r.registrado_por, `${fmtNum(r.quantidade_kg, 1)} kg (≈ ${fmtNum(r.quantidade_kg / kgS, 1)} sacos)`, 'racao_consumo', r.id)), 'Nenhuma ração lançada.')}
-    ${secao('Biometrias', [...bios].reverse().map((b) => registro(b.data, b.registrado_por, `${pesoMedioTxt(pesoMedioKg(b))}<small>${fmtInt(b.quantidade_amostrada)} ${Number(b.quantidade_amostrada) === 1 ? 'peixe' : 'peixes'} · ${fmtNum(b.peso_amostra_kg, 3)} kg</small>`, 'biometrias', b.id)), 'Nenhuma biometria registrada.')}
-    ${secao('Mortalidade', [...mort].reverse().map((m) => registro(m.data, m.registrado_por, `${fmtInt(m.quantidade)} peixes${m.causa ? `<small class="causa">${esc(m.causa)}</small>` : ''}`, 'mortalidade', m.id)), 'Nenhuma mortalidade registrada.')}
-    ${desp.length ? secao('Despescas', [...desp].reverse().map((d) => registro(d.data, d.registrado_por, `${fmtNum(d.peso_bruto_kg, 0)} kg bruto<small>${d.tipo === 'total' ? 'Total' : 'Parcial'} · ${fmtInt(d.quantidade)} peixes</small>`, 'despescas', d.id)), '') : ''}
-    ${agua.length ? secao('Água', [...agua].reverse().map((a) => registro(a.data, a.registrado_por, `${[a.oxigenio_mgl != null && `O₂ ${fmtNum(Number(a.oxigenio_mgl), 1)}`, a.temperatura_c != null && `${fmtNum(Number(a.temperatura_c), 1)} °C`, a.ph != null && `pH ${fmtNum(Number(a.ph), 1)}`, a.amonia_mgl != null && `NH₃ ${fmtNum(Number(a.amonia_mgl), 2)}`].filter(Boolean).join(' · ')}${a.obs ? `<small>${esc(a.obs)}</small>` : ''}`, 'qualidade_agua', a.id)), '') : ''}
-    ${man.length ? secao('Probiótico', [...man].reverse().map((m) => registro(m.data, m.registrado_por, `${String(Number(m.dose)).replace('.', ',')} ${esc(m.unidade)}<small>${esc(m.produto)} · ${m.via === 'agua' ? 'na água' : 'na ração'}${m.obs ? ` · ${esc(m.obs)}` : ''}</small>`, 'manejos', m.id)), '') : ''}`;
+    ${!gerir ? '<p class="aviso">Você pode corrigir ou apagar o que <b>você</b> lançou <b>hoje</b>. Para mudar um lançamento mais antigo, fale com o dono ou o gerente.</p>' : ''}
+    ${secao('Ração lançada', [...rac].reverse().map((r) => registro(r.data, r.registrado_por, `${fmtNum(r.quantidade_kg, 1)} kg (≈ ${fmtNum(r.quantidade_kg / kgS, 1)} sacos)`, 'racao_consumo', r.id, r)), 'Nenhuma ração lançada.')}
+    ${secao('Biometrias', [...bios].reverse().map((b) => registro(b.data, b.registrado_por, `${pesoMedioTxt(pesoMedioKg(b))}<small>${fmtInt(b.quantidade_amostrada)} ${Number(b.quantidade_amostrada) === 1 ? 'peixe' : 'peixes'} · ${fmtNum(b.peso_amostra_kg, 3)} kg</small>`, 'biometrias', b.id, b)), 'Nenhuma biometria registrada.')}
+    ${secao('Mortalidade', [...mort].reverse().map((m) => registro(m.data, m.registrado_por, `${fmtInt(m.quantidade)} peixes${m.causa ? `<small class="causa">${esc(m.causa)}</small>` : ''}`, 'mortalidade', m.id, m)), 'Nenhuma mortalidade registrada.')}
+    ${gerir && desp.length ? secao('Despescas', [...desp].reverse().map((d) => registro(d.data, d.registrado_por, `${fmtNum(d.peso_bruto_kg, 0)} kg bruto<small>${d.tipo === 'total' ? 'Total' : 'Parcial'} · ${fmtInt(d.quantidade)} peixes</small>`, 'despescas', d.id)), '') : ''}
+    ${agua.length ? secao('Água', [...agua].reverse().map((a) => registro(a.data, a.registrado_por, `${[a.oxigenio_mgl != null && `O₂ ${fmtNum(Number(a.oxigenio_mgl), 1)}`, a.temperatura_c != null && `${fmtNum(Number(a.temperatura_c), 1)} °C`, a.ph != null && `pH ${fmtNum(Number(a.ph), 1)}`, a.amonia_mgl != null && `NH₃ ${fmtNum(Number(a.amonia_mgl), 2)}`].filter(Boolean).join(' · ')}${a.obs ? `<small>${esc(a.obs)}</small>` : ''}`, 'qualidade_agua', a.id, a)), '') : ''}
+    ${man.length ? secao('Probiótico', [...man].reverse().map((m) => registro(m.data, m.registrado_por, `${String(Number(m.dose)).replace('.', ',')} ${esc(m.unidade)}<small>${esc(m.produto)} · ${m.via === 'agua' ? 'na água' : 'na ração'}${m.obs ? ` · ${esc(m.obs)}` : ''}</small>`, 'manejos', m.id, m)), '') : ''}`;
 
   const paineis = { resumo: painelResumo, peso: painelPeso, racao: painelRacao, agua: painelAgua, despesca: painelDespesca, registros: painelRegistros };
 

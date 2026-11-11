@@ -171,7 +171,7 @@ export function criarApi(client) {
     },
     // sem o sql/27 a tabela não existe: o relatório segue sem medições
     aguaTanque(tanqueId, desde) {
-      return todos(() => client.from('qualidade_agua').select('id,data,hora,tanque_id,oxigenio_mgl,temperatura_c,ph,amonia_mgl,obs,registrado_por').eq('tanque_id', tanqueId).gte('data', desde).order('data').order('id')).catch(() => []);
+      return todos(() => client.from('qualidade_agua').select('id,data,hora,tanque_id,oxigenio_mgl,temperatura_c,ph,amonia_mgl,obs,registrado_por,criado_em').eq('tanque_id', tanqueId).gte('data', desde).order('data').order('id')).catch(() => []);
     },
     // o banco já tem a tabela de venda só do dono (sql/28)?
     async vendaAtiva() {
@@ -301,14 +301,14 @@ export function criarApi(client) {
     // venda: true só para o dono (preço e comprador vêm da tabela só dele, sql/28)
     async dadosLote(loteId, { venda = false } = {}) {
       const [bios, mort, rac, desp, man] = await Promise.all([
-        todos(() => client.from('biometrias').select('id,data,peso_amostra_kg,quantidade_amostrada,registrado_por').eq('lote_id', loteId).order('data').order('id')),
-        todos(() => client.from('mortalidade').select('id,data,quantidade,causa,registrado_por').eq('lote_id', loteId).order('data').order('id'))
-          .catch(() => todos(() => client.from('mortalidade').select('id,data,quantidade,registrado_por').eq('lote_id', loteId).order('data').order('id'))),
-        todos(() => client.from('racao_consumo').select('id,data,quantidade_kg,registrado_por').eq('lote_id', loteId).order('data').order('id')),
+        todos(() => client.from('biometrias').select('id,data,peso_amostra_kg,quantidade_amostrada,registrado_por,criado_em').eq('lote_id', loteId).order('data').order('id')),
+        todos(() => client.from('mortalidade').select('id,data,quantidade,causa,registrado_por,criado_em').eq('lote_id', loteId).order('data').order('id'))
+          .catch(() => todos(() => client.from('mortalidade').select('id,data,quantidade,registrado_por,criado_em').eq('lote_id', loteId).order('data').order('id'))),
+        todos(() => client.from('racao_consumo').select('id,data,quantidade_kg,registrado_por,criado_em').eq('lote_id', loteId).order('data').order('id')),
         // sem o sql/20 a tabela não existe: o relatório segue sem despescas
         todos(() => client.from('despescas').select('id,uuid_local,data,tipo,quantidade,peso_bruto_kg,peso_liquido_kg,registrado_por').eq('lote_id', loteId).order('data').order('id'))
           .catch(() => []),
-        todos(() => client.from('manejos').select('id,data,tipo,produto,dose,unidade,via,obs,registrado_por').eq('lote_id', loteId).order('data').order('id')).catch(() => []), // sem o sql/21: segue sem manejos
+        todos(() => client.from('manejos').select('id,data,tipo,produto,dose,unidade,via,obs,registrado_por,criado_em').eq('lote_id', loteId).order('data').order('id')).catch(() => []), // sem o sql/21: segue sem manejos
       ]);
       if (venda && desp.length) {
         const vendas = await todos(() => client.from('despesca_vendas').select('despesca_uuid,preco_kg,comprador').in('despesca_uuid', desp.map((d) => d.uuid_local)).order('despesca_uuid'))
@@ -339,7 +339,7 @@ export function criarApi(client) {
       if (!TABELAS_EXCLUIVEIS.has(tabela)) throw new Error('Tabela não permitida');
       ok(await client.from(tabela).delete().eq('id', id));
     },
-    // corrige um registro (dono/gerente; o RLS barra os demais sem dar erro, por isso confere se alguma linha mudou)
+    // corrige um registro (dono/gerente; o funcionário só o que ele lançou hoje, sql/33; o RLS barra os demais sem dar erro, por isso confere se alguma linha mudou)
     async atualizar(tabela, id, campos) {
       if (!TABELAS_EDITAVEIS.has(tabela)) throw new Error('Tabela não permitida');
       // despesca: preço e comprador não ficam nela (sql/28), vão para a venda, só do dono (gravada depois da despesca)
@@ -388,7 +388,7 @@ export function criarApi(client) {
     async adminSalvarPacote(p) { ok(await client.rpc('admin_salvar_pacote', { p_tanques_max: p.tanques_max, p_nome: p.nome, p_preco: p.preco, p_ativo: p.ativo })); },
     async adminDefinirPiloto(ligado) { ok(await client.rpc('admin_definir_piloto', { p_ligado: ligado })); },
     async adminDefinirDocumento(fazenda, documento) { ok(await client.rpc('admin_definir_documento', { p_fazenda: fazenda, p_documento: documento })); },
-    // financeiro do sistema (sql/32); null = SQL ainda não rodado
+    // financeiro do sistema (sql/33); null = SQL ainda não rodado
     async adminFinanceiro() {
       const r = await client.rpc('admin_financeiro');
       if (r.error && (r.error.code === 'PGRST202' || r.error.code === '42883')) return null;
