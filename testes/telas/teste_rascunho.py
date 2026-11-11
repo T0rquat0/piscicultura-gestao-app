@@ -33,7 +33,7 @@ with sync_playwright() as pw:
     checa(aviso(pg) and pg.input_value('#qtd') == '7', 'fechou o app e abriu: rascunho continua')
 
     # outra aba não pega o rascunho da mortalidade
-    ir(pg, '#/lancar?tipo=racao', '#qtd'); checa(not aviso(pg) and pg.input_value('#qtd') == '', 'aba Ração: sem rascunho da mortalidade')
+    ir(pg, '#/lancar?tipo=racao', '#racao-kg'); checa(not aviso(pg) and pg.input_value('#racao-kg') == '', 'aba Ração: sem rascunho da mortalidade')
     # atalho direto para OUTRO tanque não mistura o rascunho
     ir(pg, f'#/lancar?tipo=mortalidade&tanque={T}', '#qtd'); checa(not aviso(pg) and pg.input_value('#qtd') == '', 'atalho para outro tanque: não aplica o rascunho do Tanque Dois')
 

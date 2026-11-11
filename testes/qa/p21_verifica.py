@@ -12,7 +12,7 @@ with sync_playwright() as pw:
     s.ir('#/'); s.pg.wait_for_timeout(2500); print('2 topo antes:', L(s.texto('#view'), 120))
     s.pg.locator('.tq', has_text='Tanque 4').first.click(); s.pg.wait_for_timeout(1500)
     print('  sugestão:', L(s.pg.inner_text('#sug-racao') if s.pg.locator('#sug-racao').count() else '-', 120))
-    s.pg.fill('#qtd', '4'); s.pg.get_by_text('Salvar ração').click(); s.pg.wait_for_timeout(1500)
+    s.pg.fill('#racao-kg', '100'); s.pg.get_by_text('Salvar ração').click(); s.pg.wait_for_timeout(1500)
     if s.pg.get_by_role('button', name='Lançar mesmo assim').count(): s.pg.get_by_role('button', name='Lançar mesmo assim').click()
     s.pg.wait_for_timeout(3000); print('  salvo:', L(s.texto('#view'), 80))
     s.offline(True); s.pg.goto(BASE + '#/', wait_until='domcontentloaded'); s.pg.wait_for_selector('#view', timeout=30000); s.pg.wait_for_timeout(3500)

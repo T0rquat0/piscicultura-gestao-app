@@ -56,7 +56,7 @@ def sessao(vencida):
     return {'access_token': 'x', 'refresh_token': 'y', 'token_type': 'bearer', 'expires_in': 3600, 'expires_at': int(time.time()) + (-7200 if vencida else 2592000), 'user': {'id': U, 'aud': 'authenticated'}}
 
 ROTAS = ['#/', '#/lancar', f'#/t/{T}', '#/relatorio', '#/tanques', '#/estoque', '#/mais', '#/pendencias', '#/equipe', '#/plano', '#/historico']
-LANC = [('racao', {'#qtd': '2'}), ('biometria', {'#peso': '30', '#amostra': '20'}), ('mortalidade', {'#qtd': '3'}), ('despesca', {'#desp-qtd': '100', '#desp-bruto': '150'}), ('manejo', {'#man-produto': 'Probiótico X', '#man-dose': '200'})]
+LANC = [('racao', {'#racao-kg': '50'}), ('biometria', {'#peso': '30', '#amostra': '20'}), ('mortalidade', {'#qtd': '3'}), ('despesca', {'#desp-qtd': '100', '#desp-bruto': '150'}), ('manejo', {'#man-produto': 'Probiótico X', '#man-dose': '200'})]
 
 def cenario(b, nome, modo, vencida):
     posts.clear(); morto.clear(); erros = []

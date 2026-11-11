@@ -7,7 +7,7 @@ with sync_playwright() as pw:
     s.pg.evaluate("location.hash='#/lancar?tipo=racao'"); s.pg.wait_for_timeout(1500)
     s.pg.click('#b-trocar'); s.pg.wait_for_timeout(500); s.pg.locator('#tiles .tile', has_text='Tanque 2').click(); s.pg.wait_for_timeout(800)
     print('1 form ração offline:', L(s.texto('#view'), 400))
-    s.pg.fill('#qtd', '1'); s.pg.get_by_text('Salvar ração').click(); s.pg.wait_for_timeout(2500); s.shot('racao_offline')
+    s.pg.fill('#racao-kg', '25'); s.pg.get_by_text('Salvar ração').click(); s.pg.wait_for_timeout(2500); s.shot('racao_offline')
     print('1 apos salvar:', L(s.texto('#view'), 250)); print('   cabeçalho:', L(s.texto('header') if s.pg.locator('header').count() else '', 120))
     # mortalidade offline no Tanque 1
     s.pg.evaluate("location.hash='#/lancar?tipo=mortalidade'"); s.pg.wait_for_timeout(1500)
