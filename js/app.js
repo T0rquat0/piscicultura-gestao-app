@@ -230,7 +230,7 @@ async function cadastrar(email, senha) {
 async function criarFazenda(fazenda, nome, user, documento) {
   await api.criarFazenda(fazenda, nome, documento);
   await abrirApp(user);
-  // o mesmo CPF/CNPJ já usou o teste grátis em outra fazenda (sql/29): a fazenda nasce sem teste
+  // o mesmo CPF/CNPJ já usou o teste grátis em outra fazenda (sql/30): a fazenda nasce sem teste
   try {
     const p = await api.plano();
     if (p && p.estado === 'teste_acabou') toast('Este CPF/CNPJ já usou o teste grátis. Para abrir lotes nesta fazenda, escolha um pacote em Mais > Meu plano.', 'erro');

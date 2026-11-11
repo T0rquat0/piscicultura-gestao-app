@@ -1,6 +1,6 @@
 -- ============================================================
--- 26. VENDA NA DESPESCA: preço por kg e comprador, SÓ PARA O DONO
--- Rode no SQL Editor do Supabase depois do 01 a 25. Pode rodar de novo sem estragar nada.
+-- 27. VENDA NA DESPESCA: preço por kg e comprador, SÓ PARA O DONO
+-- Rode no SQL Editor do Supabase depois do 01 a 26. Pode rodar de novo sem estragar nada.
 --
 -- Valores em R$ são só do dono (sql/23). Por isso a venda não fica na tabela despescas (que o gerente
 -- e o funcionário com acesso ao tanque leem): fica nesta tabela, que só o dono da fazenda lê e grava.

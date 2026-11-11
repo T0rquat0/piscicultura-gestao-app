@@ -1,5 +1,5 @@
 -- ============================================================
--- 28. TRAVA DOS DIAS DO TESTE GRÁTIS
+-- 29. TRAVA DOS DIAS DO TESTE GRÁTIS
 -- Rode no SQL Editor do Supabase. Pode rodar de novo sem estragar nada.
 --
 -- Brecha: criar_fazenda aceitava um 3º parâmetro (p_teste_dias). O app manda só

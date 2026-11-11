@@ -99,7 +99,7 @@ grant execute on function ver_convite(text) to anon;
 
 -- 8) Teste grátis: o app pede 30 dias, mas quem chamasse a função direto pela API podia pedir até 90.
 --    Agora o banco limita a 30 (o administrador estende no painel, se quiser).
---    Desde o sql/28 e o sql/29 o cadastro exige CPF/CNPJ e não aceita mais pedido de dias: se este arquivo
+--    Desde o sql/29 e o sql/30 o cadastro exige CPF/CNPJ e não aceita mais pedido de dias: se este arquivo
 --    for rodado de novo depois deles, NÃO recria a versão antiga (senão o cadastro sem CPF voltaria a existir).
 do $bloco$
 begin

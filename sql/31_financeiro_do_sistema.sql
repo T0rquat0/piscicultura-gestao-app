@@ -1,6 +1,6 @@
 -- ============================================================
--- 30. FINANCEIRO DO SISTEMA (painel do administrador > Financeiro)
--- Rode no SQL Editor do Supabase depois do 29. Pode rodar de novo sem estragar nada.
+-- 31. FINANCEIRO DO SISTEMA (painel do administrador > Financeiro)
+-- Rode no SQL Editor do Supabase depois do 30. Pode rodar de novo sem estragar nada.
 --
 -- É o dinheiro de QUEM VENDE o app (vocês), não o das fazendas:
 --  * receitas: cobranças pagas (as do modo piloto não contam, são grátis) + receitas lançadas à mão;

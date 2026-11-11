@@ -8,7 +8,7 @@ import { gerarPdfLucro } from '../pdf_lucro.js';
 
 const semAcesso = (el, t) => { el.innerHTML = `<h1>${t}</h1><div class="card vazio"><p>Esta tela é só para o dono (valores em R$).</p></div>`; };
 const semRede = (el, t) => { el.innerHTML = `<h1>${t}</h1><div class="card vazio"><p>Esta tela precisa de internet.</p></div>`; };
-const faltaSql = (el, t) => { el.innerHTML = `<h1>${t}</h1><div class="card vazio"><p>Este recurso ainda não foi ativado neste sistema (falta rodar o sql/27 no Supabase).</p></div>`; };
+const faltaSql = (el, t) => { el.innerHTML = `<h1>${t}</h1><div class="card vazio"><p>Este recurso ainda não foi ativado neste sistema (falta rodar o sql/28 no Supabase).</p></div>`; };
 const rotuloCat = (k) => (CATEGORIAS_DESPESA.find(([v]) => v === k) || [k, k])[1];
 
 export async function renderLucro(ctx, el) {

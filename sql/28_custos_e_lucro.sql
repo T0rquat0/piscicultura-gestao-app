@@ -1,6 +1,6 @@
 -- ============================================================
 -- CUSTO COMPLETO E LUCRO POR CICLO
--- Rode no SQL Editor do Supabase (depois do 01 a 26). Pode rodar de novo sem estragar nada.
+-- Rode no SQL Editor do Supabase (depois do 01 a 27). Pode rodar de novo sem estragar nada.
 -- Valores em R$ só para o dono (como no sql/23): o gerente não vê custo do alevino nem despesas gerais.
 -- ============================================================
 
@@ -116,7 +116,7 @@ begin
       and exists (select 1 from usuarios u where u.id = r.registrado_por and u.fazenda_id = v_f) on conflict do nothing;
   get diagnostics n = row_count; out := out || jsonb_build_object('despescas', n);
 
-  -- venda na despesca (sql/26): só da própria fazenda; a fazenda é conferida de novo pelo gatilho da tabela
+  -- venda na despesca (sql/27): só da própria fazenda; a fazenda é conferida de novo pelo gatilho da tabela
   if to_regclass('public.despesca_vendas') is not null then
     insert into despesca_vendas select r.* from jsonb_populate_recordset(null::despesca_vendas, coalesce(t->'despesca_vendas', '[]')) r
       where r.fazenda_id = v_f and exists (select 1 from despescas d where d.uuid_local = r.despesca_uuid) on conflict do nothing;
@@ -160,3 +160,7 @@ end $$;
 
 -- duas travas, como no sql/22: visitante sem login nem chega às tabelas de dinheiro
 revoke all on custos_lote, despesas_gerais from anon;
+-- (no banco real o visitante ainda passava pela 1ª trava das despesas gerais por uma permissão "para todos" (public);
+--  a 2ª trava, as funções de acesso, segurava. Agora as duas valem; quem está logado continua com a permissão, filtrada pelo RLS.)
+revoke all on custos_lote, despesas_gerais from public;
+grant select, insert, update, delete on custos_lote, despesas_gerais to authenticated;

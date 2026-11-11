@@ -95,7 +95,7 @@ export async function renderAdmin(ctx, el, aba = 'fazendas', estado = { filtro: 
     <p class="mudo nota">Pacote inativo não aparece para os donos, mas quem já tem continua com ele.</p>`;
 
   const abaFinanceiro = () => {
-    if (fin === null) return '<div class="card vazio">O financeiro precisa do <b>sql/30</b> rodado no banco.</div>';
+    if (fin === null) return '<div class="card vazio">O financeiro precisa do <b>sql/31</b> rodado no banco.</div>';
     const { ini, fim } = limitesMes(estado.mes);
     const mes = resumoPeriodo({ lancamentos: fin.lancamentos, recebimentos: fin.recebimentos, ini, fim });
     const ac = acertoSocios({ lancamentos: fin.lancamentos, recebimentos: fin.recebimentos, socios: fin.socios });

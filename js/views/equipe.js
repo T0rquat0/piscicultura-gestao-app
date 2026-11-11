@@ -54,16 +54,8 @@ export async function renderEquipe(ctx, el) {
       ${convites.length ? `<div><b>Convites em aberto</b><ul class="lista">${convites.map((c) => `<li><div class="esq"><b>${esc(ROTULO_PAPEL[c.papel] || c.papel)}</b><small>gerado em ${fmtData(c.criado_em)} · vale até ${fmtData(c.expira_em)}</small></div>
         <span class="acoes-reg"><button class="btn mini" data-copiar="${esc(c.token)}" type="button">Copiar</button><button class="btn mini perigo" data-cancelar-conv="${esc(c.token)}" type="button">Cancelar</button></span></li>`).join('')}</ul></div>` : ''}
       <p class="mudo" style="margin:0">Depois que a pessoa entrar, ela aparece na lista acima: libere os tanques dela.</p>
-    </div>` : ''}
-    <details class="avancado"${convites ? '' : ' open'}><summary>${convites ? 'A pessoa já tem conta? Vincular pelo e-mail' : 'Vincular pelo e-mail'}</summary>
-    <form id="f-novo" class="card form" novalidate>
-      <p class="mudo" style="margin:0">Primeiro a pessoa cria a própria conta no app, na tela de entrada (botão <b>Criar conta da minha fazenda</b>), com o e-mail dela, e confirma pelo e-mail recebido. Ela para na tela "Cadastre sua fazenda": não precisa preencher. Depois, vincule aqui com o mesmo e-mail:</p>
-      <label>E-mail do login <input name="email" type="email" inputmode="email" autocapitalize="none" required></label>
-      <label>Nome <input name="nome" maxlength="80" required></label>
-      <label>Papel <select name="papel"><option value="funcionario">Funcionário</option><option value="gerente">Gerente</option></select></label>
-      <p id="erro-novo" class="erro" hidden></p>
-      <button class="btn primario" type="submit">Vincular à fazenda</button>
-    </form></details>`;
+    </div>` : '<div class="card vazio">O convite por link ainda não foi ativado neste sistema (falta rodar o sql/10 no Supabase).</div>'}`;
+  // (o antigo "Vincular pelo e-mail" saiu em 11/11/2026: só o convite por link, que é mais simples e mais seguro)
 
   el.querySelectorAll('[data-todos]').forEach((b) => b.addEventListener('click', () => {
     const caixas = [...b.closest('form').querySelectorAll('input[name=tanque]')];
@@ -129,24 +121,6 @@ export async function renderEquipe(ctx, el) {
         renderEquipe(ctx, el);
       } catch (e) { erro.textContent = e.message; erro.hidden = false; btn.disabled = false; }
     }));
-
-  const fn = el.querySelector('#f-novo');
-  const erroNovo = fn.querySelector('#erro-novo');
-  fn.addEventListener('submit', async (ev) => {
-    ev.preventDefault();
-    erroNovo.hidden = true;
-    const email = fn.querySelector('[name=email]').value.trim(), nome = fn.querySelector('[name=nome]').value.trim();
-    if (!email || !nome) { erroNovo.textContent = 'Informe e-mail e nome.'; erroNovo.hidden = false; return; }
-    const btn = fn.querySelector('button'); btn.disabled = true;
-    try {
-      await ctx.api.adicionarUsuario(email, nome, fn.querySelector('[name=papel]').value);
-      ctx.toast('Pessoa vinculada. Agora libere os tanques dela.', 'ok');
-      renderEquipe(ctx, el);
-    } catch (e) {
-      erroNovo.textContent = /Nenhum login encontrado/i.test(e.message) ? 'Nenhuma conta com este e-mail. Peça para a pessoa abrir o app, tocar em "Criar conta da minha fazenda" com este e-mail e confirmar pelo e-mail recebido. Depois tente de novo.' : e.message;
-      erroNovo.hidden = false; btn.disabled = false;
-    }
-  });
 }
 
 // "2 aparelhos conectados · último uso hoje"

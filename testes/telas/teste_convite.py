@@ -89,7 +89,7 @@ with sync_playwright() as pw:
     pg.screenshot(path='equipe_convite.png', full_page=True)
     pg.click(f'[data-cancelar-conv="{TOK}"]'); pg.click('.dialogo [data-ok]'); pg.wait_for_timeout(1200)
     checa(('cancelar_convite', {'p_token': TOK}) in est['rpc'] and not pg.is_visible(f'[data-cancelar-conv="{TOK}"]'), 'dono: cancelar some com o convite')
-    checa(pg.is_visible('details.avancado summary') and 'Vincular pelo e-mail' in pg.inner_text('#view'), 'dono: vincular por e-mail continua disponível')
+    checa('Vincular pelo e-mail' not in pg.inner_text('#view'), 'dono: só o convite por link (o vincular por e-mail saiu)')
     errA = est['erros'] + est['externos']; b.close()
 
     # B) pessoa nova: abre o link sem login, cria conta (o e-mail de confirmação volta com o convite)
@@ -100,7 +100,7 @@ with sync_playwright() as pw:
     checa(pg.evaluate("localStorage.getItem('convite')") == TOK and '#/convite' not in pg.url, 'sem login: convite guardado no aparelho e tirado do endereço')
     pg.click('#b-criar'); pg.wait_for_selector('#f-cad')
     checa('fazenda que te convidou' in pg.inner_text('main'), 'cadastro: texto fala do convite (não do teste grátis)')
-    pg.fill('#email', 'n@t.com'); pg.fill('#senha', '12345678'); pg.click('#f-cad button[type=submit]'); pg.wait_for_timeout(1500)
+    pg.fill('#email', 'n@t.com'); pg.fill('#senha', 'tilapia2026'); pg.click('#f-cad button[type=submit]'); pg.wait_for_timeout(1500)
     su = est['signup'][0] if est['signup'] else ''
     checa(('convite%3D' + TOK) in su or ('convite=' + TOK) in su, 'cadastro: link de confirmação do e-mail leva o convite junto')
     errB = est['erros'] + est['externos']; b.close()

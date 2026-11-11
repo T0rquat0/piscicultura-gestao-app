@@ -1,4 +1,4 @@
--- SÓ PARA TESTES (nunca rodar no Supabase): desde o sql/26 o cadastro exige CPF/CNPJ.
+-- SÓ PARA TESTES (nunca rodar no Supabase): desde o sql/30 o cadastro exige CPF/CNPJ.
 -- Os testes antigos criam fazendas sem documento; este atalho gera um CPF válido diferente a cada chamada,
 -- para que cada fazenda de teste ganhe o seu teste grátis como antes.
 create sequence if not exists teste_cpf_seq start 100000001;

@@ -585,12 +585,12 @@ export async function renderLancar(ctx, el, params = {}) {
         dadosRapidos(),
       ]);
       if (!despescaLigada) return mostrarErro('A despesca ainda não foi ativada neste sistema (falta rodar o sql/20 no Supabase).');
-      // preço e comprador: só o dono vê e informa (valores em R$ só para o dono, sql/23 e sql/26)
+      // preço e comprador: só o dono vê e informa (valores em R$ só para o dono, sql/23 e sql/27)
       const precoTxt = (f.querySelector('#desp-preco') || { value: '' }).value.trim(), preco = precoTxt ? numDecimal(precoTxt) : null;
       if (precoTxt.includes('.') && precoTxt.includes(',')) return mostrarErro('Digite o preço sem ponto de milhar. Ex.: 9,50');
       if (precoTxt && !(preco > 0 && preco <= 1000)) return mostrarErro('Confira o preço de venda por kg (até R$ 1.000), ou deixe em branco.');
       const comprador = (f.querySelector('#desp-comprador') || { value: '' }).value.trim();
-      if ((precoTxt || comprador) && navigator.onLine && !(await Promise.race([ctx.api.vendaAtiva().catch(() => true), new Promise((r) => setTimeout(() => r(true), 2500))]))) return mostrarErro('A venda na despesca ainda não foi ativada neste sistema (falta rodar o sql/26 no Supabase). Deixe preço e comprador em branco para salvar só a despesca.');
+      if ((precoTxt || comprador) && navigator.onLine && !(await Promise.race([ctx.api.vendaAtiva().catch(() => true), new Promise((r) => setTimeout(() => r(true), 2500))]))) return mostrarErro('A venda na despesca ainda não foi ativada neste sistema (falta rodar o sql/27 no Supabase). Deixe preço e comprador em branco para salvar só a despesca.');
       payload = { ...base, tipo: despTipo, quantidade: q, peso_bruto_kg: b, peso_liquido_kg: lq, ...(preco || comprador ? { _venda: { preco_kg: preco || null, comprador: comprador || null } } : {}) };
       if (!(await pesoConferido(lote_id, q, b, data, dados))) return;
       // confere com o que o app estimava (só com internet); nunca bloqueia, porque a contagem da despesca é a real
@@ -611,7 +611,7 @@ export async function renderLancar(ctx, el, params = {}) {
         m[k] = v;
       }
       if (Object.values(m).every((v) => v == null)) return mostrarErro('Preencha pelo menos uma medição.');
-      if (navigator.onLine && !(await Promise.race([ctx.api.aguaAtiva().catch(() => true), new Promise((r) => setTimeout(() => r(true), 2500))]))) return mostrarErro('A qualidade da água ainda não foi ativada neste sistema (falta rodar o sql/25 no Supabase).');
+      if (navigator.onLine && !(await Promise.race([ctx.api.aguaAtiva().catch(() => true), new Promise((r) => setTimeout(() => r(true), 2500))]))) return mostrarErro('A qualidade da água ainda não foi ativada neste sistema (falta rodar o sql/26 no Supabase).');
       const { lote_id: _semLote, ...semLote } = base;
       const agora = new Date();
       payload = { ...semLote, tanque_id: selTanque.value, ...m, hora: data === hoje ? `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}` : null, obs: f.querySelector('#ag-obs').value.trim() || null };

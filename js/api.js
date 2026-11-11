@@ -13,7 +13,7 @@ export class ErroApi extends Error {
 const TABELAS_EXCLUIVEIS = new Set(['despesas_gerais', 'biometrias', 'mortalidade', 'despescas', 'manejos', 'qualidade_agua', 'racao_consumo', 'racao_estoque', 'racao_contagens']);
 const TABELAS_EDITAVEIS = new Set(['biometrias', 'mortalidade', 'despescas', 'manejos', 'qualidade_agua', 'racao_consumo', 'racao_estoque', 'lotes']);
 
-// venda de uma despesca (só o dono; sql/26): preço e comprador vazios apagam a venda
+// venda de uma despesca (só o dono; sql/27): preço e comprador vazios apagam a venda
 async function gravarVenda(client, despescaUuid, preco, comprador) {
   const r = preco == null && !comprador
     ? await client.from('despesca_vendas').delete().eq('despesca_uuid', despescaUuid)
@@ -169,17 +169,17 @@ export function criarApi(client) {
     aguaPeriodo(desde) {
       return todos(() => client.from('qualidade_agua').select('id,data,hora,tanque_id,oxigenio_mgl,temperatura_c,ph,amonia_mgl').gte('data', desde).order('data').order('id'));
     },
-    // sem o sql/25 a tabela não existe: o relatório segue sem medições
+    // sem o sql/26 a tabela não existe: o relatório segue sem medições
     aguaTanque(tanqueId, desde) {
       return todos(() => client.from('qualidade_agua').select('id,data,hora,tanque_id,oxigenio_mgl,temperatura_c,ph,amonia_mgl,obs,registrado_por').eq('tanque_id', tanqueId).gte('data', desde).order('data').order('id')).catch(() => []);
     },
-    // o banco já tem a tabela de venda só do dono (sql/26)?
+    // o banco já tem a tabela de venda só do dono (sql/27)?
     async vendaAtiva() {
       const { error } = await client.from('despesca_vendas').select('despesca_uuid').limit(1);
       return !(error && (error.code === '42P01' || error.code === 'PGRST205'));
     },
     salvarVenda(despescaUuid, preco, comprador) { return gravarVenda(client, despescaUuid, preco, comprador); },
-    // ----- custos (sql/27). null = tabela ainda não existe -----
+    // ----- custos (sql/28). null = tabela ainda não existe -----
     async despesasGerais() {
       const { data, error } = await client.from('despesas_gerais').select('id,data,categoria,valor,descricao').order('data', { ascending: false }).order('id').limit(1000);
       if (error) { if (error.code === '42P01' || error.code === 'PGRST205') return null; throw new ErroApi(error); }
@@ -298,7 +298,7 @@ export function criarApi(client) {
     },
 
     // ----- relatório de um lote -----
-    // venda: true só para o dono (preço e comprador vêm da tabela só dele, sql/26)
+    // venda: true só para o dono (preço e comprador vêm da tabela só dele, sql/27)
     async dadosLote(loteId, { venda = false } = {}) {
       const [bios, mort, rac, desp, man] = await Promise.all([
         todos(() => client.from('biometrias').select('id,data,peso_amostra_kg,quantidade_amostrada,registrado_por').eq('lote_id', loteId).order('data').order('id')),
@@ -312,7 +312,7 @@ export function criarApi(client) {
       ]);
       if (venda && desp.length) {
         const vendas = await todos(() => client.from('despesca_vendas').select('despesca_uuid,preco_kg,comprador').in('despesca_uuid', desp.map((d) => d.uuid_local)).order('despesca_uuid'))
-          .catch(() => null); // sem o sql/26: segue sem preço
+          .catch(() => null); // sem o sql/27: segue sem preço
         if (vendas) {
           const por = new Map(vendas.map((v) => [v.despesca_uuid, v]));
           for (const d of desp) { const v = por.get(d.uuid_local); d.preco_kg = v && v.preco_kg != null ? Number(v.preco_kg) : null; d.comprador = (v && v.comprador) || null; }
@@ -342,7 +342,7 @@ export function criarApi(client) {
     // corrige um registro (dono/gerente; o RLS barra os demais sem dar erro, por isso confere se alguma linha mudou)
     async atualizar(tabela, id, campos) {
       if (!TABELAS_EDITAVEIS.has(tabela)) throw new Error('Tabela não permitida');
-      // despesca: preço e comprador não ficam nela (sql/26), vão para a venda, só do dono (gravada depois da despesca)
+      // despesca: preço e comprador não ficam nela (sql/27), vão para a venda, só do dono (gravada depois da despesca)
       let venda = null;
       if (tabela === 'despescas' && ('preco_kg' in campos || 'comprador' in campos)) {
         const { preco_kg, comprador, ...resto } = campos;
@@ -370,9 +370,6 @@ export function criarApi(client) {
       ]);
       return { usuarios: ok(usuarios), vinculos: ok(vinculos) };
     },
-    async adicionarUsuario(email, nome, papel) {
-      ok(await client.rpc('vincular_usuario_por_email', { p_email: email, p_nome: nome, p_papel: papel }));
-    },
     async atualizarUsuario(id, campos) {
       ok(await client.from('usuarios').update(campos).eq('id', id));
     },
@@ -391,7 +388,7 @@ export function criarApi(client) {
     async adminSalvarPacote(p) { ok(await client.rpc('admin_salvar_pacote', { p_tanques_max: p.tanques_max, p_nome: p.nome, p_preco: p.preco, p_ativo: p.ativo })); },
     async adminDefinirPiloto(ligado) { ok(await client.rpc('admin_definir_piloto', { p_ligado: ligado })); },
     async adminDefinirDocumento(fazenda, documento) { ok(await client.rpc('admin_definir_documento', { p_fazenda: fazenda, p_documento: documento })); },
-    // financeiro do sistema (sql/30); null = SQL ainda não rodado
+    // financeiro do sistema (sql/31); null = SQL ainda não rodado
     async adminFinanceiro() {
       const r = await client.rpc('admin_financeiro');
       if (r.error && (r.error.code === 'PGRST202' || r.error.code === '42883')) return null;

@@ -18,10 +18,11 @@ await db.exec(`grant usage on schema public to anon, authenticated;
   create table despesas_gerais (id uuid primary key default gen_random_uuid(), fazenda_id uuid, data date, categoria text, valor numeric, descricao text, registrado_por uuid, criado_em timestamptz default now());
   alter table despesas_gerais enable row level security; grant select, insert, update, delete on despesas_gerais to authenticated;`); // como no banco real
 for (const f of arquivos.filter((f) => f >= '22')) await db.exec(readFileSync(DIR + f, 'utf8'));
-await db.exec(readFileSync(new URL('./compat_cadastro.sql', import.meta.url), 'utf8')); // sql/29: cadastro com CPF (atalho só de teste)
+await db.exec(readFileSync(new URL('./compat_cadastro.sql', import.meta.url), 'utf8')); // sql/30: cadastro com CPF (atalho só de teste)
 await db.exec(readFileSync(DIR + '22_seguranca.sql', 'utf8')); // de novo: pode repetir
 await db.exec(readFileSync(DIR + '23_dinheiro_so_dono.sql', 'utf8'));
 await db.exec(readFileSync(DIR + '24_desconectar_aparelhos.sql', 'utf8'));
+await db.exec(readFileSync(DIR + '25_so_convite.sql', 'utf8'));
 
 const id = (c) => `00000000-0000-4000-8000-0000000000${c}`;
 const [D, G, W, O, LIVRE] = [id('a1'), id('a2'), id('a3'), id('a4'), id('a5')];
@@ -81,14 +82,8 @@ checa(!!r.erro, 'ninguém insere pessoa direto na tabela (só por convite/cadast
 r = await como(W, `update usuarios set papel = 'dono' where id = '${W}'`);
 checa(!!r.erro || r.n === 0, 'funcionário NÃO vira dono');
 
-// 4) adicionar por e-mail: mesma resposta para "é cliente de outra fazenda" e "não existe"
-const e1 = (await como(D, `select vincular_usuario_por_email('o@x', 'Fulano', 'funcionario')`)).erro;
-const e2 = (await como(D, `select vincular_usuario_por_email('ninguem@x', 'Fulano', 'funcionario')`)).erro;
-checa(!!e1 && e1 === e2, 'e-mail de cliente de outra fazenda e e-mail inexistente dão a MESMA mensagem');
-r = await como(D, `select vincular_usuario_por_email('livre@x', 'Livre', 'funcionario')`);
-checa(!r.erro, 'adicionar por e-mail continua funcionando para conta livre');
-r = await como(W, `select vincular_usuario_por_email('livre@x', 'Livre', 'gerente')`);
-checa(!!r.erro, 'funcionário não adiciona ninguém');
+// 4) adicionar por e-mail: a função saiu (sql/25); a equipe entra só por convite
+checa(!!(await como(D, `select vincular_usuario_por_email('o@x', 'Fulano', 'funcionario')`)).erro, 'o antigo "vincular pelo e-mail" não existe mais (só convite por link)');
 
 // 5) visitante sem login
 for (const t of ['fazendas', 'usuarios', 'tanques', 'lotes', 'racao_consumo', 'despescas', 'racao_estoque', 'historico', 'convites'])
@@ -125,7 +120,7 @@ checa(!r.erro, 'dono registra contagem normalmente' + (r.erro ? ': ' + r.erro : 
 
 // 8) teste grátis travado em 30 dias
 const N = id('a6'); await db.exec(`insert into auth.users values ('${N}','n@x')`);
-// (desde o sql/28 o pedido de dias nem existe mais: é recusado; se existisse, o máximo seria 30)
+// (desde o sql/29 o pedido de dias nem existe mais: é recusado; se existisse, o máximo seria 30)
 const pedido = await como(N, `select criar_fazenda('Esperta', 'Fulano', 365)`);
 const dias = (await db.query(`select teste_ate - hoje_local() d from fazendas where nome = 'Esperta'`)).rows[0]?.d;
 checa(pedido.erro ? dias === undefined : dias === 30, `pedir 365 dias de teste pela API: recusado ou só 30 (deu ${pedido.erro ? 'recusado' : dias})`);

@@ -69,7 +69,7 @@ export function limitesMes(mes) {
   return { ini: `${mes}-01`, fim: `${mes}-${String(ult).padStart(2, '0')}` };
 }
 
-// CPF (11) ou CNPJ (14) com dígitos verificadores certos; aceita com ou sem pontuação. Igual ao banco (sql/29).
+// CPF (11) ou CNPJ (14) com dígitos verificadores certos; aceita com ou sem pontuação. Igual ao banco (sql/30).
 export function documentoValido(v) {
   const d = String(v || '').replace(/\D/g, '');
   const dv = (base, pesos) => { const s = pesos.reduce((a, p, i) => a + Number(base[i]) * p, 0); const r = s % 11; return r < 2 ? 0 : 11 - r; };
