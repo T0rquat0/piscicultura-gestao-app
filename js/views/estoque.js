@@ -1,6 +1,6 @@
 // Estoque de ração: saldo (todos veem, só em kg) e compras (dono/gerente veem e lançam custo).
 import { confirmar, formulario } from '../dialogo.js';
-import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num, progresso } from '../util.js';
+import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num, numMoeda, moedaCampo, progresso } from '../util.js';
 import { pizza, COR_RACAO } from '../graficos.js';
 import { PESO_SACO_PADRAO_KG } from '../config.js';
 
@@ -123,7 +123,7 @@ export async function renderEstoque(ctx, el) {
         </section>
         <section class="passo tipo-estoque">
           <h2 class="passo-t"><i>2</i> Nota da compra <small class="mudo">(opcional)</small></h2>
-          ${ctx.verDinheiro() ? '<label>Valor total pago (R$) <input id="custo" type="number" inputmode="decimal" step="0.01" min="0"></label>' : ''}
+          ${ctx.verDinheiro() ? '<label>Valor total pago <span class="com-prefixo"><em>R$</em><input id="custo" type="text" inputmode="decimal" autocomplete="off" maxlength="16" placeholder="Ex.: 3.940,00"></span></label>' : ''}
           <label>Fornecedor <input id="forn" maxlength="80" placeholder="Ex.: Agropecuária Boa Vista"></label>
         </section>
         <p id="erro" class="erro" hidden></p>
@@ -278,8 +278,8 @@ Faltaram ${fmtNum(nota - rec, (nota - rec) % 1 ? 1 : 0)} ${nota - rec === 1 ? 's
     if (!t) return falha('Informe o peso de cada saco em kg.');
     if (!f.querySelector('#data').value) return falha('Informe a data.');
     const campoCusto = f.querySelector('#custo');
-    const custo = !campoCusto || campoCusto.value === '' ? null : num(campoCusto.value);
-    if (custo !== null && !(custo >= 0)) return falha('Valor pago inválido.');
+    const custo = !campoCusto || campoCusto.value.trim() === '' ? null : numMoeda(campoCusto.value);
+    if (custo !== null && !(custo >= 0 && custo < 100000000)) return falha('Confira o valor pago. Ex.: 3.940,00');
     const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
     try {
       await ctx.api.registrarCompra({
@@ -311,15 +311,15 @@ Faltaram ${fmtNum(nota - rec, (nota - rec) % 1 ? 1 : 0)} ${nota - rec === 1 ? 's
         campos: [
           { nome: 'data', rotulo: 'Data da compra', tipo: 'date', valor: c.data_compra, max: hoje },
           { nome: 'sacos', rotulo: `Quantidade (sacos de ${fmtNum(kgS, 0)} kg)`, tipo: 'number', valor: Math.round((Number(c.quantidade_kg) / kgS) * 100) / 100, step: '0.5', min: '0.5', inputmode: 'decimal', ajuda: `Hoje: ${fmtNum(Number(c.quantidade_kg), 0)} kg.` },
-          ...(!ctx.verDinheiro() ? [] : [{ nome: 'custo', rotulo: 'Valor pago (R$, opcional)', tipo: 'number', valor: c.custo_total ?? '', step: '0.01', min: '0', inputmode: 'decimal' }]),
+          ...(!ctx.verDinheiro() ? [] : [{ nome: 'custo', rotulo: 'Valor pago (opcional)', tipo: 'text', valor: moedaCampo(c.custo_total), prefixo: 'R$', inputmode: 'decimal', maxlength: '16', placeholder: 'Ex.: 3.940,00' }]),
           { nome: 'forn', rotulo: 'Fornecedor (opcional)', tipo: 'text', valor: c.fornecedor || '', maxlength: '80' },
           ...(porTipo ? [{ nome: 'tipo', rotulo: 'Qual ração', tipo: 'select', valor: c.tipo_racao || 'engorda', opcoes: [['engorda', 'Ração de engorda'], ['alevino', 'Ração de alevino']] }] : []),
         ],
-        validar: (x) => (!x.data ? 'Informe a data.' : x.data > hoje ? 'A data não pode ser no futuro.' : !(num(x.sacos) > 0) ? 'Informe a quantidade de sacos.' : x.custo != null && x.custo !== '' && !(num(x.custo) >= 0) ? 'Valor pago inválido.' : null),
+        validar: (x) => (!x.data ? 'Informe a data.' : x.data > hoje ? 'A data não pode ser no futuro.' : !(num(x.sacos) > 0) ? 'Informe a quantidade de sacos.' : x.custo != null && String(x.custo).trim() !== '' && !(numMoeda(x.custo) >= 0 && numMoeda(x.custo) < 100000000) ? 'Confira o valor pago. Ex.: 3.940,00' : null),
       });
       if (!v) return;
       try {
-        await ctx.api.atualizar('racao_estoque', c.id, { data_compra: v.data, quantidade_kg: Math.round(num(v.sacos) * kgS * 100) / 100, ...(v.custo === undefined ? {} : { custo_total: v.custo === '' ? null : num(v.custo) }), fornecedor: v.forn.trim() || null, ...(porTipo ? { tipo_racao: v.tipo } : {}) });
+        await ctx.api.atualizar('racao_estoque', c.id, { data_compra: v.data, quantidade_kg: Math.round(num(v.sacos) * kgS * 100) / 100, ...(v.custo === undefined ? {} : { custo_total: String(v.custo).trim() === '' ? null : numMoeda(v.custo) }), fornecedor: v.forn.trim() || null, ...(porTipo ? { tipo_racao: v.tipo } : {}) });
         ctx.toast('Entrada corrigida', 'ok'); renderEstoque(ctx, el);
       } catch (e) { ctx.toast(e.message, 'erro'); }
     }));

@@ -1133,3 +1133,8 @@ table.cmp td b { font-weight: 600; }
 /* contador de letras do nome (aparece perto do limite) */
 .conta-letras { display: block; font-size: .8rem; color: var(--mudo-claro); margin-top: .25rem; }
 .conta-letras.no-limite { color: var(--erro, #b42318); font-weight: 600; }
+
+/* campo de dinheiro: "R$" fixo na frente */
+.com-prefixo { position: relative; display: block; }
+.com-prefixo input { width: 100%; padding-left: 2.6rem; }
+.com-prefixo em { position: absolute; left: .9rem; top: 50%; transform: translateY(-50%); font-style: normal; color: var(--tinta-2); font-weight: 600; pointer-events: none; }

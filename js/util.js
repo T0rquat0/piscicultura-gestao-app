@@ -62,6 +62,23 @@ export function diasEntre(a, b) {
 
 // aceita "12,5" ou "12.5"
 // Peso digitado: 9547 ou 9547,5. Recusa ponto e vírgula juntos (9.547,5), que viraria 9,5 kg sem ninguém notar.
+// Valor em reais no padrão brasileiro: "1.250,50", "1250,50", "R$ 1.250,50" e também "9.5" ou "1250.50".
+// Com vírgula, o ponto é sempre de milhar. Sem vírgula, ponto seguido de grupos de 3 dígitos é milhar ("1.250" = mil e
+// duzentos e cinquenta); senão é decimal ("9.5"). Grupo de milhar errado ("1.25,00") ou letras: NaN.
+export function numMoeda(v) {
+  if (typeof v === 'number') return v;
+  const s = String(v ?? '').replace(/R\$/i, '').replace(/\s/g, '');
+  if (!s) return NaN;
+  if (s.includes(',')) {
+    if (!/^\d{1,3}(\.\d{3})*(,\d{1,2})?$|^\d+(,\d{1,2})?$/.test(s)) return NaN;
+    return Number(s.replace(/\./g, '').replace(',', '.'));
+  }
+  if (/^\d{1,3}(\.\d{3})+$/.test(s)) return Number(s.replace(/\./g, ''));
+  return /^\d+(\.\d{1,2})?$/.test(s) ? Number(s) : NaN;
+}
+// Valor para preencher um campo de reais: 1250.5 → "1.250,50" (lido de volta por numMoeda)
+export const moedaCampo = (v) => (v == null || v === '' || Number.isNaN(Number(v)) ? '' : fmtNum(Number(v), 2));
+
 export function numDecimal(v) {
   const s = String(v ?? '');
   return s.includes('.') && s.includes(',') ? NaN : num(s);

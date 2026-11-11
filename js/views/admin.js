@@ -2,7 +2,7 @@
 // Só aparece para quem está na tabela administradores; o banco confere de novo em cada ação.
 import { confirmar, formulario } from '../dialogo.js';
 import { icone } from '../icons.js';
-import { esc, fmtData, fmtBRL, fmtInt, fmtNum, num, numDecimal, plural, hojeISO } from '../util.js';
+import { esc, fmtData, fmtBRL, fmtInt, fmtNum, num, numDecimal, numMoeda, moedaCampo, plural, hojeISO } from '../util.js';
 import { resumoPeriodo, acertoSocios, situacaoCliente, receitaMensal, limitesMes, documentoValido, fmtDocumento } from '../financeiro.js';
 
 const ESTADO = {
@@ -259,15 +259,15 @@ export async function renderAdmin(ctx, el, aba = 'fazendas', estado = { filtro: 
       campos: [
         { nome: 'tipo', rotulo: 'O que é?', tipo: 'select', valor: novo ? 'despesa' : l.tipo, opcoes: [['despesa', 'Despesa do sistema'], ['retirada', 'Retirada de sócio'], ['receita', 'Receita fora do app']] },
         { nome: 'data', rotulo: 'Data', tipo: 'date', valor: novo ? hoje : l.data, max: hoje },
-        { nome: 'valor', rotulo: 'Valor (R$)', tipo: 'text', valor: novo ? '' : String(l.valor).replace('.', ','), inputmode: 'decimal', maxlength: '14' },
+        { nome: 'valor', rotulo: 'Valor', tipo: 'text', valor: novo ? '' : moedaCampo(l.valor), prefixo: 'R$', inputmode: 'decimal', maxlength: '16', placeholder: 'Ex.: 1.250,50' },
         { nome: 'socio', rotulo: 'Quem pagou / quem retirou', tipo: 'select', valor: novo ? '' : l.socio_id || '', opcoes: [['', 'O caixa (ou ninguém, na receita)'], ...socios.map((x) => [x.id, x.nome])] },
         { nome: 'categoria', rotulo: 'Categoria', tipo: 'select', valor: novo ? '' : l.categoria || '', opcoes: CATEGORIAS_SISTEMA },
         { nome: 'fazenda', rotulo: 'Cliente (só na receita)', tipo: 'select', valor: novo ? '' : l.fazenda_id || '', opcoes: [['', 'Nenhum'], ...fazendas.map((f) => [f.id, f.nome])] },
         { nome: 'descricao', rotulo: 'Descrição', tipo: 'text', valor: novo ? '' : l.descricao || '', maxlength: '200' },
       ],
       validar: (x) => {
-        const n = numDecimal(String(x.valor).trim());
-        if (!(n > 0) || n >= 10000000) return 'Confira o valor, sem ponto de milhar. Ex.: 1250,50';
+        const n = numMoeda(String(x.valor).trim());
+        if (!(n > 0) || n >= 10000000) return 'Confira o valor. Ex.: 1.250,50';
         if (!x.data || x.data > hoje) return 'A data não pode ser no futuro.';
         if (x.tipo === 'retirada' && !x.socio) return 'Diga qual sócio retirou.';
         return null;
@@ -275,7 +275,7 @@ export async function renderAdmin(ctx, el, aba = 'fazendas', estado = { filtro: 
     });
     if (!v || salvando) return;
     salvando = true;
-    const dados = { id: novo ? '' : l.id, tipo: v.tipo, data: v.data, valor: numDecimal(String(v.valor).trim()), socio_id: v.tipo === 'receita' ? '' : v.socio,
+    const dados = { id: novo ? '' : l.id, tipo: v.tipo, data: v.data, valor: numMoeda(String(v.valor).trim()), socio_id: v.tipo === 'receita' ? '' : v.socio,
       categoria: v.categoria, fazenda_id: v.tipo === 'receita' ? v.fazenda : '', descricao: v.descricao };
     try { await acao(() => ctx.api.adminSalvarLancamento(dados), 'Lançamento salvo'); } finally { salvando = false; }
   };

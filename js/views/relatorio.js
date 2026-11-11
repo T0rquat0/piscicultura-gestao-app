@@ -7,7 +7,7 @@ import { gerarPdfRacao } from '../pdf_racao.js';
 import { gerarPdfDespesca } from '../pdf_despesca.js';
 import { confirmar, formulario } from '../dialogo.js';
 import { icone } from '../icons.js';
-import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num, ROTULO_TIPO, faseCss, nomeArquivo, dataArquivo, progresso, fmtPct, numDecimal, pesoMedioTxt, celulaCsv } from '../util.js';
+import { esc, fmtData, fmtNum, fmtInt, fmtBRL, hojeISO, num, ROTULO_TIPO, faseCss, nomeArquivo, dataArquivo, progresso, fmtPct, numDecimal, numMoeda, moedaCampo, pesoMedioTxt, celulaCsv } from '../util.js';
 import { pizza, COR_FASE, ORDEM_FASE } from '../graficos.js';
 import { calcularNaIdade, fimDoLote, mediaDe, vivosDoLote, indicadoresDespesca, avisoPesoMedio, avaliarAgua, ehTambaqui } from '../calc.js';
 import { calcularLote, precoMedioKg, pontosPeso, pesoMedioKg, evolucaoPeso, racaoPorSemana, matrizRacao, situacaoEstoque } from '../calc.js';
@@ -465,13 +465,13 @@ export async function renderRelatorioLote(ctx, el, id) {
           { nome: 'qtd', rotulo: 'Peixes retirados', tipo: 'number', valor: d.quantidade, step: '1', min: '1', inputmode: 'numeric' },
           { nome: 'bruto', rotulo: 'Peso total bruto (kg)', tipo: 'text', valor: d.peso_bruto_kg, inputmode: 'decimal' },
           { nome: 'liquido', rotulo: 'Peso total líquido (kg, opcional)', tipo: 'text', valor: d.peso_liquido_kg ?? '', inputmode: 'decimal' },
-          ...('preco_kg' in d ? [{ nome: 'preco', rotulo: 'Preço de venda (R$/kg, opcional)', tipo: 'text', valor: d.preco_kg == null ? '' : String(Number(d.preco_kg)).replace('.', ','), inputmode: 'decimal' },
+          ...('preco_kg' in d ? [{ nome: 'preco', rotulo: 'Preço de venda por kg (opcional)', tipo: 'text', valor: moedaCampo(d.preco_kg), prefixo: 'R$', inputmode: 'decimal', maxlength: '10' },
             { nome: 'comprador', rotulo: 'Comprador (opcional)', tipo: 'text', valor: d.comprador || '', maxlength: 80 }] : [])],
         validar: (v) => dataOk(v.data) || (Number.isInteger(num(v.qtd)) && num(v.qtd) >= 1 ? null : 'Informe quantos peixes saíram (número inteiro).') || pesoOk(v.bruto) || pesoOk(v.liquido) || (numDecimal(v.bruto) > 0 ? null : 'Informe o peso bruto em kg.')
           || (String(v.liquido ?? '').trim() === '' || (numDecimal(v.liquido) > 0 && numDecimal(v.liquido) <= numDecimal(v.bruto)) ? null : 'O peso líquido deve ser maior que zero e até o peso bruto.')
-          || (String(v.preco ?? '').trim() === '' || (numDecimal(v.preco) > 0 && numDecimal(v.preco) <= 1000) ? null : 'Confira o preço de venda por kg, ou deixe em branco.'),
+          || (String(v.preco ?? '').trim() === '' || (numMoeda(v.preco) > 0 && numMoeda(v.preco) <= 1000) ? null : 'Confira o preço de venda por kg, ou deixe em branco.'),
         conferir: (v) => conferirPeso(num(v.qtd), numDecimal(v.bruto), v.data, null),
-        montar: (v) => ({ data: v.data, quantidade: num(v.qtd), peso_bruto_kg: numDecimal(v.bruto), peso_liquido_kg: String(v.liquido ?? '').trim() === '' ? null : numDecimal(v.liquido), ...('preco_kg' in d ? { preco_kg: String(v.preco ?? '').trim() === '' ? null : numDecimal(v.preco), comprador: String(v.comprador || '').trim() || null } : {}) }),
+        montar: (v) => ({ data: v.data, quantidade: num(v.qtd), peso_bruto_kg: numDecimal(v.bruto), peso_liquido_kg: String(v.liquido ?? '').trim() === '' ? null : numDecimal(v.liquido), ...('preco_kg' in d ? { preco_kg: String(v.preco ?? '').trim() === '' ? null : numMoeda(v.preco), comprador: String(v.comprador || '').trim() || null } : {}) }),
       };
     }
     if (tab === 'mortalidade') {

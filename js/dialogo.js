@@ -57,7 +57,7 @@ export function formulario({ titulo, texto = '', campos, ok = 'Salvar', cancelar
     const attr = (k, v) => (v === undefined || v === null || v === '' ? '' : ` ${k}="${esc(v)}"`);
     const campo = (c) => c.tipo === 'select'
       ? `<label class="dialogo-campo">${esc(c.rotulo)}<select name="${esc(c.nome)}">${c.opcoes.map(([v, r]) => `<option value="${esc(v)}"${String(v) === String(c.valor ?? '') ? ' selected' : ''}>${esc(r)}</option>`).join('')}</select>${c.ajuda ? `<small class="mudo">${esc(c.ajuda)}</small>` : ''}</label>`
-      : `<label class="dialogo-campo">${esc(c.rotulo)}<input name="${esc(c.nome)}" type="${c.tipo || 'text'}"${attr('value', c.valor)}${attr('step', c.step)}${attr('min', c.min)}${attr('max', c.max)}${attr('inputmode', c.inputmode)}${attr('maxlength', c.maxlength)} autocomplete="off">${c.ajuda ? `<small class="mudo">${esc(c.ajuda)}</small>` : ''}</label>`;
+      : `<label class="dialogo-campo">${esc(c.rotulo)}${c.prefixo ? `<span class="com-prefixo"><em>${esc(c.prefixo)}</em>` : ''}<input name="${esc(c.nome)}" type="${c.tipo || 'text'}"${attr('value', c.valor)}${attr('step', c.step)}${attr('min', c.min)}${attr('max', c.max)}${attr('inputmode', c.inputmode)}${attr('maxlength', c.maxlength)}${attr('placeholder', c.placeholder)} autocomplete="off">${c.prefixo ? '</span>' : ''}${c.ajuda ? `<small class="mudo">${esc(c.ajuda)}</small>` : ''}</label>`;
     fundo.innerHTML = `
       <form class="dialogo-caixa" novalidate>
         <h3>${esc(titulo)}</h3>

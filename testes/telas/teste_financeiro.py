@@ -63,9 +63,10 @@ with sync_playwright() as pw:
     pg.screenshot(path='admin_financeiro.png', full_page=True)
     # novo lançamento: validações e gravação
     pg.click('#b-novo-lanc'); pg.wait_for_selector('.dialogo form')
-    pg.select_option('.dialogo [name=tipo]', 'retirada'); pg.fill('.dialogo [name=valor]', '1.250,50'); pg.click('.dialogo button[type=submit]'); pg.wait_for_timeout(200)
-    checa('ponto de milhar' in pg.inner_text('.dialogo [data-erro]'), 'valor com ponto e vírgula: recusa')
-    pg.fill('.dialogo [name=valor]', '1250,50'); pg.click('.dialogo button[type=submit]'); pg.wait_for_timeout(200)
+    pg.select_option('.dialogo [name=tipo]', 'retirada'); pg.fill('.dialogo [name=valor]', '1.25,50'); pg.click('.dialogo button[type=submit]'); pg.wait_for_timeout(200)
+    checa('Confira o valor' in pg.inner_text('.dialogo [data-erro]'), 'valor com milhar errado (1.25,50): recusa')
+    checa(pg.locator('.dialogo .com-prefixo em').first.inner_text() == 'R$', 'campo de valor com R$ na frente')
+    pg.fill('.dialogo [name=valor]', 'R$ 1.250,50'); pg.click('.dialogo button[type=submit]'); pg.wait_for_timeout(200)
     checa('qual sócio' in pg.inner_text('.dialogo [data-erro]'), 'retirada sem sócio: recusa')
     pg.select_option('.dialogo [name=socio]', H); pg.fill('.dialogo [name=descricao]', 'Pix'); pg.click('.dialogo button[type=submit]'); pg.wait_for_timeout(1000)
     x = [p for f, p in est['rpc'] if f == 'admin_salvar_lancamento']
