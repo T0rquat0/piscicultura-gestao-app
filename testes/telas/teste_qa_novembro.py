@@ -116,8 +116,8 @@ with sync_playwright() as pw:
     checa('antes da entrada do lote' in pg.inner_text('#erro') and sum(1 for t, _ in posts if t == 'mortalidade') == antes, '[pf] mortalidade com data antes da entrada do lote é barrada')
     # [1] ração lançada com sinal, app fechado e aberto sem sinal: tanque continua alimentado
     pg.goto(BASE + f'#/lancar?tipo=racao&tanque={T}'); pg.wait_for_timeout(1500)
-    pg.fill('#qtd', '4'); pg.get_by_text('Salvar ração').click(); pg.wait_for_timeout(2500)
-    checa(achou('racao_consumo', tanque_id=T, quantidade_kg=100), 'ração de 4 sacos enviada (100 kg)')
+    pg.fill('#racao-kg', '100'); pg.get_by_text('Salvar ração').click(); pg.wait_for_timeout(2500)
+    checa(achou('racao_consumo', tanque_id=T, quantidade_kg=100), 'ração de 100 kg enviada (4 sacos)')
     ctx.set_offline(True)
     pg.goto(BASE + '#/', wait_until='domcontentloaded'); pg.wait_for_selector('#view', timeout=20000); pg.wait_for_timeout(2500)
     card = pg.locator('.tq', has_text='Tanque 01').first

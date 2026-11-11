@@ -15,7 +15,7 @@ with sync_playwright() as pw:
     s.ir('#/'); s.pg.wait_for_timeout(2000)
     s.pg.locator('.tq', has_text='Tanque 3').first.click(); s.pg.wait_for_timeout(2000)
     s.pg.wait_for_timeout(800); print('   lançando em:', s.texto('#view')[30:120].replace('\n', ' '))
-    s.pg.fill('#qtd', '6'); s.pg.get_by_text('Salvar ração').click(); s.pg.wait_for_timeout(3500)
+    s.pg.fill('#racao-kg', '150'); s.pg.get_by_text('Salvar ração').click(); s.pg.wait_for_timeout(3500)
     print('   salvo:', s.texto('#view')[:90].replace('\n', ' '))
     s.offline(True); s.pg.goto(BASE + '#/', wait_until='domcontentloaded'); s.pg.wait_for_selector('#view', timeout=30000)
     print('D) Tanque 3 reaberto offline:', status(s, 'Tanque 3')); s.shot('D_t3_offline')
