@@ -20,6 +20,7 @@ await db.exec(`grant usage on schema public to anon, authenticated;
 for (const f of arquivos.filter((f) => f >= '22')) await db.exec(readFileSync(DIR + f, 'utf8'));
 await db.exec(readFileSync(DIR + '22_seguranca.sql', 'utf8')); // de novo: pode repetir
 await db.exec(readFileSync(DIR + '23_dinheiro_so_dono.sql', 'utf8'));
+await db.exec(readFileSync(DIR + '24_desconectar_aparelhos.sql', 'utf8'));
 
 const id = (c) => `00000000-0000-4000-8000-0000000000${c}`;
 const [D, G, W, O, LIVRE] = [id('a1'), id('a2'), id('a3'), id('a4'), id('a5')];
@@ -144,5 +145,35 @@ checa(!r.erro, 'gerente continua registrando compra (sem valor)' + (r.erro ? ': 
 checa((await como(G, `select * from despesas_gerais`)).rows.length === 0, 'gerente NÃO vê despesas gerais');
 checa((await como(D, `select id, valor from despesas_gerais`)).rows.length === 1, 'dono vê despesas gerais');
 
-console.log('RESULTADO: ' + (ok ? 'TUDO OK (sql/22 e 23 segurança)' : 'HOUVE FALHAS'));
+// 10) sql/24: celular perdido. Cada aparelho é uma sessão; desconectar apaga as sessões e o corte vale na hora.
+const S = (n) => `00000000-0000-4000-8000-0000000005${String(n).padStart(2, '0')}`;
+await db.exec(`insert into auth.sessions (id, user_id) values ('${S(1)}', '${D}'), ('${S(2)}', '${W}'), ('${S(3)}', '${W}'), ('${S(4)}', '${O}');`);
+const comSessao = async (uid, sessao, sql) => {
+  await db.exec(`set role authenticated; set teste.uid = '${uid}'; set request.jwt.claims = '${JSON.stringify({ sub: uid, session_id: sessao })}';`);
+  try { const r = await db.query(sql); return { rows: r.rows, n: r.affectedRows }; }
+  catch (e) { return { erro: e.message, rows: [] }; }
+  finally { await db.exec(`reset role; set teste.uid = ''; set request.jwt.claims = '';`); }
+};
+checa((await comSessao(W, S(2), `select count(*)::int c from tanques`)).rows[0].c > 0, 'funcionário com o celular conectado vê os tanques dele');
+r = await comSessao(D, S(1), `select usuario_id, aparelhos::int a from aparelhos_conectados() where usuario_id = '${W}'`);
+checa(r.rows[0] && r.rows[0].a === 2, 'dono vê que o funcionário tem 2 aparelhos conectados');
+checa((await comSessao(W, S(2), `select * from aparelhos_conectados()`)).rows.length === 0, 'funcionário não vê os aparelhos da equipe');
+checa(!!(await comSessao(W, S(2), `select desconectar_aparelhos('${D}')`)).erro, 'funcionário NÃO desconecta o dono');
+checa(!!(await comSessao(O, S(4), `select desconectar_aparelhos('${W}')`)).erro, 'dono de OUTRA fazenda não desconecta o funcionário daqui');
+checa(!!(await comSessao(D, S(1), `select admin_desconectar_dono('${F}')`)).erro, 'dono não usa a função do suporte');
+r = await comSessao(D, S(1), `select desconectar_aparelhos('${W}') n`);
+checa(!r.erro && r.rows[0].n === 2, 'dono desconecta os 2 aparelhos do funcionário' + (r.erro ? ': ' + r.erro : ''));
+checa((await comSessao(W, S(2), `select count(*)::int c from tanques`)).rows[0].c === 0, 'celular perdido perde o acesso NA HORA (mesmo com a chave antiga ainda dentro da validade)');
+checa((await comSessao(W, S(2), `select current_papel() p`)).rows[0].p === null, 'no celular perdido o papel deixa de valer');
+await db.exec(`insert into auth.sessions (id, user_id) values ('${S(5)}', '${W}')`); // entrou no celular novo
+checa((await comSessao(W, S(5), `select count(*)::int c from tanques`)).rows[0].c > 0, 'no celular novo o funcionário entra e vê tudo de novo (continua na equipe)');
+checa((await db.query(`select count(*)::int c from admin_acoes where acao = 'desconectou aparelhos'`)).rows[0].c === 1, 'fica registrado quem desconectou');
+// suporte: o dono perdeu o celular
+await db.exec(`insert into administradores (usuario_id) values ('${O}') on conflict do nothing`);
+r = await comSessao(O, S(4), `select admin_desconectar_dono('${F}') n`);
+checa(!r.erro && r.rows[0].n === 1, 'suporte desconecta o celular do dono' + (r.erro ? ': ' + r.erro : ''));
+checa((await comSessao(D, S(1), `select count(*)::int c from tanques`)).rows[0].c === 0, 'o celular perdido do dono perde o acesso na hora');
+await db.exec(`delete from administradores where usuario_id = '${O}'`);
+
+console.log('RESULTADO: ' + (ok ? 'TUDO OK (sql/22, 23 e 24 segurança)' : 'HOUVE FALHAS'));
 process.exit(ok ? 0 : 1);

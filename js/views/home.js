@@ -433,7 +433,9 @@ async function avisoConviteUsado(ctx, caixa) {
   const meu = ctx.state.perfil.id;
   const visto = await db.kvGet('convitesVistos').catch(() => null);
   if (!visto || visto.id !== meu) { await db.kvSet('convitesVistos', { id: meu, em: new Date().toISOString() }).catch(() => {}); return; }
-  const usados = (await ctx.api.convitesUsadosDesde(visto.em).catch(() => [])).filter((c) => c && c.usado_em && c.usado_em > visto.em);
+  let usados = [];
+  try { usados = (await ctx.api.convitesUsadosDesde(visto.em)) || []; } catch { return; }
+  usados = usados.filter((c) => c && c.usado_em && c.usado_em > visto.em);
   if (!usados.length) return;
   const nomes = await ctx.api.nomesUsuarios().catch(() => ({}));
   // a Início pode ter sido redesenhada enquanto buscava: usa a caixa de avisos que está na tela agora

@@ -16,7 +16,7 @@ SB = 'https://ppvliseblxpsepmeknnl.supabase.co'
 U = '11111111-1111-4111-8111-111111111111'; F = '22222222-2222-4222-8222-222222222222'
 T = '33333333-3333-4333-8333-333333333333'; L = '44444444-4444-4444-8444-444444444444'
 hoje = time.strftime('%Y-%m-%d')
-estado = {'ativo': True, 'papel': 'funcionario', 'precos_pedidos': 0}
+estado = {'ativo': True, 'papel': 'funcionario', 'precos_pedidos': 0, 'desconectado': False}
 DADOS = {
   'tanques': [{'id': T, 'nome': 'Tanque Segredo', 'area_ha': 1}],
   'lotes': [{'id': L, 'tanque_id': T, 'tipo': 'engorda', 'especie': 'Tambaqui', 'data_entrada': '2026-09-01', 'quantidade_inicial': 12345, 'peso_inicial_kg': 500, 'ativo': True, 'tanques': {'nome': 'Tanque Segredo'}}],
@@ -31,6 +31,8 @@ def rota(route, req):
     u = req.url
     if not u.startswith(SB): return route.continue_() if u.startswith(BASE) else route.abort()
     path = urlparse(u).path; obj = 'object' in (req.headers.get('accept') or '')
+    if '/auth/v1/user' in path and estado['desconectado']:  # o servidor não reconhece mais a sessão deste aparelho
+        return route.fulfill(status=403, content_type='application/json', body=json.dumps({'code': 403, 'error_code': 'session_not_found', 'msg': 'Session from session_id claim in JWT does not exist'}))
     js = lambda o: route.fulfill(status=200, content_type='application/json', body=json.dumps(o))
     if '/rpc/' in path:
         fn = path.split('/')[-1]
@@ -41,7 +43,7 @@ def rota(route, req):
                    'plano_atual': {'estado': 'ativo', 'valido_ate': '2099-01-01', 'em_uso': 1, 'limite': 5, 'piloto': True}}.get(fn, []))
     tab = path.split('/')[-1]
     if tab == 'usuarios':
-        p = {'id': U, 'nome': 'Func', 'papel': estado['papel'], 'fazenda_id': F, 'ativo': estado['ativo'], 'fazendas': {'nome': 'Fazenda Sigilo'}}
+        p = {'id': U, 'nome': 'Func', 'papel': estado['papel'], 'fazenda_id': F, 'ativo': estado['ativo'], 'fazendas': None if estado['desconectado'] else {'nome': 'Fazenda Sigilo'}}
         return js(p if obj else [p])
     if tab == 'fazendas':
         f = {'kg_saco': 25, 'teste_ate': None, 'logo': None}
@@ -94,5 +96,17 @@ with sync_playwright() as pw:
         checa('Tanque Segredo' not in json.dumps(kv(pg), ensure_ascii=False), 'ao sair da conta, a cópia dos números é apagada do celular')
     else:
         checa(False, 'achei o botão Sair')
-    ctx.close(); b.close()
+    # 5) celular perdido: o dono desconectou este aparelho; quando ele pega sinal, sai da conta e apaga os números
+    ctx = b.new_context(reduced_motion='reduce', viewport={'width': 390, 'height': 844}); pg = ctx.new_page(); pg.route('**/*', rota)
+    pg.add_init_script(f"if (!sessionStorage.getItem('ja')) {{ localStorage.setItem('sb-ppvliseblxpsepmeknnl-auth-token', {json.dumps(json.dumps(s))}); sessionStorage.setItem('ja', '1'); }}")
+    pg.goto(BASE + '#/'); pg.wait_for_selector('nav.abas', timeout=20000); pg.wait_for_timeout(2500)
+    checa('Tanque Segredo' in json.dumps(kv(pg), ensure_ascii=False), 'celular perdido: tinha a cópia dos números guardada')
+    estado['desconectado'] = True
+    pg.reload(); pg.wait_for_timeout(3000)
+    corpo = pg.inner_text('body')
+    checa('desconectado' in corpo.lower() and 'Tanque Segredo' not in corpo, 'ao pegar sinal: "Este aparelho foi desconectado", tela de entrar')
+    checa('Tanque Segredo' not in json.dumps(kv(pg), ensure_ascii=False), 'a cópia dos números foi apagada do celular perdido')
+    checa(not pg.evaluate("Object.keys(localStorage).some((k) => k.startsWith('sb-'))"), 'a sessão guardada no celular perdido foi apagada')
+    estado['desconectado'] = False; ctx.close()
+    b.close()
 print('RESULTADO: ' + ('TUDO OK (segurança no aparelho)' if ok else 'HOUVE FALHAS')); raise SystemExit(0 if ok else 1)

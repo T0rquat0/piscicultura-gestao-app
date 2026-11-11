@@ -375,6 +375,18 @@ export function criarApi(client) {
         .is('usado_em', null).eq('cancelado', false).gt('expira_em', new Date().toISOString()).order('criado_em', { ascending: false });
       return error ? null : data || []; // null = sql/10 ainda não rodado
     },
+    // ----- celular perdido (sql/24): aparelhos conectados e desconectar à distância -----
+    async aparelhosConectados() {
+      const { data, error } = await client.rpc('aparelhos_conectados');
+      return error ? null : Object.fromEntries((data || []).map((x) => [x.usuario_id, x])); // null = sql/24 ainda não rodado
+    },
+    async desconectarAparelhos(usuarioId) { return Number(ok(await client.rpc('desconectar_aparelhos', { p_usuario: usuarioId }))) || 0; },
+    async adminDesconectarDono(fazendaId) { return Number(ok(await client.rpc('admin_desconectar_dono', { p_fazenda: fazendaId }))) || 0; },
+    // a sessão deste aparelho ainda existe no servidor? (false = foi desconectado pelo dono ou pelo suporte)
+    async sessaoAindaValida() {
+      const { error } = await client.auth.getUser();
+      return !(error && (error.status === 403 || error.status === 401 || /session/i.test(error.message || '')));
+    },
     // convites usados depois de uma data (para avisar o dono quem entrou pelo link)
     async convitesUsadosDesde(iso) {
       const { data, error } = await client.from('convites').select('token,papel,usado_por,usado_em')

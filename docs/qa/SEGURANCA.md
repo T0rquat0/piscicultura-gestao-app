@@ -68,3 +68,20 @@ detalhes de "defesa em profundidade". Corrigidos no `sql/22_seguranca.sql`, no `
 - **Senha mínima:** conferir no painel do Supabase (Authentication → Providers → Email) se está 8 caracteres com letras e números.
 - **Repositório público:** o código ficar público não abre os dados. Mesmo assim, para um produto pago, o normal é **privado**: o concorrente não vê como o app é feito e não há risco de um dado real parar num teste. A Vercel continua funcionando com repositório privado.
 - **Tabelas novas no futuro:** o Supabase dá acesso ao visitante por padrão em tabela nova. Toda tabela nova precisa de RLS e de `revoke all ... from anon` (o `teste_banco_novo.mjs` confere o RLS).
+
+## Situações da vida real (o uso normal de cada pessoa)
+Testadas pelo robô `testes/telas/teste_cenarios_reais.py` (e pelos de segurança acima), com o banco simulado respondendo como o real.
+
+| # | Situação | Resultado |
+|---|---|---|
+| 1 | Gerente gera o PDF do lote e o da fazenda e manda no WhatsApp | ✅ Nenhum R$ no PDF (o do dono mostra, como controle) |
+| 2 | Gerente baixa a planilha do lote | ✅ Sem a linha de custo |
+| 3 | Gerente no estoque registra e corrige compra | ✅ Sem coluna e sem campo de valor; a correção não apaga o valor que o dono pôs |
+| 4 | Funcionário repassa o link de convite antes de usar | 🔧 Novo: o dono vê na Início "Fulano entrou como Funcionário pelo link de convite (data e hora). Não reconhece? Desative em Equipe". O link vale uma vez só; depois de usado, repassar não adianta |
+| 5 | Funcionário digita o endereço de telas do dono (equipe, histórico, plano, admin, tanques) | ✅ Barrado em todas; PDF do funcionário sem R$ |
+| 6 | Funcionário demitido e desativado | ✅ Com sinal: "acesso desativado" e o celular apaga a cópia dos números. Depois, sem sinal: nada da fazenda aparece |
+| 7 | Funcionário lança sem sinal e é desativado antes de enviar | ✅ O banco recusa o lançamento (ele não tem mais acesso ao tanque) |
+| 8 | Dois funcionários no mesmo celular | ✅ Cada um só vê os próprios pendentes; trocar de conta apaga a cópia dos números da outra |
+| 9 | Celular perdido/roubado | 🔧 Decisão do Guilherme: **sem PIN**. O funcionário avisa o dono, e o dono toca em **Desconectar aparelhos** (tela Equipe). Se for o dono, o suporte desconecta pelo painel do administrador. O corte vale **na hora**: o banco confere a cada consulta se o aparelho ainda está conectado. Testado no banco real: com a chave antiga, 0 tanques segundos depois. O celular apaga os números quando pega sinal, e a pessoa entra de novo no celular novo. Limite aceito: enquanto o celular perdido ficar sem sinal nenhum, mostra o que já estava guardado (`sql/24_desconectar_aparelhos.sql`) |
+| 10 | Dono baixa a cópia de segurança | 🔧 A tela agora avisa: o arquivo leva valores e o preço do peixe; guardar só com o dono |
+| 11 | Administrador do sistema (Guilherme/Hugo) | ✅ Pelo app, vê só a lista das fazendas (nome, dono, e-mail, nº de pessoas e tanques, plano). **Não vê** tanques, ração, lotes nem histórico. Observação honesta: quem tem a senha do painel do Supabase vê tudo, como em qualquer sistema |

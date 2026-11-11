@@ -45,6 +45,7 @@ begin
 end $$;
 
 -- 5) Fazenda bloqueada: o papel da pessoa também deixa de valer (antes só a fazenda sumia).
+--    (o sql/24 redefine esta função acrescentando a conferência do aparelho: se rodar este de novo, rode o 24 depois)
 create or replace function current_papel()
 returns text language sql stable security definer set search_path = public as $$
   select u.papel from usuarios u join fazendas f on f.id = u.fazenda_id
