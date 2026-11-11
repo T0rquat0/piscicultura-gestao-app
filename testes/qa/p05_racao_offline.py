@@ -7,7 +7,7 @@ with sync_playwright() as pw:
     s = Sessao(pw, 'p05')
     entrar(s, 'dono'); s.pg.wait_for_timeout(2500)
     s.pg.get_by_text('Lançar ração agora').click(); s.pg.wait_for_timeout(1500)
-    s.pg.fill('#qtd', '12'); s.pg.get_by_text('Salvar ração').click(); s.pg.wait_for_timeout(3500); s.shot('apos_salvar')
+    s.pg.fill('#racao-kg', '300'); s.pg.get_by_text('Salvar ração').click(); s.pg.wait_for_timeout(3500); s.shot('apos_salvar')
     print('APOS SALVAR:', s.texto('#view')[:250].replace('\n', ' '))
     s.ir('#/'); print('A) ONLINE, Início:', status_t1(s)); s.shot('A_online')
     # B) perde o sinal com o app aberto e navega

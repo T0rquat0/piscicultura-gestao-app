@@ -21,22 +21,27 @@ const TIPOS = {
 const casas = (x) => (Number.isInteger(x) ? 0 : Number.isInteger(Math.round(x * 100) / 10) ? 1 : 2);
 const kgTxt = (v) => fmtNum(Number(v), casas(Number(v)));
 
-const sacosTxt = (n) => `${fmtNum(n, casas(n))} ${n === 1 ? 'saco' : 'sacos'}`;
+const sacosTxt = (n) => `${fmtNum(n, casas(n))} ${n > 0 && n <= 1 ? 'saco' : 'sacos'}`; // 0,4 saco · 1 saco · 1,5 sacos
+// ração é lançada em kg (o número que o equipamento mostra); o app mostra quantos sacos isso dá
+const sacosDeKg = (kg, kgSaco) => Math.round((kg / kgSaco) * 10) / 10;
+// "1.250" (ponto de milhar, como o equipamento às vezes mostra) = 1250 kg, não 1,25 kg
+const kgDigitado = (v) => { const t = String(v ?? '').trim(); return /^\d{1,3}(\.\d{3})+$/.test(t) ? Number(t.replace(/\./g, '')) : numDecimal(t); };
+const kgEmSacosTxt = (kg, kgSaco) => `${fmtNum(kg, casas(kg))} kg = ${sacosTxt(sacosDeKg(kg, kgSaco))} de ${fmtNum(kgSaco, 0)} kg`;
 
 const TITULO2 = { racao: 'Quantidade de ração', biometria: 'Pesagem dos peixes', mortalidade: 'Peixes mortos', despesca: 'Dados da despesca', manejo: 'Aplicação de probiótico', agua: 'Medição da água' };
 
 function camposDoTipo(tipo, kgSaco, verDinheiro = false) {
   if (tipo === 'racao') {
-    return `<label>Quantos sacos de ração?
-      <input id="qtd" class="grande" type="number" inputmode="decimal" step="0.5" min="0" placeholder="0" required></label>
-      <div class="calc" id="conv">Cada saco = ${fmtNum(kgSaco, 0)} kg</div>
+    return `<label>Quantos kg de ração?
+      <input id="racao-kg" class="grande" type="text" inputmode="decimal" autocomplete="off" placeholder="0" required></label>
+      <div class="calc" id="conv">Digite o total em kg. Ex.: 600 kg = ${sacosTxt(sacosDeKg(600, kgSaco))}</div>
       <button type="button" class="chip repetir" id="b-ultima" hidden></button>
       <div class="sug-racao" id="sug-racao" hidden></div>
       <details class="como-det"><summary>Como lançar</summary>
       <ol class="como">
-        <li>Conte os sacos de ração que foram dados hoje neste tanque.</li>
-        <li>Se foi meio saco, digite 0,5.</li>
-        <li>Cada saco vale ${fmtNum(kgSaco, 0)} kg (muda em Mais &gt; Peso do saco).</li>
+        <li>Digite o total de kg de ração dado hoje neste tanque (o número que o equipamento mostra).</li>
+        <li>Pode ter vírgula: 37,5.</li>
+        <li>O app mostra quantos sacos isso dá. Cada saco vale ${fmtNum(kgSaco, 0)} kg (muda em Mais &gt; Peso do saco).</li>
       </ol></details>`;
   }
   if (tipo === 'biometria') {
@@ -447,9 +452,9 @@ export async function renderLancar(ctx, el, params = {}) {
     const v = m[selTanque.value];
     if (!(v > 0)) { b.hidden = true; return; }
     b.hidden = false;
-    const sc = Math.round((v / kgSaco) * 100) / 100;
-    b.textContent = `↺ Repetir ${sacosTxt(sc)} (última vez)`;
-    b.onclick = () => { f.querySelector('#qtd').value = String(sc); f.querySelector('#qtd').dispatchEvent(new Event('input')); f.querySelector('#qtd').focus(); };
+    const kg = Math.round(v * 100) / 100;
+    b.textContent = `↺ Repetir ${kgTxt(kg)} kg (última vez)`;
+    b.onclick = () => { const q = f.querySelector('#racao-kg'); q.value = kgTxt(kg); q.dispatchEvent(new Event('input')); q.focus(); };
   }
   mostrarUltima();
 
@@ -461,17 +466,17 @@ export async function renderLancar(ctx, el, params = {}) {
     if (!resumoLotes && navigator.onLine) resumoLotes = Object.fromEntries(((await ctx.api.resumoLotes().catch(() => [])) || []).map((r) => [r.lote_id, r]));
     const sug = sugestaoRacao(lotes.filter((l) => l.tanque_id === selTanque.value), resumoLotes || {}, TAXA_RACAO);
     if (!sug) { box.hidden = true; return; }
-    const sacosSug = Math.max(0.5, Math.round((sug.kg / kgSaco) * 2) / 2);
+    const kgSug = sug.kg < 10 ? Math.round(sug.kg * 10) / 10 : Math.round(sug.kg);
     const bio = sug.biomassaKg >= 1000 ? `${fmtNum(sug.biomassaKg / 1000, 1)} t` : `${fmtNum(sug.biomassaKg, 0)} kg`;
     box.hidden = false;
-    box.innerHTML = `<button type="button" class="chip" id="b-sug">Sugestão: ${sug.kg / kgSaco < 0.95 ? `${fmtNum(sug.kg, sug.kg < 10 ? 1 : 0)} kg (${esc(sacosTxt(sacosSug))})` : esc(sacosTxt(sacosSug))}</button>
+    box.innerHTML = `<button type="button" class="chip" id="b-sug">Sugestão: ${kgTxt(kgSug)} kg (${esc(sacosTxt(sacosDeKg(kgSug, kgSaco)))})</button>
       <small>${fmtNum(sug.pct, 1)}% do peso vivo${ctx.podeGerir() ? ` (${bio} de peixe)` : ''}${sug.provisoria ? ' · taxa provisória, confirme com o técnico' : ''}</small>`;
-    box.querySelector('#b-sug').onclick = () => { const q = f.querySelector('#qtd'); q.value = String(sacosSug); q.dispatchEvent(new Event('input')); q.focus(); };
+    box.querySelector('#b-sug').onclick = () => { const q = f.querySelector('#racao-kg'); q.value = kgTxt(kgSug); q.dispatchEvent(new Event('input')); q.focus(); };
   }
   if (tipo === 'racao') { mostrarSugestao(); selTanque.addEventListener('change', mostrarSugestao); }
   if (tipo === 'racao') {
-    const q = f.querySelector('#qtd'), conv = f.querySelector('#conv');
-    q.addEventListener('input', () => { const n = num(q.value); conv.textContent = n > 0 ? `${sacosTxt(n)} = ${fmtNum(n * kgSaco, 1)} kg` : `Cada saco = ${fmtNum(kgSaco, 0)} kg`; });
+    const q = f.querySelector('#racao-kg'), conv = f.querySelector('#conv');
+    q.addEventListener('input', () => { const n = kgDigitado(q.value); conv.textContent = n > 0 ? kgEmSacosTxt(n, kgSaco) : `Digite o total em kg. Ex.: 600 kg = ${sacosTxt(sacosDeKg(600, kgSaco))}`; });
   }
 
   // marca os tanques que já receberam ração hoje (fila local + servidor, quando houver internet)
@@ -508,7 +513,7 @@ export async function renderLancar(ctx, el, params = {}) {
         const igual = regs.find((r) => Math.abs(Number(r.q) - pl.quantidade_kg) < 0.01);
         const recente = regs.find((r) => r.em && agora - new Date(r.em).getTime() < 30 * 60000);
         const r = igual || recente; if (!r) return null;
-        return `Este tanque já recebeu ${sacosTxt(Number(r.q) / kgSaco)} neste dia${r.em ? ` (às ${hora(r.em)})` : ''}.`;
+        return `Este tanque já recebeu ${kgTxt(Number(r.q))} kg (${sacosTxt(sacosDeKg(Number(r.q), kgSaco))}) neste dia${r.em ? ` (às ${hora(r.em)})` : ''}.`;
       }
       if (tp === 'manejo') { const r = regs.find((x) => x.p === pl.produto); return r ? `${pl.produto} já foi lançado neste lote nesta data${r.em ? ` (às ${hora(r.em)})` : ''}.` : null; }
       if (tp === 'despesca') { const r = regs.find((x) => Number(x.q) === pl.quantidade); return r ? `Já há uma despesca de ${plural(pl.quantidade, 'peixe', 'peixes')} neste lote nesta data${r.em ? ` (às ${hora(r.em)})` : ''}.` : null; }
@@ -558,10 +563,11 @@ export async function renderLancar(ctx, el, params = {}) {
     const base = { uuid_local: id, lote_id, data, registrado_por: state.perfil.id };
     let payload;
     if (tipo === 'racao') {
-      const q = num(f.querySelector('#qtd').value);
-      if (!(q > 0)) return mostrarErro('Informe quantos sacos de ração (pode ser meio saco: 0,5).');
-      if (q * kgSaco > 2000) return mostrarErro('Quantidade muito alta. Confira o número de sacos.');
-      payload = { ...base, tanque_id: selTanque.value, quantidade_kg: Math.round(q * kgSaco * 100) / 100 };
+      const kgTxtCampo = f.querySelector('#racao-kg').value, q = kgDigitado(kgTxtCampo);
+      if (kgTxtCampo.includes('.') && kgTxtCampo.includes(',')) return mostrarErro('Digite os kg sem ponto de milhar. Ex.: 1250,5');
+      if (!(q > 0)) return mostrarErro('Informe quantos kg de ração foram dados (pode ter vírgula: 37,5).');
+      if (q > 5000) return mostrarErro('Quantidade muito alta para um tanque num dia. Confira os kg.');
+      payload = { ...base, tanque_id: selTanque.value, quantidade_kg: Math.round(q * 100) / 100 };
     } else if (tipo === 'biometria') {
       const pesoTxt = f.querySelector('#peso').value, p = pesoAmostraKg(), q = num(f.querySelector('#amostra').value);
       if (pesoTxt.includes('.') && pesoTxt.includes(',')) return mostrarErro('Digite o peso sem ponto de milhar. Ex.: 1250,5');
@@ -672,7 +678,7 @@ export async function renderLancar(ctx, el, params = {}) {
     await ctx.atualizarPendentes();
     ctx.sincronizarAgora(); // em segundo plano; não trava a tela
     const nomeTanque = (tanques.find((t) => t.id === selTanque.value) || {}).nome || '';
-    const resumo = tipo === 'racao' ? `${sacosTxt(num(f.querySelector('#qtd').value))} de ração (${kgTxt(payload.quantidade_kg)} kg)`
+    const resumo = tipo === 'racao' ? `${kgTxt(payload.quantidade_kg)} kg de ração (${sacosTxt(sacosDeKg(payload.quantidade_kg, kgSaco))})`
       : tipo === 'biometria' ? `${pesoMedioTxt(payload.peso_amostra_kg / payload.quantidade_amostrada)} de peso médio (${fmtInt(payload.quantidade_amostrada)} peixes pesados)`
       : tipo === 'agua' ? [payload.oxigenio_mgl != null && `O₂ ${fmtNum(payload.oxigenio_mgl, 1)} mg/L`, payload.temperatura_c != null && `${fmtNum(payload.temperatura_c, 1)} °C`, payload.ph != null && `pH ${fmtNum(payload.ph, 1)}`, payload.amonia_mgl != null && `amônia ${fmtNum(payload.amonia_mgl, 2)} mg/L`].filter(Boolean).join(' · ')
       : tipo === 'manejo' ? `${payload.produto}: ${String(payload.dose).replace('.', ',')} ${payload.unidade} ${payload.via === 'agua' ? 'na água' : 'na ração'}`
