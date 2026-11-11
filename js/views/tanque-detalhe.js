@@ -81,7 +81,8 @@ export async function renderTanqueDetalhe(ctx, el, id) {
   const metas = (await db.kvGet('metasDespesca')) || {};
   el.innerHTML = `${semDetalhe ? '<p class="aviso">Sem conexão: os totais aparecem quando houver internet.</p>' : numerosGuardados ? '<p class="aviso">Sem conexão: números da última atualização.</p>' : ''}
     ${htmlCardTanque(tanque, meus, resumo, racaoHojeLocal, hoje, metas, ctx.podeGerir())}
-    ${meus.length ? `<a class="hub-card td-rel" href="#/relatorio/${esc(meus[0].id)}"><span class="item-ic">${icone('relatorio')}</span><span class="esq"><b>Relatório do lote</b><small>Peso, ração e mortalidade do início até hoje</small></span><span class="seta">${icone('direita', 20)}</span></a>` : ''}`;
+    ${meus.length ? `<a class="hub-card td-rel" href="#/relatorio/${esc(meus[0].id)}"><span class="item-ic">${icone('relatorio')}</span><span class="esq"><b>Relatório do lote</b><small>Peso, ração e mortalidade do início até hoje</small></span><span class="seta">${icone('direita', 20)}</span></a>
+    ${!ctx.podeGerir() ? `<a class="hub-card td-corrigir" href="#/relatorio/${esc(meus[0].id)}?aba=registros"><span class="item-ic">${icone('historico')}</span><span class="esq"><b>Lançou errado?</b><small>Corrija ou apague o que você lançou hoje. Depois de hoje, só o dono ou o gerente.</small></span><span class="seta">${icone('direita', 20)}</span></a>` : ''}` : ''}`;
   el.querySelectorAll('[data-meta]').forEach((b) => b.addEventListener('click', async () => {
     const l = meus.find((x) => x.id === b.dataset.meta); if (!l) return;
     const v = await pedirTexto({ titulo: 'Meta de despesca', rotulo: 'Peso médio de cada peixe na despesca (kg)', texto: String(metaDe(l, metas)).replace('.', ','), placeholder: 'Ex.: 2,5', maxlength: 8,

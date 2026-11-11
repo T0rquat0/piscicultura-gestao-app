@@ -30,7 +30,7 @@ async function novoTanque(ctx, el) {
   try {
     await ctx.api.criarTanque(ctx.state.perfil.fazenda_id, nome);
     await ctx.atualizarRef();
-    ctx.toast(`${/^(tanque|viveiro)/i.test(nome) ? nome : `Tanque ${nome}`} criado`, 'ok');
+    ctx.toast(`${/^(tanque|viveiro)\b/i.test(nome) ? nome : `Tanque ${nome}`} criado`, 'ok');
     renderHome(ctx, el);
   } catch (e) { ctx.toast(e.message || 'Não foi possível criar o tanque', 'erro'); }
 }

@@ -39,10 +39,12 @@ checa(!!(await ins(D, 5, T, 30)).erro, 'oxigênio impossível recusado');
 checa(!!(await ins(D, 6, T, 5, 15)).erro, 'pH impossível recusado');
 checa(!!(await ins(D, 7, T, 5, 'null', "'25:99'")).erro, 'hora inválida recusada');
 r = await ins(D, 8, T, 0); checa(!r.erro, `oxigênio zero é aceito ${r.erro || ''}`);
+// lançado ontem: desde o sql/32 o funcionário só corrige o que lançou HOJE
+await db.exec(`update qualidade_agua set criado_em = now() - interval '1 day' where uuid_local='${uuid(1)}'`);
 await como(W, `update qualidade_agua set oxigenio_mgl = 9 where uuid_local='${uuid(1)}'`);
-checa(Number((await db.query(`select oxigenio_mgl v from qualidade_agua where uuid_local='${uuid(1)}'`)).rows[0].v) === 5, 'funcionário NÃO altera');
+checa(Number((await db.query(`select oxigenio_mgl v from qualidade_agua where uuid_local='${uuid(1)}'`)).rows[0].v) === 5, 'funcionário NÃO altera o de ontem');
 await como(W, `delete from qualidade_agua where uuid_local='${uuid(1)}'`);
-checa(await conta(`uuid_local='${uuid(1)}'`) === 1, 'funcionário NÃO exclui');
+checa(await conta(`uuid_local='${uuid(1)}'`) === 1, 'funcionário NÃO exclui o de ontem');
 checa((await como(O, `select count(*)::int n from qualidade_agua`)).rows[0].n === 0, 'outra fazenda não enxerga');
 await como(D, `delete from qualidade_agua where uuid_local='${uuid(1)}'`);
 const op = (await db.query(`select operacao from historico where tabela='qualidade_agua' and acao='excluiu'`)).rows[0]?.operacao;

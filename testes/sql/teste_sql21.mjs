@@ -45,10 +45,12 @@ checa(/duplicate|unique/i.test((await ins(W, 1, L)).erro || ''), 'reenvio com o 
 checa(await conta() === 1, 'reenvio não duplica');
 for (const [m, o] of [['dose zero', { dose: 0 }], ['unidade inválida', { unidade: "'saco'" }], ['via inválida', { via: "'ar'" }], ['produto vazio', { produto: "'   '" }]]) checa(!!(await ins(D, 20 + m.length, L, o)).erro, `${m} recusado`);
 
+// lançado ontem: desde o sql/32 o funcionário só corrige o que lançou HOJE
+await db.exec(`update manejos set criado_em = now() - interval '1 day' where uuid_local='${uuid(1)}'`);
 await como(W, `update manejos set dose = 1 where uuid_local='${uuid(1)}'`);
-checa(Number((await db.query(`select dose from manejos where uuid_local='${uuid(1)}'`)).rows[0].dose) === 200, 'funcionário NÃO altera');
+checa(Number((await db.query(`select dose from manejos where uuid_local='${uuid(1)}'`)).rows[0].dose) === 200, 'funcionário NÃO altera o de ontem');
 await como(W, `delete from manejos where uuid_local='${uuid(1)}'`);
-checa(await conta(`uuid_local='${uuid(1)}'`) === 1, 'funcionário NÃO exclui');
+checa(await conta(`uuid_local='${uuid(1)}'`) === 1, 'funcionário NÃO exclui o de ontem');
 checa((await como(O, `select count(*)::int n from manejos`)).rows[0].n === 0, 'outra fazenda não enxerga');
 checa((await como(W, `select count(*)::int n from manejos`)).rows[0].n === 1, 'funcionário do tanque enxerga');
 
