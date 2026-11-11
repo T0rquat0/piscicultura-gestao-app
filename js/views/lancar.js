@@ -1,7 +1,7 @@
 // Lançamento de ração, biometria, mortalidade, despesca e manejo (probiótico). Funciona sem internet:
 // o item é gravado na fila local (IndexedDB) e enviado quando houver conexão.
 import { icone } from '../icons.js';
-import { esc, hojeISO, fmtData, fmtNum, fmtInt, num, uuid, ROTULO_TIPO, progresso, fmtPct, plural, numDecimal, pesoMedioTxt, fmtBRL } from '../util.js';
+import { esc, hojeISO, fmtData, fmtNum, fmtInt, num, uuid, ROTULO_TIPO, progresso, fmtPct, plural, numDecimal, numMoeda, pesoMedioTxt, fmtBRL } from '../util.js';
 import * as db from '../db.js';
 import * as rascunho from '../rascunho.js';
 import { confirmar } from '../dialogo.js';
@@ -101,8 +101,8 @@ function camposDoTipo(tipo, kgSaco, verDinheiro = false) {
       <label>Peso total líquido (kg) <small class="mudo">(opcional)</small>
         <input id="desp-liquido" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 9356"></label>
       ${verDinheiro ? `<div class="man-dose desp-venda">
-        <label>Preço de venda (R$/kg) <small class="mudo">(opcional)</small>
-          <input id="desp-preco" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 9,50"></label>
+        <label>Preço de venda por kg <small class="mudo">(opcional)</small>
+          <span class="com-prefixo"><em>R$</em><input id="desp-preco" type="text" inputmode="decimal" autocomplete="off" maxlength="10" placeholder="Ex.: 9,50"></span></label>
         <label>Comprador <small class="mudo">(opcional)</small>
           <input id="desp-comprador" type="text" maxlength="80" autocomplete="off"></label>
       </div>` : ''}
@@ -431,7 +431,7 @@ export async function renderLancar(ctx, el, params = {}) {
       const L = [`Peso médio bruto: ${pesoMedioTxt(i.medioBrutoKg)} por peixe`];
       if (i.medioLiquidoKg != null) L.push(`Peso médio líquido: ${pesoMedioTxt(i.medioLiquidoKg)} por peixe`, `Diferença: ${fmtNum(i.difKg, 0)} kg (${fmtNum(i.difPct, 1)}% do bruto)`);
       if (i.peixesHa != null) L.push(`${fmtInt(i.peixesHa)} peixes por hectare`);
-      const prTxt = (f.querySelector('#desp-preco') || { value: '' }).value.trim(), pr = prTxt ? numDecimal(prTxt) : null;
+      const prTxt = (f.querySelector('#desp-preco') || { value: '' }).value.trim(), pr = prTxt ? numMoeda(prTxt) : null;
       if (pr > 0) L.push(`Receita: ${fmtBRL(b * pr)} (sobre o peso bruto)`);
       box.textContent = L.join('\n'); box.hidden = false;
     };
@@ -591,12 +591,11 @@ export async function renderLancar(ctx, el, params = {}) {
         dadosRapidos(),
       ]);
       if (!despescaLigada) return mostrarErro('A despesca ainda não foi ativada neste sistema (falta rodar o sql/20 no Supabase).');
-      // preço e comprador: só o dono vê e informa (valores em R$ só para o dono, sql/23 e sql/27)
-      const precoTxt = (f.querySelector('#desp-preco') || { value: '' }).value.trim(), preco = precoTxt ? numDecimal(precoTxt) : null;
-      if (precoTxt.includes('.') && precoTxt.includes(',')) return mostrarErro('Digite o preço sem ponto de milhar. Ex.: 9,50');
+      // preço e comprador: só o dono vê e informa (valores em R$ só para o dono, sql/23 e sql/28)
+      const precoTxt = (f.querySelector('#desp-preco') || { value: '' }).value.trim(), preco = precoTxt ? numMoeda(precoTxt) : null;
       if (precoTxt && !(preco > 0 && preco <= 1000)) return mostrarErro('Confira o preço de venda por kg (até R$ 1.000), ou deixe em branco.');
       const comprador = (f.querySelector('#desp-comprador') || { value: '' }).value.trim();
-      if ((precoTxt || comprador) && navigator.onLine && !(await Promise.race([ctx.api.vendaAtiva().catch(() => true), new Promise((r) => setTimeout(() => r(true), 2500))]))) return mostrarErro('A venda na despesca ainda não foi ativada neste sistema (falta rodar o sql/27 no Supabase). Deixe preço e comprador em branco para salvar só a despesca.');
+      if ((precoTxt || comprador) && navigator.onLine && !(await Promise.race([ctx.api.vendaAtiva().catch(() => true), new Promise((r) => setTimeout(() => r(true), 2500))]))) return mostrarErro('A venda na despesca ainda não foi ativada neste sistema (falta rodar o sql/28 no Supabase). Deixe preço e comprador em branco para salvar só a despesca.');
       payload = { ...base, tipo: despTipo, quantidade: q, peso_bruto_kg: b, peso_liquido_kg: lq, ...(preco || comprador ? { _venda: { preco_kg: preco || null, comprador: comprador || null } } : {}) };
       if (!(await pesoConferido(lote_id, q, b, data, dados))) return;
       // confere com o que o app estimava (só com internet); nunca bloqueia, porque a contagem da despesca é a real
@@ -617,7 +616,7 @@ export async function renderLancar(ctx, el, params = {}) {
         m[k] = v;
       }
       if (Object.values(m).every((v) => v == null)) return mostrarErro('Preencha pelo menos uma medição.');
-      if (navigator.onLine && !(await Promise.race([ctx.api.aguaAtiva().catch(() => true), new Promise((r) => setTimeout(() => r(true), 2500))]))) return mostrarErro('A qualidade da água ainda não foi ativada neste sistema (falta rodar o sql/26 no Supabase).');
+      if (navigator.onLine && !(await Promise.race([ctx.api.aguaAtiva().catch(() => true), new Promise((r) => setTimeout(() => r(true), 2500))]))) return mostrarErro('A qualidade da água ainda não foi ativada neste sistema (falta rodar o sql/27 no Supabase).');
       const { lote_id: _semLote, ...semLote } = base;
       const agora = new Date();
       payload = { ...semLote, tanque_id: selTanque.value, ...m, hora: data === hoje ? `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}` : null, obs: f.querySelector('#ag-obs').value.trim() || null };

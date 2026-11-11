@@ -1,5 +1,5 @@
 // Lucro por ciclo e despesas gerais (só o dono: valores em R$; precisam de internet).
-import { esc, fmtData, fmtInt, fmtNum, fmtBRL, hojeISO, numDecimal, ROTULO_TIPO, nomeArquivo, dataArquivo } from '../util.js';
+import { esc, fmtData, fmtInt, fmtNum, fmtBRL, hojeISO, numDecimal, numMoeda, moedaCampo, ROTULO_TIPO, nomeArquivo, dataArquivo } from '../util.js';
 import { calcularLote, fimDoLote, precoMedioKg, pesoProduzido, ratearDespesas, fecharCiclo } from '../calc.js';
 import { CATEGORIAS_DESPESA } from '../config.js';
 import { confirmar, formulario } from '../dialogo.js';
@@ -8,7 +8,7 @@ import { gerarPdfLucro } from '../pdf_lucro.js';
 
 const semAcesso = (el, t) => { el.innerHTML = `<h1>${t}</h1><div class="card vazio"><p>Esta tela é só para o dono (valores em R$).</p></div>`; };
 const semRede = (el, t) => { el.innerHTML = `<h1>${t}</h1><div class="card vazio"><p>Esta tela precisa de internet.</p></div>`; };
-const faltaSql = (el, t) => { el.innerHTML = `<h1>${t}</h1><div class="card vazio"><p>Este recurso ainda não foi ativado neste sistema (falta rodar o sql/28 no Supabase).</p></div>`; };
+const faltaSql = (el, t) => { el.innerHTML = `<h1>${t}</h1><div class="card vazio"><p>Este recurso ainda não foi ativado neste sistema (falta rodar o sql/29 no Supabase).</p></div>`; };
 const rotuloCat = (k) => (CATEGORIAS_DESPESA.find(([v]) => v === k) || [k, k])[1];
 
 export async function renderLucro(ctx, el) {
@@ -74,12 +74,12 @@ export async function renderLucro(ctx, el) {
   el.querySelectorAll('[data-alevino]').forEach((b) => b.addEventListener('click', async () => {
     const id = b.dataset.alevino;
     const v = await formulario({ titulo: 'Custo dos alevinos', texto: 'Quanto foi pago pelos peixes deste lote, em reais. Deixe em branco para apagar.',
-      campos: [{ nome: 'valor', rotulo: 'Valor total (R$)', tipo: 'text', valor: id in custoDe ? String(custoDe[id]).replace('.', ',') : '', inputmode: 'decimal' }],
-      validar: (x) => { const t = String(x.valor ?? '').trim(); if (!t) return null; const n = numDecimal(t); return n >= 0 && n <= 100000000 ? null : 'Confira o valor, sem ponto de milhar. Ex.: 12500,50'; } });
+      campos: [{ nome: 'valor', rotulo: 'Valor total', tipo: 'text', valor: id in custoDe ? moedaCampo(custoDe[id]) : '', prefixo: 'R$', inputmode: 'decimal', maxlength: '16', placeholder: 'Ex.: 1.500,00' }],
+      validar: (x) => { const t = String(x.valor ?? '').trim(); if (!t) return null; const n = numMoeda(t); return n >= 0 && n <= 100000000 ? null : 'Confira o valor. Ex.: 12.500,50'; } });
     if (!v) return;
     try {
       const t = String(v.valor ?? '').trim();
-      await (t ? ctx.api.salvarCustoLote(id, numDecimal(t)) : ctx.api.apagarCustoLote(id));
+      await (t ? ctx.api.salvarCustoLote(id, numMoeda(t)) : ctx.api.apagarCustoLote(id));
       ctx.toast('Custo salvo', 'ok'); renderLucro(ctx, el);
     } catch (e) { ctx.toast(e.message, 'erro'); }
   }));
@@ -111,7 +111,7 @@ export async function renderDespesas(ctx, el) {
     <form class="form card" id="f-desp" novalidate>
       <label>Data <input id="d-data" type="date" value="${hoje}" max="${hoje}" required></label>
       <label>Tipo <select id="d-cat">${CATEGORIAS_DESPESA.map(([v, r]) => `<option value="${v}">${esc(r)}</option>`).join('')}</select></label>
-      <label>Valor (R$) <input id="d-valor" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 1250,50" required></label>
+      <label>Valor <span class="com-prefixo"><em>R$</em><input id="d-valor" type="text" inputmode="decimal" autocomplete="off" maxlength="16" placeholder="Ex.: 1.250,50" required></span></label>
       <label>Descrição <small class="mudo">(opcional)</small> <input id="d-desc" type="text" maxlength="120" autocomplete="off"></label>
       <p id="d-erro" class="erro" hidden></p>
       <button class="btn primario" type="submit">Salvar despesa</button>
@@ -126,10 +126,10 @@ export async function renderDespesas(ctx, el) {
     if (salvando) return;
     const falha = (m) => { erro.textContent = m; erro.hidden = false; };
     erro.hidden = true;
-    const data = f.querySelector('#d-data').value, txt = f.querySelector('#d-valor').value.trim(), valor = numDecimal(txt);
+    const data = f.querySelector('#d-data').value, txt = f.querySelector('#d-valor').value.trim(), valor = numMoeda(txt);
     if (!data) return falha('Informe a data.');
     if (data > hoje) return falha('A data não pode ser no futuro.');
-    if (!(valor > 0) || valor > 100000000) return falha('Confira o valor, sem ponto de milhar. Ex.: 1250,50');
+    if (!(valor > 0) || valor > 100000000) return falha('Confira o valor. Ex.: 1.250,50');
     salvando = true;
     try {
       await ctx.api.criarDespesa({ data, categoria: f.querySelector('#d-cat').value, valor, descricao: f.querySelector('#d-desc').value.trim() || null, registrado_por: ctx.state.perfil.id, fazenda_id: ctx.state.perfil.fazenda_id });

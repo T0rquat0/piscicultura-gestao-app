@@ -58,7 +58,7 @@ export async function sincronizar(client, userId) {
         }
         let error = null, status = 0;
         try {
-          // a venda da despesca (preço/comprador, só do dono) viaja junto na fila, mas vai para outra tabela (sql/27)
+          // a venda da despesca (preço/comprador, só do dono) viaja junto na fila, mas vai para outra tabela (sql/28)
           const { _venda, ...registro } = it.payload;
           ({ error, status } = await client.from(it.tabela).insert(registro));
           // banco ainda sem a coluna "causa" (sql/08 não rodado): salva sem ela em vez de travar a fila

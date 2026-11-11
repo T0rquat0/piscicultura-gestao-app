@@ -18,7 +18,7 @@ def preparar(papel, fechado=True, alevino=True, preco=10):
     est['racao_consumo'] = [{'id': 'r1', 'data': '2026-03-01', 'tanque_id': T, 'quantidade_kg': 2000, 'registrado_por': U}]
     est['racao_estoque'] = [{'id': 'c1', 'data_compra': '2026-01-05', 'quantidade_kg': 2000, 'custo_total': 8000, 'fornecedor': 'X'}]
     est['despescas'] = [{'id': 'd1', 'uuid_local': 'u-d1', 'data': '2026-06-01', 'tipo': 'total' if fechado else 'parcial', 'quantidade': 950, 'peso_bruto_kg': 2000, 'peso_liquido_kg': None, 'registrado_por': U}]
-    est['despesca_vendas'] = [{'despesca_uuid': 'u-d1', 'preco_kg': preco, 'comprador': None}] if preco else []  # venda só do dono (sql/27)
+    est['despesca_vendas'] = [{'despesca_uuid': 'u-d1', 'preco_kg': preco, 'comprador': None}] if preco else []  # venda só do dono (sql/28)
     est['despesas_gerais'] = [{'id': 'g1', 'data': '2026-02-01', 'categoria': 'energia', 'valor': 2500, 'descricao': 'Luz', 'fazenda_id': F}]
     est['custos_lote'] = [{'lote_id': L1, 'custo_alevino': 1500}] if alevino else []
 def abrir(b, w=390):
@@ -46,9 +46,9 @@ with sync_playwright() as pw:
     for x in ['FECHAMENTO', '20.000,00', '12.000,00', '8.000,00', '40,0%']: checa(x in p.upper(), f'PDF mostra {x}')
     pg.click('[data-fechar]'); pg.wait_for_timeout(300)
     # custo do alevino: valor inválido barrado, válido grava
-    pg.click('[data-alevino]'); pg.wait_for_selector('.dialogo form'); pg.fill('.dialogo [name=valor]', '1.500,50'); pg.click('.dialogo button[type=submit]'); pg.wait_for_timeout(200)
-    checa('ponto de milhar' in pg.inner_text('.dialogo [data-erro]'), 'alevino: recusa ponto e vírgula juntos')
-    pg.fill('.dialogo [name=valor]', '1600,50'); pg.click('.dialogo button[type=submit]'); pg.wait_for_timeout(900)
+    pg.click('[data-alevino]'); pg.wait_for_selector('.dialogo form'); pg.fill('.dialogo [name=valor]', '1.50,00'); pg.click('.dialogo button[type=submit]'); pg.wait_for_timeout(200)
+    checa('Confira o valor' in pg.inner_text('.dialogo [data-erro]'), 'alevino: recusa milhar errado (1.50,00)')
+    pg.fill('.dialogo [name=valor]', '1.600,50'); pg.click('.dialogo button[type=submit]'); pg.wait_for_timeout(900)
     x = [p2 for tb, p2 in est['posts'] if tb == 'custos_lote']; checa(x and x[0]['custo_alevino'] == 1600.5 and x[0]['lote_id'] == L1, f'alevino grava {x}'); pg.close()
 
     # o que falta é avisado
@@ -60,16 +60,16 @@ with sync_playwright() as pw:
 
     # despesas gerais: validações, gravação, exclusão, e toque duplo
     preparar('dono'); pg = abrir(b); vai(pg, '#/despesas', '#f-desp')
-    for v, m in [('abc', 'letras'), ('0', 'zero'), ('1.250,50', 'ponto e vírgula'), ('', 'vazio')]:
+    for v, m in [('abc', 'letras'), ('0', 'zero'), ('12,345', 'três casas de centavo'), ('', 'vazio')]:
         pg.fill('#d-valor', v); pg.click('#f-desp button[type=submit]'); pg.wait_for_timeout(200); checa('Confira o valor' in pg.inner_text('#d-erro'), f'despesa {m}: recusa')
     pg.fill('#d-data', '2030-01-01'); pg.fill('#d-valor', '10'); pg.click('#f-desp button[type=submit]'); pg.wait_for_timeout(200); checa('futuro' in pg.inner_text('#d-erro'), 'data futura: recusa')
-    pg.fill('#d-data', '2026-11-01'); pg.fill('#d-valor', '1250,50'); pg.select_option('#d-cat', 'mao_de_obra'); pg.fill('#d-desc', 'Diária')
+    pg.fill('#d-data', '2026-11-01'); pg.fill('#d-valor', '1.250,50'); pg.select_option('#d-cat', 'mao_de_obra'); pg.fill('#d-desc', 'Diária')
     pg.evaluate("const b = document.querySelector('#f-desp button[type=submit]'); b.click(); b.click();"); pg.wait_for_timeout(1200)
     x = [p2 for tb, p2 in est['posts'] if tb == 'despesas_gerais']; checa(len(x) == 1 and x[0]['valor'] == 1250.5 and x[0]['categoria'] == 'mao_de_obra' and x[0]['fazenda_id'] == F, f'grava uma vez: {x}')
     pg.close()
 
-    # banco sem o sql/28, gerente e funcionário
-    preparar('dono'); SEM['sim'] = True; pg = abrir(b); vai(pg, '#/lucro', '.card.vazio'); checa('sql/28' in pg.inner_text('#view'), 'sem o sql/28: avisa'); SEM['sim'] = False; pg.close()
+    # banco sem o sql/29, gerente e funcionário
+    preparar('dono'); SEM['sim'] = True; pg = abrir(b); vai(pg, '#/lucro', '.card.vazio'); checa('sql/29' in pg.inner_text('#view'), 'sem o sql/29: avisa'); SEM['sim'] = False; pg.close()
     X = '<img src=x onerror="window.__xss=1">'
     preparar('funcionario'); est['despesas_gerais'][0]['descricao'] = X; pg = abrir(b); vai(pg, '#/lucro', '.card.vazio'); checa('só para o dono' in pg.inner_text('#view'), 'funcionário: Lucro bloqueado')
     vai(pg, '#/despesas', '.card.vazio'); checa('só para o dono' in pg.inner_text('#view'), 'funcionário: Despesas bloqueado')
