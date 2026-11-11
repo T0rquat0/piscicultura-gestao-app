@@ -7,11 +7,11 @@ import { esc } from './util.js';
 const PADRAO = {
   t: ['#/', 'Início'], tanque: ['#/tanques', 'Tanques'], tanques: ['#/mais', 'Mais'], estoque: ['#/mais', 'Mais'],
   equipe: ['#/mais', 'Mais'], plano: ['#/mais', 'Mais'], historico: ['#/mais', 'Mais'], pendencias: ['#/mais', 'Mais'],
-  admin: ['#/mais', 'Mais'], relatorio: ['#/relatorio', 'Relatórios'],
+  admin: ['#/mais', 'Mais'], relatorio: ['#/relatorio', 'Relatórios'], lucro: ['#/relatorio', 'Relatórios'], despesas: ['#/lucro', 'Lucro por ciclo'],
 };
 const NOME = {
   '': 'Início', lancar: 'Lançar', mais: 'Mais', tanques: 'Tanques', tanque: 'Tanque', t: 'Tanque', estoque: 'Estoque',
-  equipe: 'Equipe', plano: 'Meu plano', historico: 'Histórico', pendencias: 'Pendentes', admin: 'Administração',
+  equipe: 'Equipe', plano: 'Meu plano', historico: 'Histórico', pendencias: 'Pendentes', admin: 'Administração', lucro: 'Lucro por ciclo', despesas: 'Despesas gerais',
 };
 const partesDe = (hash) => String(hash || '#/').replace(/^#\/?/, '').split('?')[0].split('/');
 const nomeDe = (hash) => {

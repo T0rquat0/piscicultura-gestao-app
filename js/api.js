@@ -10,8 +10,16 @@ export class ErroApi extends Error {
   }
 }
 
-const TABELAS_EXCLUIVEIS = new Set(['biometrias', 'mortalidade', 'despescas', 'manejos', 'racao_consumo', 'racao_estoque', 'racao_contagens']);
-const TABELAS_EDITAVEIS = new Set(['biometrias', 'mortalidade', 'despescas', 'manejos', 'racao_consumo', 'racao_estoque', 'lotes']);
+const TABELAS_EXCLUIVEIS = new Set(['despesas_gerais', 'biometrias', 'mortalidade', 'despescas', 'manejos', 'qualidade_agua', 'racao_consumo', 'racao_estoque', 'racao_contagens']);
+const TABELAS_EDITAVEIS = new Set(['biometrias', 'mortalidade', 'despescas', 'manejos', 'qualidade_agua', 'racao_consumo', 'racao_estoque', 'lotes']);
+
+// venda de uma despesca (só o dono; sql/27): preço e comprador vazios apagam a venda
+async function gravarVenda(client, despescaUuid, preco, comprador) {
+  const r = preco == null && !comprador
+    ? await client.from('despesca_vendas').delete().eq('despesca_uuid', despescaUuid)
+    : await client.from('despesca_vendas').upsert({ despesca_uuid: despescaUuid, preco_kg: preco ?? null, comprador: comprador || null }, { onConflict: 'despesca_uuid' });
+  if (r.error) throw new ErroApi(r.error);
+}
 
 export function criarApi(client) {
   const ok = (res) => {
@@ -48,8 +56,8 @@ export function criarApi(client) {
     async contratarPacote(n) {
       return ok(await client.rpc('contratar_pacote', { p_tanques_max: n }));
     },
-    async criarFazenda(fazenda, nome) {
-      return ok(await client.rpc('criar_fazenda', { p_fazenda: fazenda, p_nome: nome }));
+    async criarFazenda(fazenda, nome, documento) {
+      return ok(await client.rpc('criar_fazenda', { p_fazenda: fazenda, p_nome: nome, p_documento: documento }));
     },
     // fim do teste grátis; null se não houver (fazenda antiga) ou se o sql/06 não foi rodado
     async testeAte() {
@@ -154,6 +162,37 @@ export function criarApi(client) {
       const { error } = await client.from('despescas').select('id').limit(1);
       return !(error && (error.code === '42P01' || error.code === 'PGRST205'));
     },
+    async aguaAtiva() {
+      const { error } = await client.from('qualidade_agua').select('id').limit(1);
+      return !(error && (error.code === '42P01' || error.code === 'PGRST205'));
+    },
+    aguaPeriodo(desde) {
+      return todos(() => client.from('qualidade_agua').select('id,data,hora,tanque_id,oxigenio_mgl,temperatura_c,ph,amonia_mgl').gte('data', desde).order('data').order('id'));
+    },
+    // sem o sql/26 a tabela não existe: o relatório segue sem medições
+    aguaTanque(tanqueId, desde) {
+      return todos(() => client.from('qualidade_agua').select('id,data,hora,tanque_id,oxigenio_mgl,temperatura_c,ph,amonia_mgl,obs,registrado_por').eq('tanque_id', tanqueId).gte('data', desde).order('data').order('id')).catch(() => []);
+    },
+    // o banco já tem a tabela de venda só do dono (sql/27)?
+    async vendaAtiva() {
+      const { error } = await client.from('despesca_vendas').select('despesca_uuid').limit(1);
+      return !(error && (error.code === '42P01' || error.code === 'PGRST205'));
+    },
+    salvarVenda(despescaUuid, preco, comprador) { return gravarVenda(client, despescaUuid, preco, comprador); },
+    // ----- custos (sql/28). null = tabela ainda não existe -----
+    async despesasGerais() {
+      const { data, error } = await client.from('despesas_gerais').select('id,data,categoria,valor,descricao').order('data', { ascending: false }).order('id').limit(1000);
+      if (error) { if (error.code === '42P01' || error.code === 'PGRST205') return null; throw new ErroApi(error); }
+      return data || [];
+    },
+    async custosLote() {
+      const { data, error } = await client.from('custos_lote').select('lote_id,custo_alevino');
+      if (error) { if (error.code === '42P01' || error.code === 'PGRST205') return null; throw new ErroApi(error); }
+      return data || [];
+    },
+    async criarDespesa(linha) { ok(await client.from('despesas_gerais').insert(linha)); },
+    async salvarCustoLote(loteId, valor) { ok(await client.from('custos_lote').upsert({ lote_id: loteId, custo_alevino: valor }, { onConflict: 'lote_id' })); },
+    async apagarCustoLote(loteId) { ok(await client.from('custos_lote').delete().eq('lote_id', loteId)); },
     async manejoAtivo() {
       const { error } = await client.from('manejos').select('id').limit(1);
       return !(error && (error.code === '42P01' || error.code === 'PGRST205'));
@@ -259,16 +298,26 @@ export function criarApi(client) {
     },
 
     // ----- relatório de um lote -----
-    async dadosLote(loteId) {
+    // venda: true só para o dono (preço e comprador vêm da tabela só dele, sql/27)
+    async dadosLote(loteId, { venda = false } = {}) {
       const [bios, mort, rac, desp, man] = await Promise.all([
         todos(() => client.from('biometrias').select('id,data,peso_amostra_kg,quantidade_amostrada,registrado_por').eq('lote_id', loteId).order('data').order('id')),
         todos(() => client.from('mortalidade').select('id,data,quantidade,causa,registrado_por').eq('lote_id', loteId).order('data').order('id'))
           .catch(() => todos(() => client.from('mortalidade').select('id,data,quantidade,registrado_por').eq('lote_id', loteId).order('data').order('id'))),
         todos(() => client.from('racao_consumo').select('id,data,quantidade_kg,registrado_por').eq('lote_id', loteId).order('data').order('id')),
         // sem o sql/20 a tabela não existe: o relatório segue sem despescas
-        todos(() => client.from('despescas').select('id,data,tipo,quantidade,peso_bruto_kg,peso_liquido_kg,registrado_por').eq('lote_id', loteId).order('data').order('id')).catch(() => []),
+        todos(() => client.from('despescas').select('id,uuid_local,data,tipo,quantidade,peso_bruto_kg,peso_liquido_kg,registrado_por').eq('lote_id', loteId).order('data').order('id'))
+          .catch(() => []),
         todos(() => client.from('manejos').select('id,data,tipo,produto,dose,unidade,via,obs,registrado_por').eq('lote_id', loteId).order('data').order('id')).catch(() => []), // sem o sql/21: segue sem manejos
       ]);
+      if (venda && desp.length) {
+        const vendas = await todos(() => client.from('despesca_vendas').select('despesca_uuid,preco_kg,comprador').in('despesca_uuid', desp.map((d) => d.uuid_local)).order('despesca_uuid'))
+          .catch(() => null); // sem o sql/27: segue sem preço
+        if (vendas) {
+          const por = new Map(vendas.map((v) => [v.despesca_uuid, v]));
+          for (const d of desp) { const v = por.get(d.uuid_local); d.preco_kg = v && v.preco_kg != null ? Number(v.preco_kg) : null; d.comprador = (v && v.comprador) || null; }
+        }
+      }
       return { bios, mort, rac, desp, man };
     },
     // ração de todos os tanques visíveis ao usuário a partir de uma data (para a tabela dia × tanque)
@@ -293,10 +342,20 @@ export function criarApi(client) {
     // corrige um registro (dono/gerente; o RLS barra os demais sem dar erro, por isso confere se alguma linha mudou)
     async atualizar(tabela, id, campos) {
       if (!TABELAS_EDITAVEIS.has(tabela)) throw new Error('Tabela não permitida');
+      // despesca: preço e comprador não ficam nela (sql/27), vão para a venda, só do dono (gravada depois da despesca)
+      let venda = null;
+      if (tabela === 'despescas' && ('preco_kg' in campos || 'comprador' in campos)) {
+        const { preco_kg, comprador, ...resto } = campos;
+        venda = { preco_kg: preco_kg ?? null, comprador: comprador || null }; campos = resto;
+      }
       const r = await client.from(tabela).update(campos).eq('id', id).select('id');
       if (r.error && /lotes_tipo_check/i.test(r.error.message || '')) throw new Error('As fases Berçário e Recria ainda não foram ativadas neste sistema (falta rodar o sql/17 no Supabase).');
       const d = ok(r);
       if (!d || !d.length) throw new Error('Não foi possível salvar. Sem permissão para alterar este registro.');
+      if (venda) {
+        const x = (ok(await client.from('despescas').select('id,uuid_local').eq('id', id).limit(1)) || []).find((r) => r.id === id);
+        if (x && x.uuid_local) await gravarVenda(client, x.uuid_local, venda.preco_kg, venda.comprador);
+      }
     },
     async reabrirLote(id) {
       const d = ok(await client.from('lotes').update({ ativo: true }).eq('id', id).select('id'));
@@ -328,10 +387,20 @@ export function criarApi(client) {
     async adminBloquear(fazenda, bloquear) { ok(await client.rpc('admin_bloquear', { p_fazenda: fazenda, p_bloquear: bloquear })); },
     async adminSalvarPacote(p) { ok(await client.rpc('admin_salvar_pacote', { p_tanques_max: p.tanques_max, p_nome: p.nome, p_preco: p.preco, p_ativo: p.ativo })); },
     async adminDefinirPiloto(ligado) { ok(await client.rpc('admin_definir_piloto', { p_ligado: ligado })); },
+    async adminDefinirDocumento(fazenda, documento) { ok(await client.rpc('admin_definir_documento', { p_fazenda: fazenda, p_documento: documento })); },
+    // financeiro do sistema (sql/31); null = SQL ainda não rodado
+    async adminFinanceiro() {
+      const r = await client.rpc('admin_financeiro');
+      if (r.error && (r.error.code === 'PGRST202' || r.error.code === '42883')) return null;
+      return ok(r) || null;
+    },
+    async adminSalvarLancamento(l) { return ok(await client.rpc('admin_salvar_lancamento', { p: l })); },
+    async adminExcluirLancamento(id) { ok(await client.rpc('admin_excluir_lancamento', { p_id: id })); },
+    async adminSalvarSocios(lista) { ok(await client.rpc('admin_salvar_socios', { p: lista })); },
 
     // ----- cópia de segurança (dono): tudo o que a fazenda tem, tabela por tabela -----
     async exportarTudo() {
-      const tabelas = ['fazendas', 'usuarios', 'tanques', 'usuario_tanques', 'lotes', 'biometrias', 'mortalidade', 'despescas', 'manejos', 'racao_consumo', 'racao_estoque', 'racao_contagens'];
+      const tabelas = ['fazendas', 'usuarios', 'tanques', 'usuario_tanques', 'lotes', 'biometrias', 'mortalidade', 'despescas', 'despesca_vendas', 'manejos', 'qualidade_agua', 'custos_lote', 'despesas_gerais', 'racao_consumo', 'racao_estoque', 'racao_contagens'];
       const out = { gerado_em: new Date().toISOString(), versao: 1, tabelas: {}, sem_acesso: [] };
       for (const t of tabelas) {
         try {

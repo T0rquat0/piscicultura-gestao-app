@@ -1,12 +1,13 @@
 // Lançamento de ração, biometria, mortalidade, despesca e manejo (probiótico). Funciona sem internet:
 // o item é gravado na fila local (IndexedDB) e enviado quando houver conexão.
 import { icone } from '../icons.js';
-import { esc, hojeISO, fmtData, fmtNum, fmtInt, num, uuid, ROTULO_TIPO, progresso, fmtPct, plural, numDecimal, pesoMedioTxt } from '../util.js';
+import { esc, hojeISO, fmtData, fmtNum, fmtInt, num, uuid, ROTULO_TIPO, progresso, fmtPct, plural, numDecimal, pesoMedioTxt, fmtBRL } from '../util.js';
 import * as db from '../db.js';
+import * as rascunho from '../rascunho.js';
 import { confirmar } from '../dialogo.js';
 import { ordemNatural } from './home.js';
-import { PESO_SACO_PADRAO_KG, CAUSAS_MORTE, TAXA_RACAO } from '../config.js';
-import { sugestaoRacao, vivosDoLote, indicadoresDespesca, avisoPesoMedio } from '../calc.js';
+import { AGUA_LIMITES, PESO_SACO_PADRAO_KG, CAUSAS_MORTE, TAXA_RACAO } from '../config.js';
+import { sugestaoRacao, vivosDoLote, indicadoresDespesca, avisoPesoMedio, avaliarAgua, ehTambaqui } from '../calc.js';
 
 const TIPOS = {
   racao: { rotulo: 'Ração', tabela: 'racao_consumo' },
@@ -14,6 +15,7 @@ const TIPOS = {
   mortalidade: { rotulo: 'Mortalidade', tabela: 'mortalidade' },
   despesca: { rotulo: 'Despesca', tabela: 'despescas', gerir: true }, // peso total da fazenda: só dono e gerente
   manejo: { rotulo: 'Manejo', tabela: 'manejos' },
+  agua: { rotulo: 'Água', tabela: 'qualidade_agua' },
 };
 
 const casas = (x) => (Number.isInteger(x) ? 0 : Number.isInteger(Math.round(x * 100) / 10) ? 1 : 2);
@@ -21,9 +23,9 @@ const kgTxt = (v) => fmtNum(Number(v), casas(Number(v)));
 
 const sacosTxt = (n) => `${fmtNum(n, casas(n))} ${n === 1 ? 'saco' : 'sacos'}`;
 
-const TITULO2 = { racao: 'Quantidade de ração', biometria: 'Pesagem dos peixes', mortalidade: 'Peixes mortos', despesca: 'Dados da despesca', manejo: 'Aplicação de probiótico' };
+const TITULO2 = { racao: 'Quantidade de ração', biometria: 'Pesagem dos peixes', mortalidade: 'Peixes mortos', despesca: 'Dados da despesca', manejo: 'Aplicação de probiótico', agua: 'Medição da água' };
 
-function camposDoTipo(tipo, kgSaco) {
+function camposDoTipo(tipo, kgSaco, verDinheiro = false) {
   if (tipo === 'racao') {
     return `<label>Quantos sacos de ração?
       <input id="qtd" class="grande" type="number" inputmode="decimal" step="0.5" min="0" placeholder="0" required></label>
@@ -51,6 +53,18 @@ function camposDoTipo(tipo, kgSaco) {
         <input id="amostra" type="number" inputmode="numeric" step="1" min="1" placeholder="Ex.: 10" required></label>
       <div class="calc resultado" id="pm">Peso médio: —</div>
       <p id="aviso-amostra" class="aviso" hidden>Poucos peixes pesados: com menos de 30 o peso médio fica pouco confiável.</p>`;
+  }
+  if (tipo === 'agua') {
+    return `<p class="calc" style="margin-top:0">Preencha só o que você mediu.</p>
+      <div class="agua-campos">
+        <label>Oxigênio (mg/L)<input id="ag-od" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 5,2"></label>
+        <label>Temperatura (°C)<input id="ag-temp" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 29"></label>
+        <label>pH<input id="ag-ph" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 6,5"></label>
+        <label>Amônia tóxica (mg/L)<input id="ag-am" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 0,1"></label>
+      </div>
+      <div class="calc resultado" id="ag-res" hidden></div>
+      <label>Observação <small class="mudo">(opcional)</small>
+        <input id="ag-obs" type="text" maxlength="200" autocomplete="off"></label>`;
   }
   if (tipo === 'manejo') {
     return `<div class="tiles compactos" id="man-via" role="radiogroup" aria-label="Como foi aplicado">
@@ -81,6 +95,12 @@ function camposDoTipo(tipo, kgSaco) {
         <input id="desp-bruto" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 9547" required></label>
       <label>Peso total líquido (kg) <small class="mudo">(opcional)</small>
         <input id="desp-liquido" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 9356"></label>
+      ${verDinheiro ? `<div class="man-dose desp-venda">
+        <label>Preço de venda (R$/kg) <small class="mudo">(opcional)</small>
+          <input id="desp-preco" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 9,50"></label>
+        <label>Comprador <small class="mudo">(opcional)</small>
+          <input id="desp-comprador" type="text" maxlength="80" autocomplete="off"></label>
+      </div>` : ''}
       <div class="calc resultado" id="desp-calc" hidden></div>`;
   }
   return `<label>Quantos peixes morreram?
@@ -131,7 +151,7 @@ export async function renderLancar(ctx, el, params = {}) {
       </section>
       <section class="passo tipo-${tipo}">
         <h2 class="passo-t"><i>2</i> ${TITULO2[tipo]}</h2>
-        ${camposDoTipo(tipo, kgSaco)}
+        ${camposDoTipo(tipo, kgSaco, ctx.verDinheiro && ctx.verDinheiro())}
         <div class="data-linha"><span>Data: <b id="data-txt">hoje</b></span><button type="button" class="link" id="b-data">Mudar</button></div>
         <label id="data-wrap" hidden>Data <input id="data" type="date" value="${hoje}" max="${hoje}" required></label>
       </section>
@@ -145,7 +165,7 @@ export async function renderLancar(ctx, el, params = {}) {
         <label id="causa-outra-wrap" hidden>Qual foi a causa? <input id="causa-outra" maxlength="60" placeholder="Ex.: queda de energia no aerador"></label>
       </section>` : ''}
       <p id="erro" class="erro" hidden></p>
-      <button class="btn primario grande" type="submit">Salvar ${TIPOS[tipo].rotulo.toLowerCase()}</button>
+      <button class="btn primario grande" type="submit">Salvar ${tipo === 'agua' ? 'medição' : TIPOS[tipo].rotulo.toLowerCase()}</button>
       ${navigator.onLine ? '' : '<p class="mudo" style="margin:0;text-align:center">Sem internet: será salvo no celular e enviado depois.</p>'}
     </form></div>
     <aside class="lc-painel" id="painel-tq" aria-label="Resumo do tanque escolhido"></aside></div>`;
@@ -157,6 +177,7 @@ export async function renderLancar(ctx, el, params = {}) {
     b.addEventListener('click', () => renderLancar(ctx, el, { tipo: b.dataset.tipo, tanque: el.querySelector('#tanque').value, de: tiposVisiveis.findIndex(([k]) => k === tipo) })));
 
   const f = el.querySelector('#f');
+  let rascunhoSalvo = false, timerRascunho = null;
   const selTanque = f.querySelector('#tanque');
   f.querySelectorAll('#tiles .tile').forEach((b) => b.addEventListener('click', () => {
     selTanque.value = b.dataset.tanque;
@@ -358,6 +379,23 @@ export async function renderLancar(ctx, el, params = {}) {
     }
   }
 
+  // água: mostra na hora o que está fora da faixa (só para tambaqui, a única espécie com faixa de fonte conhecida)
+  const AG_CAMPOS = [['#ag-od', 'oxigenio_mgl', 'oxigenio', 'Oxigênio'], ['#ag-temp', 'temperatura_c', 'temperatura', 'Temperatura'], ['#ag-ph', 'ph', 'ph', 'pH'], ['#ag-am', 'amonia_mgl', 'amonia', 'Amônia']];
+  const leituraAgua = () => Object.fromEntries(AG_CAMPOS.map(([s, k]) => { const t = f.querySelector(s).value.trim(); return [k, t ? numDecimal(t) : null]; }));
+  const temTambaqui = () => lotes.some((l) => l.tanque_id === selTanque.value && ehTambaqui(l.especie));
+  if (tipo === 'agua') {
+    const res = f.querySelector('#ag-res');
+    const pintar = () => {
+      const m = leituraAgua();
+      if (!temTambaqui() || Object.values(m).every((v) => v == null || !Number.isFinite(v))) { res.hidden = true; return; }
+      const fora = avaliarAgua(m);
+      res.textContent = fora.length ? fora.map((x) => x.texto[0].toUpperCase() + x.texto.slice(1)).join('\n') : 'Dentro da faixa do tambaqui.';
+      res.hidden = false;
+    };
+    AG_CAMPOS.forEach(([s]) => f.querySelector(s).addEventListener('input', pintar));
+    selTanque.addEventListener('change', pintar);
+  }
+
   // manejo: na ração ou na água; o último produto já vem preenchido
   let manVia = 'racao';
   if (tipo === 'manejo') {
@@ -388,6 +426,8 @@ export async function renderLancar(ctx, el, params = {}) {
       const L = [`Peso médio bruto: ${pesoMedioTxt(i.medioBrutoKg)} por peixe`];
       if (i.medioLiquidoKg != null) L.push(`Peso médio líquido: ${pesoMedioTxt(i.medioLiquidoKg)} por peixe`, `Diferença: ${fmtNum(i.difKg, 0)} kg (${fmtNum(i.difPct, 1)}% do bruto)`);
       if (i.peixesHa != null) L.push(`${fmtInt(i.peixesHa)} peixes por hectare`);
+      const prTxt = (f.querySelector('#desp-preco') || { value: '' }).value.trim(), pr = prTxt ? numDecimal(prTxt) : null;
+      if (pr > 0) L.push(`Receita: ${fmtBRL(b * pr)} (sobre o peso bruto)`);
       box.textContent = L.join('\n'); box.hidden = false;
     };
     f.querySelectorAll('#desp-tipo .tile').forEach((b) => b.addEventListener('click', () => {
@@ -395,7 +435,7 @@ export async function renderLancar(ctx, el, params = {}) {
       f.querySelectorAll('#desp-tipo .tile').forEach((x) => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', String(on)); });
       pintarDica();
     }));
-    ['#desp-qtd', '#desp-bruto', '#desp-liquido'].forEach((s) => f.querySelector(s).addEventListener('input', contas));
+    ['#desp-qtd', '#desp-bruto', '#desp-liquido', '#desp-preco'].forEach((s) => { const c = f.querySelector(s); if (c) c.addEventListener('input', contas); });
     selTanque.addEventListener('change', contas);
     pintarDica();
   }
@@ -453,6 +493,7 @@ export async function renderLancar(ctx, el, params = {}) {
   // Ração: mesmo tanque e dia com a mesma quantidade, ou qualquer um nos últimos 30 minutos.
   // Mortalidade: mesmo lote, dia e quantidade. Biometria: mesmo lote e dia.
   async function acharParecido(tp, pl) {
+    if (tp === 'agua') return null; // medir de manhã e à tarde no mesmo dia é normal
     try {
       const tab = TIPOS[tp].tabela;
       const locais = (await db.filaList()).filter((i) => i.tabela === tab && i.payload.data === pl.data && (tp === 'racao' ? i.payload.tanque_id === pl.tanque_id : i.payload.lote_id === pl.lote_id));
@@ -544,7 +585,13 @@ export async function renderLancar(ctx, el, params = {}) {
         dadosRapidos(),
       ]);
       if (!despescaLigada) return mostrarErro('A despesca ainda não foi ativada neste sistema (falta rodar o sql/20 no Supabase).');
-      payload = { ...base, tipo: despTipo, quantidade: q, peso_bruto_kg: b, peso_liquido_kg: lq };
+      // preço e comprador: só o dono vê e informa (valores em R$ só para o dono, sql/23 e sql/27)
+      const precoTxt = (f.querySelector('#desp-preco') || { value: '' }).value.trim(), preco = precoTxt ? numDecimal(precoTxt) : null;
+      if (precoTxt.includes('.') && precoTxt.includes(',')) return mostrarErro('Digite o preço sem ponto de milhar. Ex.: 9,50');
+      if (precoTxt && !(preco > 0 && preco <= 1000)) return mostrarErro('Confira o preço de venda por kg (até R$ 1.000), ou deixe em branco.');
+      const comprador = (f.querySelector('#desp-comprador') || { value: '' }).value.trim();
+      if ((precoTxt || comprador) && navigator.onLine && !(await Promise.race([ctx.api.vendaAtiva().catch(() => true), new Promise((r) => setTimeout(() => r(true), 2500))]))) return mostrarErro('A venda na despesca ainda não foi ativada neste sistema (falta rodar o sql/27 no Supabase). Deixe preço e comprador em branco para salvar só a despesca.');
+      payload = { ...base, tipo: despTipo, quantidade: q, peso_bruto_kg: b, peso_liquido_kg: lq, ...(preco || comprador ? { _venda: { preco_kg: preco || null, comprador: comprador || null } } : {}) };
       if (!(await pesoConferido(lote_id, q, b, data, dados))) return;
       // confere com o que o app estimava (só com internet); nunca bloqueia, porque a contagem da despesca é a real
       const vivos = dados && lote ? vivosDoLote(lote, dados.res[lote.id]) : null;
@@ -554,6 +601,20 @@ export async function renderLancar(ctx, el, params = {}) {
         const texto = despTipo === 'total' ? `Serão registrados ${plural(q, 'peixe', 'peixes')} e o lote será encerrado.${conta}` : `Você informou ${plural(q, 'peixe', 'peixes')}, mais do que o estimado.${conta}`;
         if (!(await confirmar({ titulo: despTipo === 'total' ? 'Encerrar o lote com esta despesca?' : 'Conferir a quantidade', texto, ok: despTipo === 'total' ? 'Registrar e encerrar' : 'Registrar assim', cancelar: 'Voltar' }))) return;
       }
+    } else if (tipo === 'agua') {
+      const m = {};
+      for (const [s, k, lim, nome] of AG_CAMPOS) {
+        const t = f.querySelector(s).value.trim();
+        if (!t) { m[k] = null; continue; }
+        const v = numDecimal(t), [a, b] = AGUA_LIMITES[lim];
+        if (!Number.isFinite(v) || v < a || v > b) return mostrarErro(`${nome}: confira o valor (de ${a} a ${b}).`);
+        m[k] = v;
+      }
+      if (Object.values(m).every((v) => v == null)) return mostrarErro('Preencha pelo menos uma medição.');
+      if (navigator.onLine && !(await Promise.race([ctx.api.aguaAtiva().catch(() => true), new Promise((r) => setTimeout(() => r(true), 2500))]))) return mostrarErro('A qualidade da água ainda não foi ativada neste sistema (falta rodar o sql/26 no Supabase).');
+      const { lote_id: _semLote, ...semLote } = base;
+      const agora = new Date();
+      payload = { ...semLote, tanque_id: selTanque.value, ...m, hora: data === hoje ? `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}` : null, obs: f.querySelector('#ag-obs').value.trim() || null };
     } else if (tipo === 'manejo') {
       const produto = f.querySelector('#man-produto').value.trim(), doseTxt = f.querySelector('#man-dose').value.trim(), dose = numDecimal(doseTxt);
       const obs = f.querySelector('#man-obs').value.trim();
@@ -608,11 +669,13 @@ export async function renderLancar(ctx, el, params = {}) {
     if (tipo === 'racao') {
       try { const m = (await db.kvGet('ultimaRacao')) || {}; m[selTanque.value] = payload.quantidade_kg; await db.kvSet('ultimaRacao', m); } catch { /* opcional */ }
     }
+    rascunhoSalvo = true; clearTimeout(timerRascunho); await rascunho.apagar(state.perfil.id, tipo);
     await ctx.atualizarPendentes();
     ctx.sincronizarAgora(); // em segundo plano; não trava a tela
     const nomeTanque = (tanques.find((t) => t.id === selTanque.value) || {}).nome || '';
     const resumo = tipo === 'racao' ? `${sacosTxt(num(f.querySelector('#qtd').value))} de ração (${kgTxt(payload.quantidade_kg)} kg)`
       : tipo === 'biometria' ? `${pesoMedioTxt(payload.peso_amostra_kg / payload.quantidade_amostrada)} de peso médio (${fmtInt(payload.quantidade_amostrada)} peixes pesados)`
+      : tipo === 'agua' ? [payload.oxigenio_mgl != null && `O₂ ${fmtNum(payload.oxigenio_mgl, 1)} mg/L`, payload.temperatura_c != null && `${fmtNum(payload.temperatura_c, 1)} °C`, payload.ph != null && `pH ${fmtNum(payload.ph, 1)}`, payload.amonia_mgl != null && `amônia ${fmtNum(payload.amonia_mgl, 2)} mg/L`].filter(Boolean).join(' · ')
       : tipo === 'manejo' ? `${payload.produto}: ${String(payload.dose).replace('.', ',')} ${payload.unidade} ${payload.via === 'agua' ? 'na água' : 'na ração'}`
       : tipo === 'despesca' ? `despesca ${payload.tipo}: ${plural(payload.quantidade, 'peixe', 'peixes')}, ${fmtNum(payload.peso_bruto_kg, 0)} kg bruto`
       : `${plural(payload.quantidade, 'peixe morto', 'peixes mortos')}`;
@@ -629,8 +692,9 @@ export async function renderLancar(ctx, el, params = {}) {
     f.outerHTML = `
       <div class="sucesso card" role="status">
         <div class="sucesso-ic">${icone('check', 34)}</div>
-        <h2>${tipo === 'manejo' ? 'Probiótico salvo' : `${TIPOS[tipo].rotulo} salva`}</h2>
+        <h2>${tipo === 'manejo' ? 'Probiótico salvo' : tipo === 'agua' ? 'Medição salva' : `${TIPOS[tipo].rotulo} salva`}</h2>
         <p class="sucesso-res"><b>${esc(nomeTanque)}</b> · ${esc(resumo)}</p>
+        ${tipo === 'agua' && temTambaqui() && avaliarAgua(payload).length ? `<p class="aviso">${avaliarAgua(payload).map((x) => esc(x.texto[0].toUpperCase() + x.texto.slice(1))).join('<br>')}</p>` : ''}
         ${navigator.onLine ? '' : '<p class="mudo nota">Sem internet: guardado no celular. Será enviado sozinho quando a internet voltar.</p>'}
         <div class="sucesso-acoes">
           ${proximo ? `<button type="button" class="btn primario grande" id="b-proximo">Próximo: ${esc(proximo.nome)}</button>` : `<button type="button" class="btn primario grande" id="b-outro">Lançar em outro tanque</button>`}
@@ -641,6 +705,31 @@ export async function renderLancar(ctx, el, params = {}) {
     const bp = el.querySelector('#b-proximo');
     if (bp) bp.addEventListener('click', () => renderLancar(ctx, el, { tipo, tanque: proximo.id }));
   };
+  // ---- rascunho: o que foi digitado fica no aparelho até salvar (sair da tela não perde) ----
+  const guardarRascunho = () => { if (!rascunhoSalvo && f.isConnected) rascunho.guardar(state.perfil.id, tipo, rascunho.capturar(f)); };
+  const agendarRascunho = () => { clearTimeout(timerRascunho); timerRascunho = setTimeout(guardarRascunho, 300); };
+  f.addEventListener('input', agendarRascunho);
+  f.addEventListener('change', agendarRascunho);
+  f.addEventListener('click', (ev) => { if (ev.target.closest('#man-via, #desp-tipo, #causas')) agendarRascunho(); });
+  // celular apagando a tela ou trocando de app: guarda na hora
+  const aoEsconder = () => { if (!f.isConnected) { document.removeEventListener('visibilitychange', aoEsconder); return; } if (document.visibilityState === 'hidden') { clearTimeout(timerRascunho); guardarRascunho(); } };
+  document.addEventListener('visibilitychange', aoEsconder);
+  const salvoAntes = await rascunho.ler(state.perfil.id, tipo);
+  if (salvoAntes && (!params.tanque || params.tanque === salvoAntes.tanque) && f.isConnected) {
+    if (salvoAntes.tanque !== selTanque.value && tanques.some((t) => t.id === salvoAntes.tanque)) {
+      const tile = f.querySelector(`#tiles .tile[data-tanque="${CSS.escape(salvoAntes.tanque)}"]`);
+      if (tile) tile.click();
+    }
+    rascunho.aplicarCampos(f, salvoAntes);
+    const quando = rascunho.diaDe(salvoAntes.em) === rascunho.diaDe(Date.now()) ? `das ${rascunho.horaDe(salvoAntes.em)}` : `de ${rascunho.diaDe(salvoAntes.em)} às ${rascunho.horaDe(salvoAntes.em)}`;
+    f.insertAdjacentHTML('afterbegin', `<div class="aviso rascunho-aviso" id="rascunho-aviso" role="status"><span>Rascunho ${quando} recuperado. Confira antes de salvar.</span> <button type="button" class="link" id="b-limpar-rascunho">Limpar</button></div>`);
+    f.querySelector('#b-limpar-rascunho').addEventListener('click', async () => {
+      rascunhoSalvo = true; clearTimeout(timerRascunho);
+      await rascunho.apagar(state.perfil.id, tipo);
+      renderLancar(ctx, el, { tipo, tanque: selTanque.value });
+    });
+  }
+
   // toque duplo: enquanto um salvamento está em andamento, o segundo é ignorado
   let salvando = false;
   f.addEventListener('submit', async (ev) => {

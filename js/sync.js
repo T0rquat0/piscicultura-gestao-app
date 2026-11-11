@@ -36,7 +36,7 @@ export async function anotarNoResumo(tabela, p) {
 }
 import { ehErroDeRede, ehErroDeSessao, traduzErro } from './util.js';
 
-const TABELAS = new Set(['biometrias', 'mortalidade', 'racao_consumo', 'despescas', 'manejos']);
+const TABELAS = new Set(['biometrias', 'mortalidade', 'racao_consumo', 'despescas', 'manejos', 'qualidade_agua']);
 let rodando = false;
 
 export async function sincronizar(client, userId) {
@@ -58,7 +58,9 @@ export async function sincronizar(client, userId) {
         }
         let error = null, status = 0;
         try {
-          ({ error, status } = await client.from(it.tabela).insert(it.payload));
+          // a venda da despesca (preço/comprador, só do dono) viaja junto na fila, mas vai para outra tabela (sql/27)
+          const { _venda, ...registro } = it.payload;
+          ({ error, status } = await client.from(it.tabela).insert(registro));
           // banco ainda sem a coluna "causa" (sql/08 não rodado): salva sem ela em vez de travar a fila
           if (error && it.payload.causa !== undefined && /causa/i.test(error.message || '')) {
             const { causa, ...semCausa } = it.payload;
@@ -66,6 +68,24 @@ export async function sincronizar(client, userId) {
           }
         } catch (e) {
           error = { message: String((e && e.message) || e), code: '' };
+        }
+        if ((!error || error.code === '23505') && it.payload._venda) {
+          // a despesca já está no banco; agora a venda (de novo, se for repetição: a gravação substitui)
+          const v = it.payload._venda;
+          let ev = null, sv = 0;
+          try {
+            ({ error: ev, status: sv } = await client.from('despesca_vendas')
+              .upsert({ despesca_uuid: it.payload.uuid_local, preco_kg: v.preco_kg ?? null, comprador: v.comprador || null }, { onConflict: 'despesca_uuid' }));
+          } catch (e) { ev = { message: String((e && e.message) || e), code: '' }; }
+          if (ev) {
+            if (!error) await anotarNoResumo(it.tabela, it.payload); // a despesca entrou: o resumo já conta
+            if (ehErroDeRede(ev) || sv >= 500 || sv === 408 || sv === 429) { r.semRede = true; return r; }
+            if (ehErroDeSessao(ev)) { r.sessaoExpirada = true; return r; }
+            it.status = 'erro'; it.erro = 'A despesca foi enviada, mas o preço de venda não foi gravado: ' + traduzErro(ev);
+            it.tentativas = (it.tentativas || 0) + 1;
+            await filaPut(it); r.falhas++;
+            continue;
+          }
         }
         if (!error || error.code === '23505') {
           if (!error) await anotarNoResumo(it.tabela, it.payload); // 23505 = já tinha ido antes: não soma de novo

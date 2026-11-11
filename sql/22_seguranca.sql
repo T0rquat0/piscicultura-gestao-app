@@ -99,6 +99,15 @@ grant execute on function ver_convite(text) to anon;
 
 -- 8) Teste grátis: o app pede 30 dias, mas quem chamasse a função direto pela API podia pedir até 90.
 --    Agora o banco limita a 30 (o administrador estende no painel, se quiser).
+--    Desde o sql/29 e o sql/30 o cadastro exige CPF/CNPJ e não aceita mais pedido de dias: se este arquivo
+--    for rodado de novo depois deles, NÃO recria a versão antiga (senão o cadastro sem CPF voltaria a existir).
+do $bloco$
+begin
+  if exists (select 1 from pg_proc where proname = 'criar_fazenda' and pronamespace = 'public'::regnamespace
+             and 'p_documento' = any (coalesce(proargnames, '{}'))) then
+    return;
+  end if;
+  execute $f$
 create or replace function criar_fazenda(p_fazenda text, p_nome text, p_teste_dias integer default 30)
 returns uuid language plpgsql security definer set search_path = public as $$
 declare v_id uuid;
@@ -115,5 +124,7 @@ begin
   insert into usuarios (id, fazenda_id, nome, papel) values (auth.uid(), v_id, p_nome, 'dono');
   return v_id;
 end $$;
-revoke execute on function criar_fazenda(text, text, integer) from public, anon;
-grant execute on function criar_fazenda(text, text, integer) to authenticated;
+$f$;
+  execute 'revoke execute on function criar_fazenda(text, text, integer) from public, anon';
+  execute 'grant execute on function criar_fazenda(text, text, integer) to authenticated';
+end $bloco$;

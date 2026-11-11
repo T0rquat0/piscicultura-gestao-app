@@ -2,27 +2,33 @@
 // Só aparece para quem está na tabela administradores; o banco confere de novo em cada ação.
 import { confirmar, formulario } from '../dialogo.js';
 import { icone } from '../icons.js';
-import { esc, fmtData, fmtBRL, fmtInt, num, plural } from '../util.js';
+import { esc, fmtData, fmtBRL, fmtInt, fmtNum, num, numDecimal, plural, hojeISO } from '../util.js';
+import { resumoPeriodo, acertoSocios, situacaoCliente, receitaMensal, limitesMes, documentoValido, fmtDocumento } from '../financeiro.js';
 
 const ESTADO = {
   teste: ['Em teste', 'ok'], teste_acabou: ['Teste acabou', 'erro'], ativo: ['Pagante', 'ok'],
   carencia: ['Em carência', 'alerta'], vencido: ['Vencido', 'erro'], livre: ['Sem limite', ''],
 };
-const FILTROS = [['todas', 'Todas'], ['teste', 'Em teste'], ['ativo', 'Pagantes'], ['atencao', 'Vencidas'], ['bloqueada', 'Bloqueadas']];
+const FILTROS = [['todas', 'Todas'], ['teste', 'Em teste'], ['ativo', 'Pagantes'], ['atencao', 'Vencidas'], ['livre', 'Sem limite'], ['bloqueada', 'Bloqueadas']];
+const TIPO_LANC = { receita: 'Receita', despesa: 'Despesa', retirada: 'Retirada' };
+const CATEGORIAS_SISTEMA = [['', 'Sem categoria'], ['servidor', 'Servidor / banco de dados'], ['dominio', 'Domínio / site'], ['impostos', 'Impostos'], ['marketing', 'Divulgação'], ['implantacao', 'Implantação / treinamento'], ['outros', 'Outros']];
+const ROT_CAT = Object.fromEntries(CATEGORIAS_SISTEMA);
 
 function situacao(f) {
   if (f.bloqueada) return { rotulo: 'Bloqueada', classe: 'erro', grupo: 'bloqueada' };
   const p = f.plano || {}; const [rotulo, classe] = ESTADO[p.estado] || ['—', ''];
-  const grupo = p.estado === 'teste' ? 'teste' : p.estado === 'ativo' ? 'ativo' : ['carencia', 'vencido', 'teste_acabou'].includes(p.estado) ? 'atencao' : 'outra';
+  const grupo = p.estado === 'teste' ? 'teste' : p.estado === 'ativo' ? 'ativo' : ['carencia', 'vencido', 'teste_acabou'].includes(p.estado) ? 'atencao' : p.estado === 'livre' ? 'livre' : 'outra';
   return { rotulo, classe, grupo };
 }
 
 export async function renderAdmin(ctx, el, aba = 'fazendas', estado = { filtro: 'todas', busca: '' }) {
+  if (!estado.mes) estado.mes = hojeISO().slice(0, 7);
   if (!ctx.state.admin) { el.innerHTML = '<div class="card vazio">Somente administradores do sistema.</div>'; return; }
   el.innerHTML = `<h1>Administração</h1><p class="carregando">Carregando…</p>`;
   if (!navigator.onLine) { el.innerHTML = `<h1>Administração</h1><div class="card vazio">Precisa de internet.</div>`; return; }
-  const [fazendas, cobrancas, pacotes, config] = await Promise.all([
+  const [fazendas, cobrancas, pacotes, config, fin] = await Promise.all([
     ctx.api.adminFazendas(), ctx.api.adminCobrancas(), ctx.api.adminPacotes(), ctx.api.adminConfig(),
+    aba === 'financeiro' ? ctx.api.adminFinanceiro() : Promise.resolve(undefined),
   ]);
   const pendentes = cobrancas.filter((c) => c.status === 'pendente');
   const conta = (g) => fazendas.filter((f) => situacao(f).grupo === g).length;
@@ -35,23 +41,26 @@ export async function renderAdmin(ctx, el, aba = 'fazendas', estado = { filtro: 
         <div class="kpi"><span>Pagantes</span><b>${conta('ativo')}</b></div>
         <div class="kpi"><span>Vencidas / bloqueadas</span><b>${conta('atencao') + conta('bloqueada')}</b></div>
       </div>
-      <label class="adm-busca">Procurar <input id="adm-busca" type="search" placeholder="Fazenda, dono ou e-mail" value="${esc(estado.busca)}"></label>
+      <label class="adm-busca">Procurar <input id="adm-busca" type="search" placeholder="Fazenda, dono, e-mail ou CPF/CNPJ" value="${esc(estado.busca)}"></label>
       <div class="adm-filtros">${FILTROS.map(([k, r]) => `<button type="button" class="chip${estado.filtro === k ? ' on' : ''}" data-filtro="${k}">${r}</button>`).join('')}</div>
       <div id="adm-lista">${listaFazendas()}</div>`;
   const listaFazendas = () => {
     const termo = estado.busca.trim().toLowerCase();
     const lista = fazendas.filter((f) => (estado.filtro === 'todas' || situacao(f).grupo === estado.filtro)
-      && (!termo || [f.nome, f.dono_nome, f.dono_email].some((x) => String(x || '').toLowerCase().includes(termo))));
+      && (!termo || [f.nome, f.dono_nome, f.dono_email].some((x) => String(x || '').toLowerCase().includes(termo))
+        || (termo.replace(/\D/g, '').length >= 3 && String(f.documento || '').includes(termo.replace(/\D/g, '')))));
     return `${lista.length ? lista.map((f) => {
         const s = situacao(f), p = f.plano || {};
         const validade = f.bloqueada ? '' : p.valido_ate ? ` até ${fmtData(p.valido_ate)}` : '';
         return `<article class="card adm-faz" data-faz="${esc(f.id)}">
           <header><b>${esc(f.nome)}</b><span class="tag ${s.classe}">${esc(s.rotulo)}${esc(validade)}</span></header>
           <small>${esc(f.dono_nome || 'sem dono')}${f.dono_email ? ` · ${esc(f.dono_email)}` : ''}</small>
+          <small>CPF/CNPJ: ${f.documento ? esc(fmtDocumento(f.documento)) : '<b>não informado</b>'}</small>
           <small>Entrou em ${fmtData(f.criado_em)} · ${plural(f.pessoas, 'pessoa', 'pessoas')} · ${plural(f.tanques, 'tanque', 'tanques')}, ${fmtInt(p.em_uso || 0)} em uso${p.limite ? ` de ${p.limite}` : ''}</small>
           <small>Último lançamento de ração: ${f.ultimo_lancamento ? fmtData(f.ultimo_lancamento) : 'nenhum'}</small>
           <div class="acoes">
-            <button class="btn mini" data-estender="${esc(f.id)}" type="button">Estender teste</button>
+            <button class="btn mini" data-estender="${esc(f.id)}" type="button">${p.estado === 'livre' ? 'Dar prazo de teste' : 'Estender teste'}</button>
+            <button class="btn mini" data-documento="${esc(f.id)}" type="button">${f.documento ? 'Corrigir CPF/CNPJ' : 'Informar CPF/CNPJ'}</button>
             ${f.bloqueada ? `<button class="btn mini" data-liberar="${esc(f.id)}" type="button">Liberar</button>`
               : `<button class="btn mini perigo" data-bloquear="${esc(f.id)}" type="button">Bloquear</button>`}
             <button class="btn mini" data-desconectar-dono="${esc(f.id)}" type="button">Desconectar celular do dono</button>
@@ -85,15 +94,66 @@ export async function renderAdmin(ctx, el, aba = 'fazendas', estado = { filtro: 
       <div class="acoes"><button class="btn" id="b-novo-pacote" type="button">Novo pacote</button></div></div>
     <p class="mudo nota">Pacote inativo não aparece para os donos, mas quem já tem continua com ele.</p>`;
 
+  const abaFinanceiro = () => {
+    if (fin === null) return '<div class="card vazio">O financeiro precisa do <b>sql/31</b> rodado no banco.</div>';
+    const { ini, fim } = limitesMes(estado.mes);
+    const mes = resumoPeriodo({ lancamentos: fin.lancamentos, recebimentos: fin.recebimentos, ini, fim });
+    const ac = acertoSocios({ lancamentos: fin.lancamentos, recebimentos: fin.recebimentos, socios: fin.socios });
+    const nomeSocio = (id) => (fin.socios.find((x) => x.id === id) || {}).nome || '';
+    const doMes = [
+      ...fin.recebimentos.filter((r) => r.data >= ini && r.data <= fim).map((r) => ({ ...r, tipo: 'cobranca' })),
+      ...fin.lancamentos.filter((l) => l.data >= ini && l.data <= fim),
+    ].sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : 0));
+    const linhaLanc = (l) => {
+      if (l.tipo === 'cobranca') return `<li><div class="esq"><b>Mensalidade · ${esc(l.fazenda)}</b><small>${fmtData(l.data)} · ${plural(l.meses, 'mês', 'meses')} de ${fmtBRL(l.mensal)}</small></div><b class="fin-mais">+ ${fmtBRL(l.valor)}</b></li>`;
+      const sinal = l.tipo === 'receita' ? '+' : '−';
+      const quem = l.tipo === 'despesa' ? (l.socio_id ? ` · paga por ${esc(nomeSocio(l.socio_id))}` : ' · paga pelo caixa') : l.tipo === 'retirada' ? ` · ${esc(nomeSocio(l.socio_id))}` : l.fazenda ? ` · ${esc(l.fazenda)}` : '';
+      return `<li><div class="esq"><b>${TIPO_LANC[l.tipo]}${l.categoria ? ` · ${esc(ROT_CAT[l.categoria] || l.categoria)}` : ''}</b>
+        <small>${fmtData(l.data)}${quem}${l.descricao ? ` · ${esc(l.descricao)}` : ''}</small></div>
+        <b class="${l.tipo === 'receita' ? 'fin-mais' : 'fin-menos'}">${sinal} ${fmtBRL(l.valor)}</b>
+        <button class="btn mini" data-lanc="${esc(l.id)}" type="button">Abrir</button></li>`;
+    };
+    const hoje = fin.hoje || hojeISO();
+    return `
+      ${fin.modo_piloto ? `<div class="card adm-piloto ligado"><b>Modo piloto LIGADO</b><small>Quem contrata um pacote usa 12 meses de graça. Desligue na aba Pacotes antes do primeiro cliente pagante.</small></div>` : ''}
+      ${fin.sem_limite ? `<div class="card adm-piloto ligado"><b>${plural(fin.sem_limite, 'fazenda sem limite nenhum', 'fazendas sem limite nenhum')}</b><small>Fazendas antigas, de antes do teste grátis: usam quantos tanques quiserem sem pagar. Veja em Fazendas > Sem limite e use "Dar prazo de teste" para começar a cobrar.</small></div>` : ''}
+      <label class="adm-busca">Mês <input id="fin-mes" type="month" value="${esc(estado.mes)}" max="${esc(hoje.slice(0, 7))}"></label>
+      <div class="kpis adm-kpis">
+        <div class="kpi"><span>Entrou no mês</span><b>${fmtBRL(mes.receitas)}</b></div>
+        <div class="kpi"><span>Despesas no mês</span><b>${fmtBRL(mes.despesas)}</b></div>
+        <div class="kpi"><span>Resultado do mês</span><b class="${mes.resultado < 0 ? 'fin-menos' : ''}">${fmtBRL(mes.resultado)}</b></div>
+        <div class="kpi"><span>Mensalidades em dia</span><b>${fmtBRL(receitaMensal(fin.clientes, hoje))}</b></div>
+      </div>
+      ${Number(fin.pendentes) > 0 ? `<p class="mudo nota">Cobranças pendentes, ainda não pagas: <b>${fmtBRL(fin.pendentes)}</b> (aba Cobranças).</p>` : ''}
+
+      <h2>Acerto entre sócios <small class="mudo">desde o começo</small></h2>
+      <div class="card"><ul class="lista">${ac.socios.map((x) => `
+        <li><div class="esq"><b>${esc(x.nome)} · ${fmtNum(x.percentual, x.percentual % 1 ? 2 : 0)}%${x.ativo ? '' : ' (inativo)'}</b>
+          <small>Parte do resultado ${fmtBRL(x.parte)} · pagou do bolso ${fmtBRL(x.pagou)} · já retirou ${fmtBRL(x.retirou)}</small>
+          <small>${x.saldo >= 0 ? 'Tem a receber' : 'Retirou a mais'}: <b class="${x.saldo < 0 ? 'fin-menos' : ''}">${fmtBRL(Math.abs(x.saldo))}</b></small></div></li>`).join('')}
+        <li><div class="esq"><b>Caixa: ${fmtBRL(ac.caixa)}</b><small>O que deveria estar guardado: entradas − despesas pagas pelo caixa − retiradas</small></div></li></ul>
+        <div class="acoes"><button class="btn mini" id="b-socios" type="button">Sócios e divisão</button></div></div>
+
+      <h2>Clientes pagantes <span class="contagem">${fin.clientes.length}</span></h2>
+      ${fin.clientes.length ? `<div class="card"><ul class="lista">${fin.clientes.map((c) => { const st = c.bloqueada ? { rotulo: 'Bloqueada', classe: 'erro' } : situacaoCliente(c.pago_ate, hoje); return `
+        <li><div class="esq"><b>${esc(c.fazenda)}</b><small>${c.documento ? `${esc(fmtDocumento(c.documento))} · ` : ''}${fmtBRL(c.mensal)} por mês · ${fmtInt(c.tanques)} tanques · pago até ${fmtData(c.pago_ate)}</small></div>
+        <span class="tag ${st.classe}">${esc(st.rotulo)}</span></li>`; }).join('')}</ul></div>` : '<div class="card vazio">Nenhum cliente pagou ainda (as liberações do modo piloto não contam).</div>'}
+
+      <h2>Movimento do mês</h2>
+      <div class="card">${doMes.length ? `<ul class="lista">${doMes.map(linhaLanc).join('')}</ul>` : '<p class="mudo" style="margin:0">Nada neste mês.</p>'}
+        <div class="acoes"><button class="btn primario" id="b-novo-lanc" type="button">Novo lançamento</button></div></div>
+      <p class="mudo nota">Mensalidades entram sozinhas quando a cobrança é marcada como paga. Lance aqui o resto: despesas do sistema (diga quem pagou), retiradas de cada sócio e receitas fora do app.</p>`;
+  };
+
   el.innerHTML = `
-    
     <h1>Administração</h1>
-    <div class="seg" style="--n:3" role="tablist">
+    <div class="seg" style="--n:4" role="tablist">
       <button type="button" data-aba="fazendas" class="${aba === 'fazendas' ? 'on' : ''}">Fazendas</button>
       <button type="button" data-aba="cobrancas" class="${aba === 'cobrancas' ? 'on' : ''}">Cobranças${pendentes.length ? ` (${pendentes.length})` : ''}</button>
       <button type="button" data-aba="pacotes" class="${aba === 'pacotes' ? 'on' : ''}">Pacotes</button>
+      <button type="button" data-aba="financeiro" class="${aba === 'financeiro' ? 'on' : ''}">Financeiro</button>
     </div>
-    <div id="adm-corpo">${aba === 'cobrancas' ? abaCobrancas() : aba === 'pacotes' ? abaPacotes() : abaFazendas()}</div>`;
+    <div id="adm-corpo">${aba === 'cobrancas' ? abaCobrancas() : aba === 'pacotes' ? abaPacotes() : aba === 'financeiro' ? abaFinanceiro() : abaFazendas()}</div>`;
 
   el.querySelectorAll('[data-aba]').forEach((b) => b.addEventListener('click', () => recarregar(b.dataset.aba)));
   const acao = async (fn, msg) => { try { const r = await fn(); ctx.toast(typeof msg === 'function' ? msg(r) : msg, 'ok'); recarregar(); } catch (e) { ctx.toast(e.message, 'erro'); } };
@@ -119,6 +179,15 @@ export async function renderAdmin(ctx, el, aba = 'fazendas', estado = { filtro: 
         ok: 'Estender',
       });
       if (v) acao(() => ctx.api.adminEstenderTeste(f.id, num(v.dias)), (ate) => `Teste estendido até ${fmtData(ate)}`);
+    }));
+    el.querySelectorAll('[data-documento]').forEach((b) => b.addEventListener('click', async () => {
+      const f = fazPor(b.dataset.documento);
+      const v = await formulario({
+        titulo: `CPF/CNPJ: ${f.nome}`, texto: 'Do dono ou da fazenda. Este número passa a contar como teste grátis já usado.',
+        campos: [{ nome: 'doc', rotulo: 'CPF ou CNPJ', tipo: 'text', valor: f.documento ? fmtDocumento(f.documento) : '', inputmode: 'numeric', maxlength: '18' }],
+        validar: (x) => (documentoValido(x.doc) ? null : 'CPF ou CNPJ inválido. Confira os números.'),
+      });
+      if (v) acao(() => ctx.api.adminDefinirDocumento(f.id, v.doc.replace(/\D/g, '')), 'CPF/CNPJ salvo');
     }));
     el.querySelectorAll('[data-bloquear]').forEach((b) => b.addEventListener('click', async () => {
       const f = fazPor(b.dataset.bloquear);
@@ -176,4 +245,74 @@ export async function renderAdmin(ctx, el, aba = 'fazendas', estado = { filtro: 
   };
   el.querySelectorAll('[data-pacote]').forEach((b) => b.addEventListener('click', () => editarPacote(pacotes.find((p) => p.tanques_max === Number(b.dataset.pacote)))));
   const bn = el.querySelector('#b-novo-pacote'); if (bn) bn.addEventListener('click', () => editarPacote(null));
+
+  // ---- financeiro ----
+  if (aba !== 'financeiro' || !fin) return;
+  const mesIn = el.querySelector('#fin-mes');
+  mesIn.addEventListener('change', () => { if (/^\d{4}-\d{2}$/.test(mesIn.value)) { estado.mes = mesIn.value; recarregar(); } });
+  let salvando = false;
+  const editarLanc = async (l) => {
+    const novo = !l; const hoje = fin.hoje || hojeISO();
+    const socios = fin.socios.filter((x) => x.ativo || (l && l.socio_id === x.id));
+    const v = await formulario({
+      titulo: novo ? 'Novo lançamento' : `Editar ${TIPO_LANC[l.tipo].toLowerCase()}`,
+      campos: [
+        { nome: 'tipo', rotulo: 'O que é?', tipo: 'select', valor: novo ? 'despesa' : l.tipo, opcoes: [['despesa', 'Despesa do sistema'], ['retirada', 'Retirada de sócio'], ['receita', 'Receita fora do app']] },
+        { nome: 'data', rotulo: 'Data', tipo: 'date', valor: novo ? hoje : l.data, max: hoje },
+        { nome: 'valor', rotulo: 'Valor (R$)', tipo: 'text', valor: novo ? '' : String(l.valor).replace('.', ','), inputmode: 'decimal', maxlength: '14' },
+        { nome: 'socio', rotulo: 'Quem pagou / quem retirou', tipo: 'select', valor: novo ? '' : l.socio_id || '', opcoes: [['', 'O caixa (ou ninguém, na receita)'], ...socios.map((x) => [x.id, x.nome])] },
+        { nome: 'categoria', rotulo: 'Categoria', tipo: 'select', valor: novo ? '' : l.categoria || '', opcoes: CATEGORIAS_SISTEMA },
+        { nome: 'fazenda', rotulo: 'Cliente (só na receita)', tipo: 'select', valor: novo ? '' : l.fazenda_id || '', opcoes: [['', 'Nenhum'], ...fazendas.map((f) => [f.id, f.nome])] },
+        { nome: 'descricao', rotulo: 'Descrição', tipo: 'text', valor: novo ? '' : l.descricao || '', maxlength: '200' },
+      ],
+      validar: (x) => {
+        const n = numDecimal(String(x.valor).trim());
+        if (!(n > 0) || n >= 10000000) return 'Confira o valor, sem ponto de milhar. Ex.: 1250,50';
+        if (!x.data || x.data > hoje) return 'A data não pode ser no futuro.';
+        if (x.tipo === 'retirada' && !x.socio) return 'Diga qual sócio retirou.';
+        return null;
+      },
+    });
+    if (!v || salvando) return;
+    salvando = true;
+    const dados = { id: novo ? '' : l.id, tipo: v.tipo, data: v.data, valor: numDecimal(String(v.valor).trim()), socio_id: v.tipo === 'receita' ? '' : v.socio,
+      categoria: v.categoria, fazenda_id: v.tipo === 'receita' ? v.fazenda : '', descricao: v.descricao };
+    try { await acao(() => ctx.api.adminSalvarLancamento(dados), 'Lançamento salvo'); } finally { salvando = false; }
+  };
+  el.querySelector('#b-novo-lanc').addEventListener('click', () => editarLanc(null));
+  el.querySelectorAll('[data-lanc]').forEach((b) => b.addEventListener('click', async () => {
+    const l = fin.lancamentos.find((x) => x.id === b.dataset.lanc);
+    const o = await formulario({ titulo: `${TIPO_LANC[l.tipo]} de ${fmtBRL(l.valor)}`, texto: `${fmtData(l.data)}${l.descricao ? ` · ${l.descricao}` : ''}`,
+      campos: [{ nome: 'o', rotulo: 'O que fazer?', tipo: 'select', valor: 'editar', opcoes: [['editar', 'Editar'], ['excluir', 'Excluir']] }], ok: 'Continuar' });
+    if (!o) return;
+    if (o.o === 'editar') { editarLanc(l); return; }
+    if (await confirmar({ titulo: 'Excluir este lançamento?', texto: `${TIPO_LANC[l.tipo]} de ${fmtBRL(l.valor)} em ${fmtData(l.data)}. Fica registrado no histórico do administrador.`, ok: 'Excluir', perigo: true }))
+      acao(() => ctx.api.adminExcluirLancamento(l.id), 'Lançamento excluído');
+  }));
+  el.querySelector('#b-socios').addEventListener('click', async () => {
+    const lista = [...fin.socios, { id: '', nome: '', percentual: 0, ativo: true }];
+    const pct = (x, i) => numDecimal(String(x[`p${i}`] || '').trim() || '0');
+    const v = await formulario({
+      titulo: 'Sócios e divisão', texto: 'Os percentuais precisam somar 100%. A divisão vale para todo o resultado, desde o começo. Sócio com 0% fica inativo. A última linha é para incluir alguém novo (deixe vazia se não for o caso).',
+      campos: lista.flatMap((x, i) => [
+        { nome: `n${i}`, rotulo: x.id ? `Sócio ${i + 1}` : 'Novo sócio (opcional)', tipo: 'text', valor: x.nome, maxlength: '60' },
+        { nome: `p${i}`, rotulo: '% do resultado', tipo: 'text', valor: x.id ? String(x.percentual).replace('.', ',') : '', inputmode: 'decimal', maxlength: '6' },
+      ]),
+      validar: (x) => {
+        let soma = 0;
+        for (let i = 0; i < lista.length; i++) {
+          const nome = String(x[`n${i}`] || '').trim();
+          if (!lista[i].id && !nome) continue;
+          if (nome.length < 2) return 'Informe o nome de cada sócio.';
+          if (!(pct(x, i) >= 0 && pct(x, i) <= 100)) return 'Percentual de 0 a 100.';
+          soma += pct(x, i);
+        }
+        return Math.abs(soma - 100) < 0.001 ? null : `Os percentuais precisam somar 100%. Hoje somam ${fmtNum(soma, 2)}%.`;
+      },
+    });
+    if (!v) return;
+    const dados = lista.map((x, i) => ({ id: x.id, nome: String(v[`n${i}`] || '').trim(), percentual: pct(v, i), ativo: pct(v, i) > 0 }))
+      .filter((x) => x.id || x.nome);
+    acao(() => ctx.api.adminSalvarSocios(dados), 'Sócios salvos');
+  });
 }
