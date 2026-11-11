@@ -1,4 +1,4 @@
-# Funcionário corrige ou apaga o que ELE lançou HOJE (sql/32, pedido do cliente piloto em 11/11/2026).
+# Funcionário corrige ou apaga o que ELE lançou HOJE (sql/33, pedido do cliente piloto em 11/11/2026).
 # Supabase SIMULADO: confere quais botões aparecem para o funcionário e para o dono, e o que vai para o banco.
 import os
 _AQUI = os.path.dirname(os.path.abspath(__file__))

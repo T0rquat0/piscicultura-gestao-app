@@ -1,6 +1,6 @@
 -- ============================================================
--- 32. FUNCIONÁRIO CORRIGE O QUE ELE MESMO LANÇOU, SÓ NO MESMO DIA (pedido do cliente piloto, 11/11/2026)
--- Rode no SQL Editor do Supabase (depois do 01 a 31). Pode rodar de novo sem estragar nada.
+-- 33. FUNCIONÁRIO CORRIGE O QUE ELE MESMO LANÇOU, SÓ NO MESMO DIA (pedido do cliente piloto, 11/11/2026)
+-- Rode no SQL Editor do Supabase (depois do 01 a 32). Pode rodar de novo sem estragar nada.
 --
 -- Antes: só o dono e o gerente corrigiam ou apagavam lançamentos. O funcionário que digitava 6000 em vez
 -- de 600 kg de ração não tinha como desfazer.

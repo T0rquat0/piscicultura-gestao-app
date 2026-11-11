@@ -9,7 +9,7 @@ const db = new PGlite();
 await db.exec(`create role anon; create role authenticated; create schema auth; create table auth.users (id uuid primary key, email text);
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('teste.uid', true), '')::uuid $$; grant usage on schema auth to anon, authenticated;`);
 for (const f of readdirSync(DIR).filter((f) => /^\d\d_.*\.sql$/.test(f) && !f.startsWith('05_')).sort()) await db.exec(readFileSync(DIR + f, 'utf8'));
-await db.exec(readFileSync(new URL('./compat_cadastro.sql', import.meta.url), 'utf8')); // sql/30: cadastro com CPF (atalho só de teste)
+await db.exec(readFileSync(new URL('./compat_cadastro.sql', import.meta.url), 'utf8')); // sql/31: cadastro com CPF (atalho só de teste)
 await db.exec(readFileSync(DIR + '21_manejo_probiotico.sql', 'utf8')); // de novo: pode repetir
 await db.exec(`grant usage on schema public to anon, authenticated; grant select, insert, update, delete on all tables in schema public to anon, authenticated;`);
 
@@ -45,7 +45,7 @@ checa(/duplicate|unique/i.test((await ins(W, 1, L)).erro || ''), 'reenvio com o 
 checa(await conta() === 1, 'reenvio não duplica');
 for (const [m, o] of [['dose zero', { dose: 0 }], ['unidade inválida', { unidade: "'saco'" }], ['via inválida', { via: "'ar'" }], ['produto vazio', { produto: "'   '" }]]) checa(!!(await ins(D, 20 + m.length, L, o)).erro, `${m} recusado`);
 
-// lançado ontem: desde o sql/32 o funcionário só corrige o que lançou HOJE
+// lançado ontem: desde o sql/33 o funcionário só corrige o que lançou HOJE
 await db.exec(`update manejos set criado_em = now() - interval '1 day' where uuid_local='${uuid(1)}'`);
 await como(W, `update manejos set dose = 1 where uuid_local='${uuid(1)}'`);
 checa(Number((await db.query(`select dose from manejos where uuid_local='${uuid(1)}'`)).rows[0].dose) === 200, 'funcionário NÃO altera o de ontem');

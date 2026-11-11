@@ -60,4 +60,10 @@ for (let i = 0; i < 2000; i++) {
   assert.ok(documentoValido(cpf), cpf); assert.ok(!documentoValido(cpf.slice(0, 10) + ((d2 + 1) % 10)), 'DV trocado ' + cpf);
 }
 assert.equal(fmtDocumento('52998224725'), '529.982.247-25'); assert.equal(fmtDocumento('11222333000181'), '11.222.333/0001-81');
+// valores em reais no padrão brasileiro (campos de custo, preço e despesa)
+const { numMoeda, moedaCampo } = await import('../../js/util.js');
+for (const [t, v] of [['1.250,50', 1250.5], ['1250,50', 1250.5], ['R$ 1.250,50', 1250.5], ['r$1.250', 1250], ['1.250', 1250], ['1.000.000,00', 1000000],
+  ['9,5', 9.5], ['9.5', 9.5], ['9.50', 9.5], ['3200', 3200], ['0,99', 0.99], [' 12,30 ', 12.3], [1250.5, 1250.5]]) assert.equal(numMoeda(t), v, String(t));
+for (const t of ['abc', '', null, '1.25,00', '1,234', '1.2345', '12,345', '1,250.50', '-5', '1..000', '9,']) assert.ok(Number.isNaN(numMoeda(t)), 'deveria recusar: ' + t);
+assert.equal(moedaCampo(1250.5), '1.250,50'); assert.equal(moedaCampo(null), ''); assert.equal(numMoeda(moedaCampo(3940)), 3940);
 console.log('RESULTADO: TUDO OK (financeiro)');

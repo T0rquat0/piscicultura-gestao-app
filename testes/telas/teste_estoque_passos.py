@@ -64,7 +64,7 @@ with sync_playwright() as pw:
     checa('número de sacos' in pg.inner_text('#f-compra #erro'), 'compra: sem sacos mostra o erro')
     pg.fill('#sacos', '40'); pg.click('#f-compra #b-data'); pg.fill('#f-compra #data', ontem)
     checa(pg.inner_text('#f-compra #data-txt') == f'{ontem[8:10]}/{ontem[5:7]}/{ontem[:4]}', 'compra: "Mudar" a data atualiza o texto')
-    pg.fill('#custo', '3200'); pg.fill('#forn', 'Agro X')
+    pg.fill('#custo', '3.200,00'); pg.fill('#forn', 'Agro X')
     pg.screenshot(path='estoque_compra.png', full_page=True)
     pg.click('#f-compra button[type=submit]'); pg.wait_for_timeout(1000)
     ins = [x for t, x in est['insert'] if t == 'racao_estoque']
