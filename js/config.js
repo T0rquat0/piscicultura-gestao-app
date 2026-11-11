@@ -8,6 +8,8 @@
 // Endereço que não estiver na lista usa o "padrao" (testes, prévias da Vercel e localhost).
 const AMBIENTES = {
   padrao: { nome: 'testes e demonstração', url: 'https://ppvliseblxpsepmeknnl.supabase.co', chave: 'sb_publishable_ckz6Ih2NnJ_xOb4i4_ea8w_uBGQyW3t' },
+  // banco só dos clientes (projeto "Piscicultura Clientes", organização PisciApp no Supabase), criado em 11/11/2026
+  'pisciapp-gestao.vercel.app': { nome: 'clientes', url: 'https://ljunnpmszkkgoqmtvxse.supabase.co', chave: 'sb_publishable_2KYZgELf4iFhLI40EB1Eog_S3-tNYHi' },
   // 'app.seudominio.com.br': { nome: 'clientes', url: 'https://XXXXXXXX.supabase.co', chave: 'sb_publishable_XXXXXXXX' },
 };
 export function ambienteDo(host) {

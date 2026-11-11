@@ -5,7 +5,7 @@
 // Quando existir o banco dos clientes, acrescente-o aqui também (mesma URL e chave de js/config.js).
 const PROJETOS = [
   { nome: 'testes e demonstração', url: 'https://ppvliseblxpsepmeknnl.supabase.co', chave: 'sb_publishable_ckz6Ih2NnJ_xOb4i4_ea8w_uBGQyW3t' },
-  // { nome: 'clientes', url: 'https://XXXXXXXX.supabase.co', chave: 'sb_publishable_XXXXXXXX' },
+  { nome: 'clientes', url: 'https://ljunnpmszkkgoqmtvxse.supabase.co', chave: 'sb_publishable_2KYZgELf4iFhLI40EB1Eog_S3-tNYHi' },
 ];
 
 module.exports = async (req, res) => {
