@@ -311,9 +311,6 @@ export function criarApi(client) {
       ]);
       return { usuarios: ok(usuarios), vinculos: ok(vinculos) };
     },
-    async adicionarUsuario(email, nome, papel) {
-      ok(await client.rpc('vincular_usuario_por_email', { p_email: email, p_nome: nome, p_papel: papel }));
-    },
     async atualizarUsuario(id, campos) {
       ok(await client.from('usuarios').update(campos).eq('id', id));
     },

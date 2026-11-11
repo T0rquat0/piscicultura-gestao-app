@@ -1113,3 +1113,7 @@ table.cmp td b { font-weight: 600; }
 .aparelhos { display: grid; gap: .45rem; margin-top: .6rem; padding-top: 1rem; border-top: 1px solid var(--linha); }
 .aparelhos small { display: block; line-height: 1.45; }
 .aparelhos .btn { width: 100%; }
+
+/* contador de letras do nome (aparece perto do limite) */
+.conta-letras { display: block; font-size: .8rem; color: var(--mudo-claro); margin-top: .25rem; }
+.conta-letras.no-limite { color: var(--erro, #b42318); font-weight: 600; }

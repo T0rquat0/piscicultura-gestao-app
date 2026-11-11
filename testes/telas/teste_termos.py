@@ -75,7 +75,7 @@ with sync_playwright() as pw:
     # B) ligado: cadastro exige aceite e grava versão e data na conta
     b, pg, est = abrir(pw, termos_ligado=True, logado=False)
     pg.goto(BASE); pg.wait_for_selector('#b-criar', timeout=20000); pg.click('#b-criar'); pg.wait_for_selector('#f-cad #aceite')
-    pg.fill('#email', 'nova@x.com'); pg.fill('#senha', '12345678'); pg.click('#f-cad button[type=submit]')
+    pg.fill('#email', 'nova@x.com'); pg.fill('#senha', 'tilapia2026'); pg.click('#f-cad button[type=submit]')
     checa('marque que leu e aceita' in pg.inner_text('#erro') and not any(a[1].endswith('/signup') for a in est['auth']), 'ligado: sem marcar o aceite, não cria a conta')
     pg.check('#aceite'); pg.click('#f-cad button[type=submit]'); pg.wait_for_timeout(1500)
     sig = [a for a in est['auth'] if a[1].endswith('/signup')]
