@@ -102,7 +102,7 @@ export function traduzErro(error) {
   if (/Email not confirmed/i.test(m)) return 'E-mail ainda não confirmado';
   if (/rate limit|too many requests|security purposes/i.test(m) || c === '429' || c === 'over_email_send_rate_limit') return 'Muitos cadastros e e-mails agora. Espere uns minutos (até 1 hora) e tente de novo.';
   if (/already registered|already been registered|user_already_exists/i.test(m)) return 'Este e-mail já tem conta. Toque em "Já tenho conta" e entre.';
-  if (/Password should be at least|weak password/i.test(m)) return 'Senha fraca: use pelo menos 8 caracteres, com letras e números.';
+  if (/Password should (be at least|contain)|weak password/i.test(m)) return 'Senha fraca: use pelo menos 8 caracteres, com letras e números.';
   if (/invalid format|Unable to validate email/i.test(m)) return 'E-mail inválido. Confira se está escrito certo.';
   return m;
 }

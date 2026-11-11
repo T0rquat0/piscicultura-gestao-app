@@ -12,6 +12,20 @@ import { ordemNatural } from './home.js';
 // 2,3 kg / 500 g; 5,5 ha
 const pmTxt = (kg) => (kg >= 1 ? `${fmtNum(kg, kg % 1 ? 2 : 0)} kg` : `${fmtNum(kg * 1000, 0)} g`);
 const haTxt = (ha) => `${fmtNum(ha, Number(ha) % 1 ? 2 : 0).replace(/(,\d)0$/, '$1')} ha`;
+// Nome com limite de letras: o campo para de aceitar no limite. Mostra quantas faltam perto do fim,
+// para a pessoa não achar que o nome foi cortado sem motivo.
+function contarLetras(input) {
+  if (!input || !input.maxLength || input.maxLength < 1) return;
+  const aviso = document.createElement('small'); aviso.className = 'conta-letras'; input.after(aviso);
+  const atualiza = () => {
+    const n = input.value.length, max = input.maxLength;
+    aviso.hidden = n < max - 15;
+    aviso.textContent = n >= max ? `${n} de ${max} letras: o nome não cabe mais` : `${n} de ${max} letras`;
+    aviso.classList.toggle('no-limite', n >= max);
+  };
+  input.addEventListener('input', atualiza); atualiza();
+}
+
 const semPermissao = (el) => { el.innerHTML = '<div class="card vazio">Você não tem permissão para esta tela.</div>'; };
 const avisoOffline = () => (navigator.onLine ? '' : '<p class="aviso">Sem internet: cadastros de tanques e lotes só funcionam com conexão.</p>');
 
@@ -55,6 +69,7 @@ export async function renderTanques(ctx, el) {
     </div>`;
 
   const f = el.querySelector('#f-novo');
+  contarLetras(f && f.querySelector('#nome'));
   const erro = f.querySelector('#erro');
   f.addEventListener('submit', async (ev) => {
     ev.preventDefault();
@@ -377,6 +392,7 @@ export async function renderTanque(ctx, el, id, params = {}) {
   });
 
   const fn = el.querySelector('#f-nome');
+  contarLetras(fn && fn.querySelector('#nome'));
   fn.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const e = fn.querySelector('#erro-nome'); e.hidden = true;

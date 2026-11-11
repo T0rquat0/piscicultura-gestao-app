@@ -13,7 +13,7 @@ export function renderCadastro(ctx, root) {
     ${cabeca('Criar minha conta', ctx.state.convite ? 'Depois de confirmar o e-mail, você entra na fazenda que te convidou.' : `Teste grátis por ${TESTE_DIAS} dias. Sem cartão.`)}
     <form id="f-cad" class="form" novalidate>
       <label>E-mail <input id="email" type="email" autocomplete="username" inputmode="email" autocapitalize="none" required></label>
-      <label>Crie uma senha <input id="senha" type="password" autocomplete="new-password" minlength="8" required><small class="mudo">Pelo menos 8 caracteres.</small></label>
+      <label>Crie uma senha <input id="senha" type="password" autocomplete="new-password" minlength="8" required><small class="mudo">Pelo menos 8 caracteres, com letras e números.</small></label>
       <p id="erro" class="erro" hidden></p>
       <p id="ok" class="aviso" hidden></p>
       ${TERMOS_VERSAO ? `<label class="linha-check aceite"><input type="checkbox" id="aceite"> <span>Li e aceito ${LINKS_TERMOS}</span></label>` : ''}
@@ -30,6 +30,7 @@ export function renderCadastro(ctx, root) {
     const falha = (m) => { erro.textContent = m; erro.hidden = false; };
     if (!/^\S+@\S+\.\S+$/.test(email)) return falha('Informe um e-mail válido.');
     if (senha.length < 8) return falha('A senha precisa ter pelo menos 8 caracteres.');
+    if (!/[a-zA-Z]/.test(senha) || !/\d/.test(senha)) return falha('A senha precisa ter letras e números (ex.: tilapia2026).');
     if (TERMOS_VERSAO && !f.querySelector('#aceite').checked) return falha('Para criar a conta, marque que leu e aceita os termos e a política de privacidade.');
     const btn = f.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'Criando…';
     try {
@@ -172,7 +173,7 @@ export function renderNovaSenha(ctx, root) {
   <main class="login"><div class="login-card">
     ${cabeca('Crie uma senha nova')}
     <form id="f-nova" class="form" novalidate>
-      <label>Senha nova <input id="senha" type="password" autocomplete="new-password" minlength="8" required><small class="mudo">Pelo menos 8 caracteres.</small></label>
+      <label>Senha nova <input id="senha" type="password" autocomplete="new-password" minlength="8" required><small class="mudo">Pelo menos 8 caracteres, com letras e números.</small></label>
       <label>Repita a senha <input id="senha2" type="password" autocomplete="new-password" minlength="8" required></label>
       <p id="erro" class="erro" hidden></p>
       <button class="btn primario grande" type="submit">Salvar e entrar</button>
@@ -184,6 +185,7 @@ export function renderNovaSenha(ctx, root) {
     const a = f.querySelector('#senha').value, b = f.querySelector('#senha2').value;
     const falha = (m) => { erro.textContent = m; erro.hidden = false; };
     if (a.length < 8) return falha('A senha precisa ter pelo menos 8 caracteres.');
+    if (!/[a-zA-Z]/.test(a) || !/\d/.test(a)) return falha('A senha precisa ter letras e números (ex.: tilapia2026).');
     if (a !== b) return falha('As duas senhas são diferentes.');
     const btn = f.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'Salvando…';
     try { await ctx.definirNovaSenha(a); }

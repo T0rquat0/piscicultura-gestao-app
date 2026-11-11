@@ -140,10 +140,10 @@ with sync_playwright() as pw:
     pg.click('.dialogo [data-ok]'); pg.wait_for_timeout(800)
     checa(('lotes', L2, {'ativo': True}) in patches, 'reabrir: grava ativo = true')
 
-    # 4) Equipe: texto novo
-    pg.goto(BASE + '#/equipe'); pg.wait_for_selector('#f-novo', state='attached', timeout=15000)
-    t = pg.text_content('#f-novo')
-    checa('Criar conta da minha fazenda' in t and 'administrador' not in t, 'equipe: texto novo, sem "peça ao administrador"')
+    # 4) Equipe: só o convite por link (o "vincular pelo e-mail" saiu em 11/11/2026)
+    pg.goto(BASE + '#/equipe'); pg.wait_for_timeout(1500)
+    t = pg.inner_text('#view')
+    checa(pg.locator('#f-novo').count() == 0 and 'Vincular pelo e-mail' not in t, 'equipe: sem o antigo "vincular pelo e-mail"')
     pg.screenshot(path=sys.argv[1] if len(sys.argv) > 1 else 'equipe.png')
     b.close()
 
