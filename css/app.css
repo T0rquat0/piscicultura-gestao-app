@@ -1138,3 +1138,13 @@ table.cmp td b { font-weight: 600; }
 .com-prefixo { position: relative; display: block; }
 .com-prefixo input { width: 100%; padding-left: 2.6rem; }
 .com-prefixo em { position: absolute; left: .9rem; top: 50%; transform: translateY(-50%); font-style: normal; color: var(--tinta-2); font-weight: 600; pointer-events: none; }
+
+/* suporte do administrador (sql/34): faixa laranja enquanto está na fazenda do cliente */
+.faixa-suporte { display: flex; align-items: center; justify-content: space-between; gap: .6rem; flex-wrap: wrap; background: #92400e; color: #fff; padding: .55rem 1rem; font-size: .88rem; }
+.faixa-suporte b { font-weight: 700; }
+.faixa-suporte .btn { background: #fff; color: #92400e; border-color: #fff; flex: none; }
+.faixa-cel { position: sticky; top: 0; z-index: 19; }
+.em-suporte .topo { box-shadow: inset 0 -3px 0 #92400e; }
+.lateral .faixa-suporte { border-radius: var(--r-botao); flex-direction: column; align-items: stretch; text-align: left; padding: .7rem; }
+@media (min-width: 900px) { .faixa-cel { display: none; } }
+.adm-acessos { margin-top: .6rem; padding-top: .6rem; border-top: 1px solid var(--linha, #e5e9e6); }

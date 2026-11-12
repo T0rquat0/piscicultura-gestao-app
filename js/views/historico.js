@@ -65,7 +65,7 @@ export async function renderHistorico(ctx, el, aba = 'lixeira') {
   if (ctx.state.perfil.papel !== 'dono') { el.innerHTML = '<div class="card vazio">Somente o dono vê o histórico.</div>'; return; }
   el.innerHTML = `<h1>Histórico e lixeira</h1><p class="carregando">Carregando…</p>`;
   if (!navigator.onLine) { el.innerHTML = `<h1>Histórico e lixeira</h1><div class="card vazio">Precisa de internet.</div>`; return; }
-  const [lista, nomes] = await Promise.all([ctx.api.historico(), ctx.api.nomesUsuarios().catch(() => ({}))]);
+  const [lista, nomes, acessos] = await Promise.all([ctx.api.historico(), ctx.api.nomesUsuarios().catch(() => ({})), ctx.api.acessosSuporte().catch(() => [])]);
   if (!lista) { el.innerHTML = `<h1>Histórico e lixeira</h1><div class="card vazio">O histórico ainda não foi ativado neste sistema (falta rodar o sql/12 no Supabase).</div>`; return; }
 
   const tanquesConhecidos = Object.fromEntries((ctx.state.ref.tanques || []).map((t) => [t.id, t.nome]));
@@ -111,7 +111,10 @@ export async function renderHistorico(ctx, el, aba = 'lixeira') {
       ? `<p class="mudo nota">O que foi excluído fica aqui por 180 dias. Restaurar traz de volta tudo o que foi apagado junto.</p>
          <div class="card">${lixeira.length ? `<ul class="lista registros">${lixeira.map(itemLixo).join('')}</ul>` : '<p class="mudo" style="margin:0">Nada foi excluído.</p>'}</div>`
       : `<p class="mudo nota">Correções em lançamentos, compras, lotes e equipe, com como era antes e como ficou.</p>
-         <div class="card">${alteracoes.length ? `<ul class="lista registros">${alteracoes.map(itemAlt).join('')}</ul>` : '<p class="mudo" style="margin:0">Nenhuma alteração registrada.</p>'}</div>`}`;
+         <div class="card">${alteracoes.length ? `<ul class="lista registros">${alteracoes.map(itemAlt).join('')}</ul>` : '<p class="mudo" style="margin:0">Nenhuma alteração registrada.</p>'}</div>`}
+    ${acessos && acessos.length ? `<h2>Acessos do suporte</h2>
+      <p class="mudo nota">Quando você pede ajuda, o suporte do PisciApp entra na fazenda. O que ele fez aparece acima com "(suporte)".</p>
+      <div class="card"><ul class="lista registros">${acessos.map((a) => `<li><div class="esq"><b>${esc(a.quem)} (suporte)</b><small>${quando(a.inicio)} até ${quando(a.fim).split(' às ')[1]}${a.motivo ? ` · ${esc(a.motivo)}` : ''}</small></div></li>`).join('')}</ul></div>` : ''}`;
 
   el.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => renderHistorico(ctx, el, b.dataset.aba)));
   el.querySelectorAll('[data-restaurar]').forEach((b) => b.addEventListener('click', async () => {

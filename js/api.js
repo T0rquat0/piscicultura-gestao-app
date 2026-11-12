@@ -447,6 +447,11 @@ export function criarApi(client) {
       return error ? null : Object.fromEntries((data || []).map((x) => [x.usuario_id, x])); // null = sql/24 ainda não rodado
     },
     async desconectarAparelhos(usuarioId) { return Number(ok(await client.rpc('desconectar_aparelhos', { p_usuario: usuarioId }))) || 0; },
+    // suporte do administrador (sql/34): entra na fazenda do cliente como dono, por até 2 horas
+    async meuSuporte() { return ok(await client.rpc('meu_suporte')) || null; },
+    async adminEntrarSuporte(fazendaId, motivo) { return ok(await client.rpc('admin_entrar_suporte', { p_fazenda: fazendaId, p_motivo: motivo || null })); },
+    async adminSairSuporte() { ok(await client.rpc('admin_sair_suporte')); },
+    async acessosSuporte(fazendaId) { return ok(await client.rpc('acessos_suporte', fazendaId ? { p_fazenda: fazendaId } : {})) || []; },
     async adminDesconectarDono(fazendaId) { return Number(ok(await client.rpc('admin_desconectar_dono', { p_fazenda: fazendaId }))) || 0; },
     // a sessão deste aparelho ainda existe no servidor? (false = foi desconectado pelo dono ou pelo suporte)
     async sessaoAindaValida() {

@@ -14,6 +14,8 @@ const TIPO_LANC = { receita: 'Receita', despesa: 'Despesa', retirada: 'Retirada'
 const CATEGORIAS_SISTEMA = [['', 'Sem categoria'], ['servidor', 'Servidor / banco de dados'], ['dominio', 'Domínio / site'], ['impostos', 'Impostos'], ['marketing', 'Divulgação'], ['implantacao', 'Implantação / treinamento'], ['outros', 'Outros']];
 const ROT_CAT = Object.fromEntries(CATEGORIAS_SISTEMA);
 
+const horaDe = (iso) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+
 function situacao(f) {
   if (f.bloqueada) return { rotulo: 'Bloqueada', classe: 'erro', grupo: 'bloqueada' };
   const p = f.plano || {}; const [rotulo, classe] = ESTADO[p.estado] || ['—', ''];
@@ -64,6 +66,8 @@ export async function renderAdmin(ctx, el, aba = 'fazendas', estado = { filtro: 
             ${f.bloqueada ? `<button class="btn mini" data-liberar="${esc(f.id)}" type="button">Liberar</button>`
               : `<button class="btn mini perigo" data-bloquear="${esc(f.id)}" type="button">Bloquear</button>`}
             <button class="btn mini" data-desconectar-dono="${esc(f.id)}" type="button">Desconectar celular do dono</button>
+            <button class="btn mini primario" data-suporte="${esc(f.id)}" type="button">Entrar como suporte</button>
+            <button class="btn mini" data-acessos="${esc(f.id)}" type="button">Acessos do suporte</button>
           </div>
         </article>`;
       }).join('') : '<div class="card vazio">Nenhuma fazenda neste filtro.</div>'}`;
@@ -193,6 +197,29 @@ export async function renderAdmin(ctx, el, aba = 'fazendas', estado = { filtro: 
       const f = fazPor(b.dataset.bloquear);
       if (!(await confirmar({ titulo: `Bloquear ${f.nome}?`, texto: 'Ninguém desta fazenda consegue ver nem lançar nada até você liberar. Os dados continuam guardados.', ok: 'Bloquear', perigo: true, digitar: f.nome }))) return;
       acao(() => ctx.api.adminBloquear(f.id, true), 'Fazenda bloqueada');
+    }));
+    // suporte (sql/34): entra na fazenda do cliente e vê/altera tudo como o dono, por até 2 horas
+    el.querySelectorAll('[data-suporte]').forEach((b) => b.addEventListener('click', async () => {
+      const f = fazPor(b.dataset.suporte);
+      const v = await formulario({
+        titulo: `Entrar na ${f.nome} como suporte?`,
+        texto: 'Você vê e pode alterar tudo como o dono: tanques, lotes, lançamentos, estoque, equipe e vendas. Tudo o que fizer fica no histórico da fazenda com o seu nome e "(suporte)", e o dono vê quem entrou. Vale por 2 horas. Use quando o cliente pedir ajuda.',
+        campos: [{ nome: 'motivo', rotulo: 'Motivo (o dono vê)', tipo: 'text', valor: '', maxlength: '120', placeholder: 'Ex.: cliente pediu ajuda com o estoque' }],
+        validar: (x) => (String(x.motivo || '').trim().length >= 3 ? null : 'Escreva o motivo (o dono vê).'),
+        ok: 'Entrar como suporte',
+      });
+      if (!v) return;
+      b.disabled = true;
+      try { if (!(await ctx.entrarSuporte(f.id, v.motivo.trim()))) b.disabled = false; } catch (e) { ctx.toast(e.message, 'erro'); b.disabled = false; }
+    }));
+    el.querySelectorAll('[data-acessos]').forEach((b) => b.addEventListener('click', async () => {
+      const f = fazPor(b.dataset.acessos);
+      b.disabled = true;
+      try {
+        const l = await ctx.api.acessosSuporte(f.id);
+        const card = b.closest('article'); card.querySelector('.adm-acessos')?.remove();
+        card.insertAdjacentHTML('beforeend', `<div class="adm-acessos"><b>Acessos do suporte</b>${l.length ? `<ul class="lista">${l.map((a) => `<li><div class="esq"><b>${esc(a.quem)}</b><small>${fmtData(a.inicio)} ${horaDe(a.inicio)}–${horaDe(a.fim)}${a.motivo ? ` · ${esc(a.motivo)}` : ''}</small></div></li>`).join('')}</ul>` : '<p class="mudo" style="margin:0">Ninguém do suporte entrou nesta fazenda.</p>'}</div>`);
+      } catch (e) { ctx.toast(e.message, 'erro'); } finally { b.disabled = false; }
     }));
     // o dono perdeu o celular e ligou para o suporte: tira a conta dele de todos os aparelhos
     el.querySelectorAll('[data-desconectar-dono]').forEach((b) => b.addEventListener('click', async () => {
