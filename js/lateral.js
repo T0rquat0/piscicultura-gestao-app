@@ -13,7 +13,6 @@ import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, ESTOQUE_COBERTURA_DIAS, PES
 export function catalogoAtalhos(state, gerir) {
   const dono = state.perfil.papel === 'dono';
   return [
-    gerir && ['tanques', 'tanques', '#/tanques', 'tanque', 'Tanques e lotes'],
     ['estoque', 'estoque', '#/estoque', 'estoque', 'Estoque de ração'],
     dono && ['equipe', 'equipe', '#/equipe', 'equipe', 'Equipe'],
     dono && ['plano', 'plano', '#/plano', 'check', 'Meu plano'],
@@ -26,7 +25,7 @@ export function catalogoAtalhos(state, gerir) {
   ].filter(Boolean);
 }
 // os 5 primeiros que a pessoa pode ver (o mesmo que aparecia antes da personalização)
-const PADRAO = ['tanques', 'estoque', 'equipe', 'plano', 'historico'];
+const PADRAO = ['estoque', 'equipe', 'plano', 'historico']; // Tanques virou item do menu (13/11/2026)
 
 // ids escolhidos (na ordem); sem escolha guardada, o padrão do papel
 export async function atalhosEscolhidos(state, gerir) {

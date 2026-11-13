@@ -22,6 +22,7 @@ import { renderHistorico } from './views/historico.js';
 import { renderAdmin } from './views/admin.js';
 import { renderPendencias } from './views/pendencias.js';
 import { renderMais } from './views/mais.js';
+import { renderRonda } from './views/ronda.js';
 import { renderLucro, renderDespesas } from './views/lucro.js';
 import { htmlAtalhos, atualizarLateral, marcarAtalho, pintarAtalhos } from './lateral.js';
 import { registrarRota, linhaVoltar, ehAbaPrincipal } from './voltar.js';
@@ -160,7 +161,7 @@ const ctx = {
 // Aparelho desconectado (celular perdido: o dono ou o suporte tirou a conta deste aparelho) ou sessão encerrada:
 // apaga a cópia dos números da fazenda e a sessão guardada, e volta para a tela de entrar.
 async function aparelhoDesconectado(aviso = 'Este aparelho foi desconectado da conta (pelo dono da fazenda ou pelo suporte). Entre de novo com seu e-mail e senha.') {
-  for (const k of ['perfil', 'ref', 'resumo', 'racao14', 'admin']) { try { await db.kvDel(k); } catch { /* ignora */ } }
+  for (const k of ['perfil', 'ref', 'resumo', 'racao14', 'agua14', 'admin']) { try { await db.kvDel(k); } catch { /* ignora */ } }
   try { Object.keys(localStorage).filter((k) => k.startsWith('sb-')).forEach((k) => localStorage.removeItem(k)); } catch { /* ignora */ }
   state.user = null; state.perfil = null; state.ref = { tanques: [], lotes: [] };
   mostrarLogin(aviso);
@@ -237,7 +238,7 @@ async function criarFazenda(fazenda, nome, user, documento) {
   // o mesmo CPF/CNPJ já usou o teste grátis em outra fazenda (sql/31): a fazenda nasce sem teste
   try {
     const p = await api.plano();
-    if (p && p.estado === 'teste_acabou') toast('Este CPF/CNPJ já usou o teste grátis. Para abrir lotes nesta fazenda, escolha um pacote em Mais > Meu plano.', 'erro');
+    if (p && p.estado === 'teste_acabou') toast('Este CPF/CNPJ já usou o teste grátis. Para abrir lotes nesta fazenda, escolha um pacote em Fazenda > Meu plano.', 'erro');
   } catch { /* sem plano: nada a avisar */ }
 }
 
@@ -291,7 +292,7 @@ async function abrirApp(user) {
   let daRede = false;
   const guardado = await db.kvGet('perfil');
   const temGuardado = !!(guardado && guardado.id === user.id);
-  if (guardado && !temGuardado) { await db.kvDel('resumo'); await db.kvDel('racao14'); } // outra conta neste aparelho
+  if (guardado && !temGuardado) { await db.kvDel('resumo'); await db.kvDel('racao14'); await db.kvDel('agua14'); } // outra conta neste aparelho
   try {
     perfil = await (temGuardado ? comLimite(api.perfil(user.id), LIMITE_ABERTURA_MS) : api.perfil(user.id));
     daRede = true;
@@ -305,7 +306,7 @@ async function abrirApp(user) {
   if (TERMOS_VERSAO && daRede && (user.user_metadata || {}).termos_versao !== TERMOS_VERSAO) { state.user = user; renderAceiteTermos(ctx, root, user); return; }
   // sem acesso (tirado da fazenda, desativado ou fazenda suspensa): apaga do aparelho a cópia dos números da fazenda.
   // Sem isso, quem perdeu o acesso ainda via os dados guardados ao abrir o app sem internet.
-  const apagarCopias = async () => { for (const k of ['perfil', 'ref', 'resumo', 'racao14', 'admin']) await db.kvDel(k); };
+  const apagarCopias = async () => { for (const k of ['perfil', 'ref', 'resumo', 'racao14', 'agua14', 'admin']) await db.kvDel(k); };
   if (!perfil) { if (daRede && guardado) await apagarCopias(); if (state.convite) renderAceitarConvite(ctx, root, user, state.convite); else renderCriarFazenda(ctx, root, user); return; }
   if (state.convite) { // conta já está numa fazenda: o convite não serve para ela
     descartarConvite();
@@ -411,6 +412,7 @@ async function sair(forcar = false) {
   await db.kvDel('ref');
   await db.kvDel('resumo');
   await db.kvDel('racao14');
+  await db.kvDel('agua14');
   state.user = null; state.perfil = null; state.ref = { tanques: [], lotes: [] };
   saindo = false;
   mostrarLogin();
@@ -419,7 +421,7 @@ async function sair(forcar = false) {
 // ---------- suporte do administrador (sql/34) ----------
 // Trocar de fazenda: apaga as cópias da fazenda anterior e abre o app de novo (perfil, tanques e números da outra).
 async function trocarDeFazenda() {
-  for (const k of ['perfil', 'ref', 'resumo', 'racao14']) { try { await db.kvDel(k); } catch { /* ignora */ } }
+  for (const k of ['perfil', 'ref', 'resumo', 'racao14', 'agua14']) { try { await db.kvDel(k); } catch { /* ignora */ } }
   location.hash = '#/';
   location.reload();
 }
@@ -449,7 +451,8 @@ function montarShell() {
   const p = state.perfil;
   const fazenda = esc((p.fazendas && p.fazendas.nome) || 'Piscicultura');
   const papel = esc(ROTULO_PAPEL[p.papel] || p.papel);
-  const links = [['', '#/', 'inicio', 'Início'], ['lancar', '#/lancar', 'lancar', 'Lançar'], ['relatorio', '#/relatorio', 'relatorio', 'Relatórios'], ['mais', '#/mais', 'mais', 'Mais']];
+  // menu: Hoje, Tanques, Relatórios e Fazenda (o lançar fica dentro de cada tanque e da ronda)
+  const links = [['', '#/', 'inicio', 'Hoje'], ['tanques', '#/tanques', 'tanques', 'Tanques'], ['relatorio', '#/relatorio', 'relatorio', 'Relatórios'], ['mais', '#/mais', 'fazenda', 'Fazenda']];
   const sup = p.suporte;
   const faixa = sup ? `<div class="faixa-suporte" role="status"><span><b>Suporte</b> · ${esc(p.nome)} (administrador) · até ${horaCurta(sup.expira)}</span><button class="btn mini" type="button" data-sair-suporte>Sair do suporte</button></div>` : '';
   root.innerHTML = `
@@ -463,10 +466,9 @@ function montarShell() {
     <aside class="lateral" aria-label="Navegação">
       <div class="marca"><span class="logo-sm"></span><div><strong>${fazenda}</strong><small>Piscicultura</small></div></div>
       ${faixa}
-      <nav>${links.filter(([aba]) => aba !== 'mais').map(([aba, href, ic, txt]) => `<a data-aba="${aba}" href="${href}">${icone(ic, 19)}<span>${txt}</span></a>`).join('')}</nav>
+      <nav>${links.map(([aba, href, ic, txt]) => `<a data-aba="${aba}" href="${href}">${icone(ic, 19)}<span>${txt}</span></a>`).join('')}</nav>
       ${htmlAtalhos()}
       <div class="lateral-pe">
-        <a class="lat-mais" data-aba="mais" href="#/mais">${icone('mais', 19)}<span>Mais</span></a>
         <a id="pill-lateral" class="pill" href="#/pendencias"></a>
         <div class="perfil-linha"><span class="avatar">${esc((p.nome || '?').trim().charAt(0).toUpperCase())}</span><div><b>${esc(p.nome)}</b><small>${papel}</small></div></div>
       </div>
@@ -498,7 +500,8 @@ async function rotear() {
   if (suporteVenceu() && navigator.onLine) { toast('O tempo do suporte acabou (2 horas). Voltando para a sua fazenda.', 'erro'); sairSuporte(true); return; }
   const { rota, partes, params } = parseHash(location.hash);
   rotaAtual = rota;
-  const aba = rota === 't' ? '' : ['', 'lancar', 'relatorio'].includes(rota) ? rota : 'mais'; // tela do tanque é aberta pelo Início
+  // aba acesa: o tanque e o cadastro ficam em Tanques; ronda e lançar, em Hoje; o resto, em Fazenda
+  const aba = ['t', 'tanque', 'tanques'].includes(rota) ? 'tanques' : ['', 'ronda', 'lancar'].includes(rota) ? '' : rota === 'relatorio' || rota === 'lucro' || rota === 'despesas' ? 'relatorio' : 'mais';
   document.querySelectorAll('.abas a, .lateral a[data-aba]').forEach((a) => {
     const on = a.dataset.aba === aba;
     a.classList.toggle('on', on);
@@ -526,7 +529,8 @@ async function rotear() {
       case 'historico': await renderHistorico(ctx, el); break;
       case 'admin': await renderAdmin(ctx, el); break;
       case 'pendencias': await renderPendencias(ctx, el); break;
-      case 'mais': renderMais(ctx, el); break;
+      case 'ronda': await renderRonda(ctx, el); break;
+      case 'mais': case 'fazenda': renderMais(ctx, el); break;
       default: await renderHome(ctx, el);
     }
   } catch (e) {

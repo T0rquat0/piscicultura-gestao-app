@@ -30,23 +30,25 @@ const semPermissao = (el) => { el.innerHTML = '<div class="card vazio">Você nã
 const avisoOffline = () => (navigator.onLine ? '' : '<p class="aviso">Sem internet: cadastros de tanques e lotes só funcionam com conexão.</p>');
 
 export async function renderTanques(ctx, el) {
-  if (!ctx.podeGerir()) return semPermissao(el);
+  const gerir = ctx.podeGerir();
   const { tanques, lotes } = ctx.state.ref;
   // peixes vivos (entrada − mortos − despescados), igual à Início; sem o resumo, mostra a entrada
   const resumo = Object.fromEntries((((await db.kvGet('resumo').catch(() => null)) || [])).map((r) => [r.lote_id, r]));
 
+  const comPeixe = tanques.filter((t) => lotes.some((l) => l.tanque_id === t.id)).length;
   el.innerHTML = `
     <h1>Tanques</h1>
-    ${avisoOffline()}
+    <p class="sub-titulo">${gerir ? `${plural(tanques.length, 'tanque', 'tanques')} · ${fmtInt(comPeixe)} com peixes` : 'Os tanques liberados para você'}</p>
+    ${gerir ? avisoOffline() : ''}
     <div class="card">
       ${tanques.length ? `<ul class="lista lista-grade">${[...tanques].sort(ordemNatural).map((t) => {
         const ls = lotes.filter((l) => l.tanque_id === t.id);
         const peixes = ls.reduce((a, l) => a + (resumo[l.id] ? vivosDoLote(l, resumo[l.id]) : Number(l.quantidade_inicial) || 0), 0);
         const sub = ls.length > 1 ? `${ls.length} lotes ativos · ${fmtInt(peixes)} peixes` : ls.length ? `${ROTULO_TIPO[ls[0].tipo] || ls[0].tipo} · ${fmtInt(peixes)} peixes` : 'sem lote ativo';
-        return `<li><a class="esq" href="#/tanque/${esc(t.id)}"><b>${esc(t.nome)}</b><small>${esc(sub)}${t.area_ha ? ` · ${haTxt(t.area_ha)}` : ''}</small></a><span class="seta">${icone('direita', 20)}</span></li>`;
-      }).join('')}</ul>` : (ctx.state.perfil.papel === 'dono' ? '<p class="mudo" style="margin:0">Nenhum tanque cadastrado ainda.</p>' : '<p class="aviso" style="margin:0">Nenhum tanque liberado para você. Se a fazenda já tem tanques, peça ao dono para liberar em Mais › Equipe, em vez de cadastrar de novo.</p>')}
+        return `<li><a class="esq" href="#/t/${esc(t.id)}"><b>${esc(t.nome)}</b><small>${esc(sub)}${t.area_ha ? ` · ${haTxt(t.area_ha)}` : ''}</small></a><span class="seta">${icone('direita', 20)}</span></li>`;
+      }).join('')}</ul>` : (ctx.state.perfil.papel === 'dono' ? '<p class="mudo" style="margin:0">Nenhum tanque cadastrado ainda.</p>' : gerir ? '<p class="aviso" style="margin:0">Nenhum tanque liberado para você. Se a fazenda já tem tanques, peça ao dono para liberar em Fazenda › Equipe, em vez de cadastrar de novo.</p>' : '<p class="aviso" style="margin:0">Nenhum tanque liberado para você ainda. Peça ao dono ou ao gerente.</p>')}
     </div>
-    <div class="pc-duas">
+    ${gerir ? `<div class="pc-duas">
     <details class="card form-dobra" id="d-novo-tanque">
       <summary>Novo tanque</summary>
     <form id="f-novo" class="form" novalidate>
@@ -68,7 +70,8 @@ export async function renderTanques(ctx, el) {
         <button class="btn primario" id="b-importar" type="button" hidden>Cadastrar</button>
       </div>
     </details>
-    </div>`;
+    </div>` : ''}`;
+  if (!gerir) return; // funcionário: só a lista dos tanques dele
 
   const f = el.querySelector('#f-novo');
   contarLetras(f && f.querySelector('#nome'));
@@ -371,7 +374,7 @@ export async function renderTanque(ctx, el, id, params = {}) {
       const lote = todos.find((l) => l.id === b.dataset.excluirLote);
       const livre0 = ocupado('Conferindo o que será apagado…');
       let r, lixo; try { [r, lixo] = await Promise.all([resumoDe([lote.id]), ctx.api.temLixeira()]); } finally { livre0(); }
-      if (!(await confirmar({ titulo: 'Excluir este lote?', texto: `Será apagado com ${txtResumo(r)} ${lixo ? 'Fica na lixeira por 180 dias: dá para restaurar em Mais > Histórico e lixeira.' : 'Não dá para desfazer.'}`, ok: 'Excluir lote', perigo: true, digitar: 'excluir' }))) return;
+      if (!(await confirmar({ titulo: 'Excluir este lote?', texto: `Será apagado com ${txtResumo(r)} ${lixo ? 'Fica na lixeira por 180 dias: dá para restaurar em Fazenda > Histórico e lixeira.' : 'Não dá para desfazer.'}`, ok: 'Excluir lote', perigo: true, digitar: 'excluir' }))) return;
       const livre = ocupado('Excluindo o lote…');
       try { await ctx.api.excluirLote(lote.id); await ctx.atualizarRef(true); } finally { livre(); }
       ctx.toast('Lote excluído', 'ok');
@@ -385,7 +388,7 @@ export async function renderTanque(ctx, el, id, params = {}) {
     try {
       const livre0 = ocupado('Conferindo o que será apagado…');
       let r, lixo; try { [r, lixo] = await Promise.all([resumoDe(todos.map((l) => l.id)), ctx.api.temLixeira()]); } finally { livre0(); }
-      if (!(await confirmar({ titulo: `Apagar "${tanque.nome}"?`, texto: `Serão apagados ${plural(todos.length, 'lote', 'lotes')}, ${txtResumo(r)} ${lixo ? 'Fica na lixeira por 180 dias: dá para restaurar em Mais > Histórico e lixeira.' : 'Não dá para desfazer.'}`, ok: 'Apagar tanque', perigo: true, digitar: tanque.nome }))) return;
+      if (!(await confirmar({ titulo: `Apagar "${tanque.nome}"?`, texto: `Serão apagados ${plural(todos.length, 'lote', 'lotes')}, ${txtResumo(r)} ${lixo ? 'Fica na lixeira por 180 dias: dá para restaurar em Fazenda > Histórico e lixeira.' : 'Não dá para desfazer.'}`, ok: 'Apagar tanque', perigo: true, digitar: tanque.nome }))) return;
       const livre = ocupado('Apagando o tanque…');
       try {
         await ctx.api.excluirTanque(id);

@@ -142,9 +142,12 @@ with sync_playwright() as pw:
     USADOS.clear(); ctx.close()
     # [5] funcionário digitando o endereço de telas do dono
     ctx, pg = abrir(b, 'funcionario')
-    for r, palavra in [('#/equipe', 'Somente o dono'), ('#/historico', 'Somente o dono'), ('#/plano', 'Somente o dono'), ('#/admin', 'Somente administradores'), ('#/tanques', 'permissão'), ('#/tanque/' + T, 'permissão')]:
+    for r, palavra in [('#/equipe', 'Somente o dono'), ('#/historico', 'Somente o dono'), ('#/plano', 'Somente o dono'), ('#/admin', 'Somente administradores'), ('#/tanque/' + T, 'permissão')]:
         pg.goto(BASE + r); pg.wait_for_timeout(1200)
         checa(palavra in pg.inner_text('#view'), f'[5] funcionário abrindo {r} direto pelo endereço: barrado')
+    # Tanques (desde 13/11/2026): o funcionário vê a lista dos tanques dele, sem o cadastro
+    pg.goto(BASE + '#/tanques'); pg.wait_for_timeout(1200)
+    checa('liberados para você' in pg.inner_text('#view') and pg.locator('#f-novo').count() == 0 and pg.locator('#d-planilha').count() == 0, '[5] funcionário em Tanques: só a lista, sem cadastrar tanque')
     pg.goto(BASE + '#/estoque'); pg.wait_for_timeout(1500)
     checa('R$' not in pg.inner_text('#view'), '[5] funcionário no estoque: vê as compras (sacos, fornecedor), mas nenhum valor em R$')
     tl = texto_pdf(pg, '#/relatorio/' + L, '#b-pdf')

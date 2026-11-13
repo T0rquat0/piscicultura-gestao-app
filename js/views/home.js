@@ -1,22 +1,19 @@
 import { esc, fmtInt, fmtNum, fmtData, hojeISO, diasEntre, num, ROTULO_TIPO, ROTULO_PAPEL, progresso, fmtPct } from '../util.js';
 import * as db from '../db.js';
-import { situacaoEstoque, previsaoDespesca, alertasManejo, sugestaoRacao, vivosDoLote } from '../calc.js';
-import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, ESTOQUE_COBERTURA_DIAS, PESO_SACO_PADRAO_KG, CONTAGEM_LEMBRETE_DIAS, PLANO_AVISO_DIAS, ALERTAS, TAXA_RACAO } from '../config.js';
+import { situacaoEstoque, previsaoDespesca, alertasManejo, vivosDoLote } from '../calc.js';
+import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, ESTOQUE_COBERTURA_DIAS, CONTAGEM_LEMBRETE_DIAS, PLANO_AVISO_DIAS, ALERTAS } from '../config.js';
 import { icone } from '../icons.js';
 import { pedirTexto } from '../dialogo.js';
 import { pizza, COR_FASE, ORDEM_FASE, COR_RACAO } from '../graficos.js';
-import { metaDe, pesoTxt, htmlPrevisao } from './despesca.js';
+import { metaDe, htmlPrevisao } from './despesca.js';
 import { pintarTempo } from './tempo.js';
+import { dadosDoDia, situacaoTanque, formatosSaco, ordemNatural, statusTanque } from './dia.js';
+import { renderRonda } from './ronda.js';
 export { renderTanqueDetalhe } from './tanque-detalhe.js';
+export { ordemNatural, statusTanque };
 
-export const ordemNatural = (a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR', { numeric: true, sensitivity: 'base' });
-
-export function statusTanque(tanque, lotes, resumo, racaoHojeLocal, hoje) {
-  const meus = lotes.filter((l) => l.tanque_id === tanque.id);
-  if (!meus.length) return 'semlote';
-  const lancou = racaoHojeLocal.has(tanque.id) || meus.some((l) => resumo[l.id] && resumo[l.id].ultima_racao === hoje);
-  return lancou ? 'ok' : 'falta';
-}
+// chips do que falta num tanque (Hoje e tela do tanque)
+export const htmlChips = (itens) => itens.map((c) => `<span class="sit${c.tom ? ` ${c.tom}` : ''}">${esc(c.txt)}</span>`).join('');
 
 // Cria um tanque direto da tela inicial (dono/gerente). O limite do pacote é imposto no banco.
 async function novoTanque(ctx, el) {
@@ -43,66 +40,27 @@ export async function renderHome(ctx, el) {
   if (!tanques.length) {
     el.innerHTML = `<h1>Olá, ${esc(primeiro)}</h1>` + (state.perfil.papel === 'dono'
       ? `<div class="card vazio"><p>Nenhum tanque cadastrado ainda.</p><button class="btn primario" id="b-novo-tanque" type="button">Cadastrar o primeiro tanque</button></div>`
-      : `<div class="card vazio"><p>Nenhum tanque liberado para você ainda.<br>Peça ao ${state.perfil.papel === 'gerente' ? 'dono' : 'dono ou ao gerente'} para liberar os seus tanques em Mais › Equipe.</p></div>`);
+      : `<div class="card vazio"><p>Nenhum tanque liberado para você ainda.<br>Peça ao ${state.perfil.papel === 'gerente' ? 'dono' : 'dono ou ao gerente'} para liberar os seus tanques em Fazenda › Equipe.</p></div>`);
     const b0 = el.querySelector('#b-novo-tanque'); if (b0) b0.addEventListener('click', () => novoTanque(ctx, el));
     return;
   }
 
-  el.innerHTML = `<div class="h-titulo"><h1>Hoje na fazenda</h1></div><p class="carregando">Carregando tanques…</p>`;
-  const hoje = hojeISO();
-  const desde = (n) => { const d = new Date(`${hoje}T00:00:00Z`); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10); };
-  const gerir = ctx.podeGerir();
-  const resumo = {};
-  let semDetalhe = false, saldos = null, racao = null, mortes = null, agua = [];
-  if (navigator.onLine) {
-    const [rs, sd, rc, mt, ag] = await Promise.all([
-      ctx.api.resumoLotes().catch(() => null),
-      ctx.api.saldosRacao().catch(() => null),
-      ctx.api.racaoPeriodo(desde(13)).catch(() => null), // 14 dias: hoje e os 13 anteriores
-      gerir ? ctx.api.mortalidadePeriodo(desde(6)).catch(() => null) : null, // 7 dias com hoje
-      gerir ? ctx.api.aguaPeriodo(desde(1)).catch(() => null) : null,
-    ]);
-    agua = ag || [];
-    if (rs) for (const r of rs) resumo[r.lote_id] = r; else semDetalhe = true;
-    saldos = sd; racao = rc; mortes = mt;
-    if (rc) db.kvSet('racao14', rc).catch(() => {}); // sem sinal, "ração dada hoje" continua com o que já foi enviado
-  } else {
-    const g = await ctx.api.resumoGuardado().catch(() => null);
-    if (g) for (const r of g) resumo[r.lote_id] = r; else semDetalhe = true;
-    const rg = await db.kvGet('racao14').catch(() => null);
-    if (Array.isArray(rg)) racao = rg.filter((r) => r.data >= desde(13));
-  }
-  const numerosGuardados = !semDetalhe && (!navigator.onLine || !!ctx.state.semRede);
+  // funcionário: a Hoje dele é a ronda (uma linha por tanque liberado, o que falta e as ações)
+  if (!ctx.podeGerir()) return renderRonda(ctx, el, { inicio: true });
+
+  el.innerHTML = `<div class="h-titulo"><h1>Hoje</h1></div><p class="carregando">Carregando tanques…</p>`;
+  const D = await dadosDoDia(ctx, { mortes: true });
+  const { hoje, resumo, semDetalhe, numerosGuardados, saldos, racao, mortes, porTanque, porDia, dias14 } = D;
+  const agua = D.agua || [];
   // a ração de alevino só aparece na Início quando a fazenda usa (tem saldo, compra ou consumo)
   const usadas = saldos ? saldos.linhas.filter((s, i) => i === 0 || ['total_comprado_kg', 'total_consumido_kg', 'saldo_kg'].some((k) => Number(s[k]))) : [];
   // lembrete de contagem: a ração em uso há mais tempo sem contar
   const paraContar = usadas.filter((s) => Number(s.consumo_7d_kg) > 0).sort((a, b) => String(a.ultima_contagem || '').localeCompare(String(b.ultima_contagem || '')))[0] || usadas[0] || null;
 
-  const fila = await db.filaList();
   const metas = (await db.kvGet('metasDespesca')) || {};
-  const pendHoje = fila.filter((i) => i.tabela === 'racao_consumo' && i.payload.data === hoje);
-  const racaoHojeLocal = new Set(pendHoje.map((i) => i.payload.tanque_id));
-  const kgS = state.ref.kgSaco || PESO_SACO_PADRAO_KG;
-  const sacos = (kg) => kg / kgS;
-  // sacos: inteiro a partir de 3 (ninguém conta 6,7 sacos no galpão); abaixo disso, uma casa
-  // sugestão: arredonda em meio saco, igual à tela Lançar (as duas mostram o mesmo número)
-  const nSug = (kg) => { const n = sacos(kg); if (n < 0.95) return nSacos(n); const v = Math.round(n * 2) / 2; return `${fmtNum(v, Number.isInteger(v) ? 0 : 1)} ${v === 1 ? 'saco' : 'sacos'}`; };
-  // menos de 1 saco (alevino) vai em kg: ninguém pesa "0,2 saco" no galpão
-  const nSacos = (n) => { if (n > 0 && n < 0.95) return `${fmtNum(n * kgS, n * kgS < 10 ? 1 : 0)} kg`; const v = n >= 3 ? Math.round(n) : Math.round(n * 10) / 10; return `${fmtNum(v, Number.isInteger(v) ? 0 : 1)} ${v === 1 ? 'saco' : 'sacos'}`; };
+  const F = formatosSaco(state.ref.kgSaco);
+  const { kgS, sacos, nSacos } = F;
 
-  // ração por tanque: hoje (banco + o que ainda está no aparelho) e a média dos dias com ração na última semana
-  const porTanque = {};
-  const dias14 = Array.from({ length: 14 }, (_, i) => desde(13 - i));
-  const porDia = Object.fromEntries(dias14.map((d) => [d, 0]));
-  const t0 = (id) => (porTanque[id] ||= { hojeKg: 0, semana: {} });
-  for (const r of racao || []) {
-    const kg = Number(r.quantidade_kg) || 0;
-    if (r.data in porDia) porDia[r.data] += kg;
-    const t = t0(r.tanque_id);
-    if (r.data === hoje) t.hojeKg += kg;
-    else if (r.data >= desde(7)) t.semana[r.data] = (t.semana[r.data] || 0) + kg;
-  }
-  for (const i of pendHoje) { const kg = Number(i.payload.quantidade_kg) || 0; t0(i.payload.tanque_id).hojeKg += kg; porDia[hoje] += kg; }
   const hojePorTipo = {};
   for (const t of tanques) {
     const kg = (porTanque[t.id] || {}).hojeKg || 0; if (!kg) continue;
@@ -113,53 +71,10 @@ export async function renderHome(ctx, el) {
   // consumo da semana; sem histórico (fazenda nova), usa o ritmo de hoje: 82 sacos ÷ 18 por dia = ~4 dias
   const consumo7d = (s) => (Number(s.consumo_7d_kg) > 0 ? Number(s.consumo_7d_kg) : (hojePorTipo[s.tipo_racao || 'engorda'] || 0) * 7);
   const peloDeHoje = (s) => !(Number(s.consumo_7d_kg) > 0) && (hojePorTipo[s.tipo_racao || 'engorda'] || 0) > 0;
-  const mediaKg = (id) => { const s = Object.values((porTanque[id] || {}).semana || {}); return s.length ? s.reduce((a, b) => a + b, 0) / s.length : null; };
-
-  const status = {};
-  for (const t of tanques) status[t.id] = statusTanque(t, lotes, resumo, racaoHojeLocal, hoje);
+  const mediaKg = D.mediaKg;
+  const status = D.status;
   const grupo = (k) => tanques.filter((t) => status[t.id] === k).sort(ordemNatural);
   const faltam = grupo('falta'), feitos = grupo('ok'), vazios = grupo('semlote');
-  const dadoKg = feitos.reduce((s, t) => s + ((porTanque[t.id] || {}).hojeKg || 0), 0);
-  const previstoFaltaKg = faltam.reduce((s, t) => s + (mediaKg(t.id) || 0), 0);
-  const temMedia = faltam.every((t) => mediaKg(t.id) != null);
-
-  const fase = (t) => { const ls = lotes.filter((l) => l.tanque_id === t.id); return ls.length > 1 ? `${ls.length} lotes` : ls.length ? ROTULO_TIPO[ls[0].tipo] || ls[0].tipo : 'Sem lote'; };
-  const visto = icone('check', 16);
-  // linha de números do quadro: toneladas na água e peso médio ÷ meta de despesca (só com um lote no tanque)
-  const linhaTq = (t) => {
-    const ls = lotes.filter((l) => l.tanque_id === t.id);
-    if (!ls.length || semDetalhe) return '';
-    let bio = 0;
-    for (const l of ls) {
-      const r = resumo[l.id];
-      const v = vivosDoLote(l, r);
-      const pm = r && r.ultimo_peso_medio_kg != null ? Number(r.ultimo_peso_medio_kg) : Number(l.peso_inicial_kg) / Math.max(1, Number(l.quantidade_inicial));
-      bio += v * (pm || 0);
-    }
-    // toneladas só para dono e gerente (o funcionário vê só o peso médio)
-    const bioTxt = !gerir ? '' : `<span>${bio >= 1000 ? `${fmtNum(bio / 1000, 1)} t` : `${fmtNum(bio, 0)} kg`}</span>`;
-    if (ls.length > 1) return bioTxt ? `<span class="tq-dado">${bioTxt}</span>` : '';
-    const l = ls[0], r = resumo[l.id];
-    const pm = r && r.ultimo_peso_medio_kg != null ? Number(r.ultimo_peso_medio_kg) : Number(l.peso_inicial_kg) / Math.max(1, Number(l.quantidade_inicial));
-    const meta = metaDe(l, metas);
-    return `<span class="tq-dado">${bioTxt}<strong>${pesoTxt(pm)}<span> / ${pesoTxt(meta)}</span></strong></span>${progresso((pm / meta) * 100, { fina: true, tom: pm >= meta ? 'ok' : '', rotulo: `Peso médio ${pesoTxt(pm)} de ${pesoTxt(meta)}` })}`;
-  };
-  // sugestão do dia (só quando o tanque ainda não tem média de ração na semana)
-  const sugDe = (t) => (semDetalhe ? null : sugestaoRacao(lotes.filter((l) => l.tanque_id === t.id), resumo, TAXA_RACAO));
-  const tile = (t) => {
-    if (status[t.id] === 'falta') {
-      const m = mediaKg(t.id);
-      return `<a class="tq falta" href="#/lancar?tipo=racao&tanque=${esc(t.id)}"><b>${esc(t.nome)}</b><span class="tq-fase">${esc(fase(t))}</span>
-        ${linhaTq(t)}<span class="tq-acao">${m ? `<span class="tq-verbo">Lançar </span><span class="tq-mais">+</span>${esc(nSacos(sacos(m)))}` : sugDe(t) ? `<span class="tq-verbo">Lançar </span><span class="tq-mais">+</span>~${esc(nSug(sugDe(t).kg))}` : 'Lançar ração'}</span></a>`;
-    }
-    if (status[t.id] === 'ok') {
-      const kg = (porTanque[t.id] || {}).hojeKg;
-      return `<a class="tq pronto" href="#/t/${esc(t.id)}"><b>${esc(t.nome)}</b><span class="tq-fase">${esc(fase(t))}</span>
-        ${linhaTq(t)}<span class="tq-ok">${visto}${kg ? esc(nSacos(sacos(kg))) : 'Alimentado'}</span></a>`;
-    }
-    return `<a class="tq vazio" href="#/t/${esc(t.id)}"><b>${esc(t.nome)}</b><span class="tq-fase">Sem lote</span></a>`;
-  };
-
   const comLote = faltam.length + feitos.length;
   const achado = !comLote ? 'Nenhum tanque com lote ativo.'
     : faltam.length ? `<b>${fmtInt(faltam.length)} ${faltam.length === 1 ? 'tanque' : 'tanques'}</b> ainda sem ração`
@@ -168,26 +83,26 @@ export async function renderHome(ctx, el) {
 
   el.innerHTML = `
     <div class="h-titulo">
-      <div><h1>Hoje na fazenda</h1>
+      <div><h1>Hoje</h1>
         <p class="h-achado">${esc(dataLonga.charAt(0).toUpperCase() + dataLonga.slice(1))} · ${achado}</p></div>
     </div>
     <div id="avisos">${avisoContagem(ctx, paraContar, hoje)}</div>
     ${semDetalhe ? '<p class="aviso">Sem conexão: mostrando só o que está guardado no aparelho. Os totais aparecem quando houver internet.</p>' : numerosGuardados ? '<p class="aviso">Sem conexão: números da última atualização, sem os lançamentos ainda não enviados.</p>' : ''}
-    ${comLote ? `<div class="h-topo">${seguro(cartaoAgora, 'Próxima tarefa')}${seguro(painelKpis, 'Indicadores')}</div>` : ''}
-    ${gerir ? seguro(blocoAlertas, 'Atenção') : ''}
+    ${seguro(blocoAlertas, 'Atenção')}
+    ${comLote ? `<a class="btn primario grande h-ronda" id="b-ronda" href="#/ronda">${icone('racao', 22)}<span>Fazer a ronda de hoje</span></a>` : ''}
+    ${comLote ? seguro(numeros, 'Números') : ''}
+    ${seguro(blocoTanques, 'Tanques')}
     <div class="h-grade">
       <div class="h-col">
-        ${seguro(blocoRacao, 'Tanques')}
-        ${gerir ? seguro(blocoDespescas, 'Despescas e mudanças de fase') : ''}
-        ${gerir && lotes.length ? seguro(blocoMortes, 'Mortalidade') : ''}
+        ${seguro(blocoDespescas, 'Despescas e mudanças de fase')}
+        ${lotes.length ? seguro(blocoMortes, 'Mortalidade') : ''}
       </div>
       <div class="h-col">
         <section class="h-bloco" aria-labelledby="h-tempo" id="b-tempo"><header><h2 id="h-tempo">Tempo na fazenda</h2></header><p class="h-calmo">Carregando a previsão…</p></section>
         ${seguro(blocoEstoque, 'Estoque de ração')}
-        ${gerir ? seguro(blocoPeixe, 'Peixe na água') : ''}
+        ${seguro(blocoPeixe, 'Peixe na água')}
       </div>
     </div>`;
-  const bn = el.querySelector('#b-novo-tanque'); if (bn) bn.addEventListener('click', () => novoTanque(ctx, el));
   avisoPlano(ctx, el.querySelector('#avisos'));
   avisoConviteUsado(ctx, el.querySelector('#avisos'));
   pintarTempo(el.querySelector('#b-tempo'), ctx, hoje);
@@ -230,48 +145,45 @@ export async function renderHome(ctx, el) {
     return `<section class="h-alertas" aria-labelledby="h-at"><h2 id="h-at">Atenção</h2><ul>${linhas}</ul></section>`;
   }
 
-  function cartaoAgora() {
-    const pct = comLote ? feitos.length / comLote : 0;
-    const C = 2 * Math.PI * 54;
-    const anel = `<div class="ag-anel" role="img" aria-label="${feitos.length} de ${comLote} tanques alimentados hoje"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" class="ag-trilho"/><circle cx="60" cy="60" r="54" class="ag-feito${pct >= 1 ? ' cheio' : ''}" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - pct)).toFixed(1)}"/></svg>
-      <div><b>${fmtInt(feitos.length)}/${fmtInt(comLote)}</b><small>tanques<br>alimentados</small></div></div>`;
-    const dado = dadoKg > 0 ? ` · ${esc(nSacos(sacos(dadoKg)))} ${Math.round(sacos(dadoKg) * 10) === 10 ? 'dado' : 'dados'} hoje` : '';
-    if (!faltam.length) {
-      return `<section class="ag ok">${anel}<div class="ag-txt"><span class="ag-rot">Ração de hoje</span><h2>Todos os tanques comeram</h2><p>Bom trabalho${dado}.</p>
-        ${gerir ? '<a class="btn" href="#/relatorio/racao">Ver ração de hoje</a>' : ''}</div></section>`;
-    }
-    const t = faltam[0], m = mediaKg(t.id);
-    const ls = lotes.filter((l) => l.tanque_id === t.id);
-    const peixes = ls.reduce((a, l) => a + vivosDoLote(l, resumo[l.id]), 0);
-    const sg = m ? null : sugDe(t);
-    const det = [fase(t), peixes ? `${fmtInt(peixes)} peixes` : '', m ? `média de ${nSacos(sacos(m))}` : sg ? `sugestão de ~${nSug(sg.kg)} (${fmtNum(sg.pct, 1)}% do peso vivo${sg.provisoria ? ', provisória' : ''})` : 'sem média ainda: conte os sacos dados'].filter(Boolean).join(' · ');
-    return `<section class="ag">${anel}<div class="ag-txt"><span class="ag-rot">Próxima tarefa</span><h2>Ração no ${esc(t.nome)}</h2><p>${esc(det)}${dado}</p>
-      <a class="btn primario grande" href="#/lancar?tipo=racao&tanque=${esc(t.id)}">Lançar ração agora</a></div></section>`;
-  }
-
-  function painelKpis() {
-    const ks = [];
-    if (gerir && !semDetalhe) {
-      let peixes = 0, kg = 0, ini = 0, mortos = 0;
+  // os números do dia: peixe na água, quanto vale (só o dono vê R$), quanto dura a ração e mortes da semana
+  function numeros() {
+    const ns = [];
+    if (!semDetalhe) {
+      let peixes = 0, kg = 0;
       for (const l of lotes) {
         const r = resumo[l.id];
         const v = vivosDoLote(l, r);
         const pm = r && r.ultimo_peso_medio_kg != null ? Number(r.ultimo_peso_medio_kg) : Number(l.peso_inicial_kg) / Math.max(1, Number(l.quantidade_inicial));
-        peixes += v; kg += v * (pm || 0); ini += Number(l.quantidade_inicial) || 0; mortos += Number(r && r.mortos) || 0;
+        peixes += v; kg += v * (pm || 0);
       }
-      const sob = ini > 0 ? (Math.max(0, ini - mortos) / ini) * 100 : 100; // despescado não conta como perda
-      ks.push(`<div class="kp"><span>Peixe na água</span><b>${kg >= 1000 ? fmtNum(kg / 1000, 1) : fmtNum(kg, 0)}<em>${kg >= 1000 ? 't' : 'kg'}</em></b><small>${fmtInt(peixes)} peixes vivos</small></div>`);
-      ks.push(`<div class="kp"><span>Sobrevivência</span><b>${fmtPct(sob)}<em>%</em></b>${progresso(sob, { fina: true, tom: sob >= 90 ? 'ok' : sob >= 75 ? 'alerta' : 'erro', rotulo: `Sobrevivência ${fmtPct(sob)}%` })}<small>desde a entrada dos lotes</small></div>`);
-    } else {
-      ks.push(`<div class="kp"><span>Ração dada hoje</span><b>${fmtNum(sacos(dadoKg), 0)}<em>${Math.round(sacos(dadoKg)) === 1 ? 'saco' : 'sacos'}</em></b><small>${fmtNum(dadoKg, 0)} kg</small></div>`);
+      ns.push(`<div class="num"><span>Peixe na água</span><b>${kg >= 1000 ? fmtNum(kg / 1000, 1) : fmtNum(kg, 0)}<small> ${kg >= 1000 ? 't' : 'kg'}</small></b><small>${fmtInt(peixes)} peixes vivos</small></div>`);
+      if (state.perfil.papel === 'dono' && state.ref.precoKg) ns.push(`<div class="num"><span>Vale hoje</span><b>${esc(valorCurto(kg * state.ref.precoKg))}</b><small>a R$ ${fmtNum(state.ref.precoKg, 2)}/kg</small></div>`);
     }
     if (usadas.length) {
-      const tot = usadas.reduce((a, x) => a + Math.max(0, Number(x.saldo_kg) || 0), 0), algumNeg = usadas.some((x) => Number(x.saldo_kg) < 0);
+      const algumNeg = usadas.some((x) => Number(x.saldo_kg) < 0);
       const sit = situacaoEstoque(Number(usadas[0].saldo_kg) || 0, consumo7d(usadas[0]), ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS);
       const tom = { atencao: 'alerta', critico: 'erro', negativo: 'erro' }[sit.nivel] || '';
-      ks.push(`<a class="kp" href="#/estoque"><span>Estoque de ração</span><b>${fmtNum(sacos(tot), 0)}<em>sacos</em></b>${algumNeg ? `<small>${usadas.length > 1 ? 'falta registrar compra de uma das rações' : 'falta registrar compra de ração'}</small>` : sit.dias != null ? `${progresso((sit.dias / ESTOQUE_COBERTURA_DIAS) * 100, { fina: true, tom, rotulo: `Dura ${fmtInt(Math.floor(sit.dias))} dias` })}<small>dura ~${fmtInt(Math.floor(sit.dias))} dias${usadas.length > 1 ? ' (engorda)' : ''}${peloDeHoje(usadas[0]) ? ', no ritmo de hoje' : ''}</small>` : '<small>sem consumo para estimar</small>'}</a>`);
+      ns.push(`<a class="num${tom ? ` ${tom}` : ''}" href="#/estoque"><span>Ração dura</span>${algumNeg ? '<b>0<small> dias</small></b><small>falta registrar compra</small>' : sit.dias != null ? `<b>${fmtInt(Math.floor(sit.dias))}<small> ${Math.floor(sit.dias) === 1 ? 'dia' : 'dias'}</small></b><small>${usadas.length > 1 ? 'engorda' : 'no galpão'}${peloDeHoje(usadas[0]) ? ', ritmo de hoje' : ''}</small>` : '<b>—</b><small>sem consumo</small>'}</a>`);
     }
-    return `<div class="h-kpis">${ks.join('')}</div>`;
+    if (mortes) {
+      const ativos = new Set(lotes.map((l) => l.id));
+      const tot = mortes.filter((m) => ativos.has(m.lote_id)).reduce((a, m) => a + (Number(m.quantidade) || 0), 0);
+      ns.push(`<div class="num"><span>Mortes 7 dias</span><b>${fmtInt(tot)}</b><small>${tot === 1 ? 'peixe' : 'peixes'}</small></div>`);
+    }
+    return ns.length ? `<div class="numeros n${ns.length}">${ns.join('')}</div>` : '';
+  }
+
+  // uma linha por tanque com o que falta hoje; tocar abre o tanque (botões grandes de lançar)
+  function blocoTanques() {
+    const linha = (t) => {
+      const sit = situacaoTanque(D, t, F);
+      return `<a class="card tq ${status[t.id]}" href="#/t/${esc(t.id)}"><span class="tq-cab"><b>${esc(t.nome)}</b><small>${esc(D.fase(t.id))}</small><span class="seta">${icone('direita', 18)}</span></span>
+        <span class="sits">${htmlChips(sit.itens)}</span></a>`;
+    };
+    return `<section class="h-tanques" aria-labelledby="h-tq">
+      <header><h2 id="h-tq">O que falta em cada tanque</h2><span class="h-meta">toque para abrir</span></header>
+      <div class="hoje-tanques">${[...faltam, ...feitos, ...vazios].map(linha).join('')}</div>
+    </section>`;
   }
 
   // um bloco com erro não derruba a tela: mostra um aviso pequeno no lugar dele e o resto aparece
@@ -296,22 +208,6 @@ export async function renderHome(ctx, el) {
     </section>`;
   }
 
-
-  function blocoRacao() {
-    const previsto = dadoKg + previstoFaltaKg;
-    const lead = !comLote ? ''
-      : temMedia && previsto > 0 && faltam.length
-        ? `<p class="h-lead"><span class="h-num">${fmtNum(sacos(dadoKg), 0)}</span><span class="h-de">de ${esc(nSacos(sacos(previsto)))}</span></p>
-           <div class="h-trilho" role="img" aria-label="${fmtNum(sacos(dadoKg), 0)} de ${fmtNum(sacos(previsto), 0)} sacos dados hoje"><span style="width:${Math.min(100, (dadoKg / previsto) * 100).toFixed(1)}%"></span></div>
-           <p class="h-trilho-leg"><span>${fmtNum(dadoKg, 0)} kg dados</span><span>faltam ${esc(nSacos(sacos(previstoFaltaKg)))}</span></p>`
-        : `<p class="h-lead"><span class="h-num">${fmtNum(sacos(dadoKg), dadoKg && dadoKg / kgS < 10 ? 1 : 0)}</span><span class="h-de">${Math.abs(sacos(dadoKg) - 1) < 0.05 ? 'saco dado' : 'sacos dados'} hoje</span></p>`;
-    return `<section class="h-bloco" aria-labelledby="h-racao">
-      <header><h2 id="h-racao">Tanques</h2><span class="h-meta">${gerir && !semDetalhe && lotes.length ? 'peso médio ÷ meta de despesca' : lotes.length ? 'ração de hoje' : ''}</span></header>
-      ${comLote ? '' : lead}
-      <div class="mapa" aria-label="Tanques">${[...faltam, ...feitos, ...vazios].map(tile).join('')}
-        ${gerir ? `<button class="tq novo" id="b-novo-tanque" type="button">${icone('lancar', 20)}<b>Novo tanque</b></button>` : ''}</div>
-    </section>`;
-  }
 
   function blocoPeixe() {
     let peixes = 0, kg = 0; const porT = {}, porFase = {};
