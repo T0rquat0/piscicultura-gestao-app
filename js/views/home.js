@@ -269,7 +269,7 @@ export async function renderHome(ctx, el) {
       const tot = usadas.reduce((a, x) => a + Math.max(0, Number(x.saldo_kg) || 0), 0), algumNeg = usadas.some((x) => Number(x.saldo_kg) < 0);
       const sit = situacaoEstoque(Number(usadas[0].saldo_kg) || 0, consumo7d(usadas[0]), ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS);
       const tom = { atencao: 'alerta', critico: 'erro', negativo: 'erro' }[sit.nivel] || '';
-      ks.push(`<a class="kp" href="#/estoque"><span>Estoque de ração</span><b>${fmtNum(sacos(tot), 0)}<em>sacos</em></b>${algumNeg ? `<small>${usadas.length > 1 ? 'uma das rações ficou negativa' : 'saldo negativo'}: confira as compras</small>` : sit.dias != null ? `${progresso((sit.dias / ESTOQUE_COBERTURA_DIAS) * 100, { fina: true, tom, rotulo: `Dura ${fmtInt(Math.floor(sit.dias))} dias` })}<small>dura ~${fmtInt(Math.floor(sit.dias))} dias${usadas.length > 1 ? ' (engorda)' : ''}${peloDeHoje(usadas[0]) ? ', no ritmo de hoje' : ''}</small>` : '<small>sem consumo para estimar</small>'}</a>`);
+      ks.push(`<a class="kp" href="#/estoque"><span>Estoque de ração</span><b>${fmtNum(sacos(tot), 0)}<em>sacos</em></b>${algumNeg ? `<small>${usadas.length > 1 ? 'falta registrar compra de uma das rações' : 'falta registrar compra de ração'}</small>` : sit.dias != null ? `${progresso((sit.dias / ESTOQUE_COBERTURA_DIAS) * 100, { fina: true, tom, rotulo: `Dura ${fmtInt(Math.floor(sit.dias))} dias` })}<small>dura ~${fmtInt(Math.floor(sit.dias))} dias${usadas.length > 1 ? ' (engorda)' : ''}${peloDeHoje(usadas[0]) ? ', no ritmo de hoje' : ''}</small>` : '<small>sem consumo para estimar</small>'}</a>`);
     }
     return `<div class="h-kpis">${ks.join('')}</div>`;
   }
@@ -343,7 +343,7 @@ export async function renderHome(ctx, el) {
     const saldo = Number(s.saldo_kg) || 0;
     const sit = situacaoEstoque(saldo, consumo7d(s), ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS);
     let nota = '';
-    if (sit.nivel === 'negativo') nota = '<p class="h-alerta">O saldo ficou negativo: confira o estoque no galpão.</p>';
+    if (sit.nivel === 'negativo') nota = '<p class="h-alerta">Foi lançada mais ração do que a registrada no estoque. <a href="#/estoque">Registre a compra que faltou</a> ou conte o galpão.</p>';
     else if (sit.dias != null) {
       const fim = new Date(`${hoje}T12:00:00`); fim.setDate(fim.getDate() + Math.floor(sit.dias));
       const quando = fim.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' });
@@ -353,9 +353,9 @@ export async function renderHome(ctx, el) {
     const tomEst = { atencao: 'alerta', critico: 'erro', negativo: 'erro' }[sit.nivel] || '';
     const quando = sit.dias != null ? (() => { const f = new Date(`${hoje}T12:00:00`); f.setDate(f.getDate() + Math.floor(sit.dias)); return f.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }).replace('.', ''); })() : '';
     return `<div class="h-est-linha">
-      <div class="h-est-cab"><span>${esc(titulo || 'Ração')}</span><b>${saldo < 0 ? '−' : ''}${fmtNum(Math.abs(sacos(saldo)), 0)} <small>${Math.round(Math.abs(sacos(saldo))) === 1 ? 'saco' : 'sacos'}</small></b></div>
+      <div class="h-est-cab"><span>${esc(titulo || 'Ração')}</span><b>${fmtNum(Math.max(0, sacos(saldo)), 0)} <small>${Math.round(Math.max(0, sacos(saldo))) === 1 ? 'saco' : 'sacos'}</small></b></div>
       ${sit.dias != null || sit.nivel === 'negativo' ? progresso(((sit.dias || 0) / ESTOQUE_COBERTURA_DIAS) * 100, { fina: true, tom: tomEst, rotulo: `Estoque para ${fmtInt(Math.floor(sit.dias || 0))} de ${ESTOQUE_COBERTURA_DIAS} dias` }) : ''}
-      <small class="h-est-sub">${sit.nivel === 'negativo' ? 'foi lançado mais do que foi comprado' : sit.dias != null ? `dura ${fmtInt(Math.floor(sit.dias))} ${Math.floor(sit.dias) === 1 ? 'dia' : 'dias'}${peloDeHoje(s) ? ' no ritmo de hoje' : ''} · acaba por volta de ${esc(quando)}` : 'sem consumo para estimar'}</small>
+      <small class="h-est-sub">${sit.nivel === 'negativo' ? `faltou registrar a compra de ${esc(nSacos(Math.abs(sacos(saldo))))}` : sit.dias != null ? `dura ${fmtInt(Math.floor(sit.dias))} ${Math.floor(sit.dias) === 1 ? 'dia' : 'dias'}${peloDeHoje(s) ? ' no ritmo de hoje' : ''} · acaba por volta de ${esc(quando)}` : 'sem consumo para estimar'}</small>
       ${sit.nivel === 'critico' || sit.nivel === 'atencao' || sit.nivel === 'negativo' ? nota : ''}</div>`;
   }
 

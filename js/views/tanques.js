@@ -47,8 +47,9 @@ export async function renderTanques(ctx, el) {
       }).join('')}</ul>` : (ctx.state.perfil.papel === 'dono' ? '<p class="mudo" style="margin:0">Nenhum tanque cadastrado ainda.</p>' : '<p class="aviso" style="margin:0">Nenhum tanque liberado para você. Se a fazenda já tem tanques, peça ao dono para liberar em Mais › Equipe, em vez de cadastrar de novo.</p>')}
     </div>
     <div class="pc-duas">
-    <form id="f-novo" class="card form" novalidate>
-      <h3>Novo tanque</h3>
+    <details class="card form-dobra" id="d-novo-tanque">
+      <summary>Novo tanque</summary>
+    <form id="f-novo" class="form" novalidate>
       <div class="duas">
         <label>Nome do tanque <input id="nome" maxlength="60" placeholder="Ex.: Tanque 1" required></label>
         <label>Área (hectares) <small class="mudo">opcional</small><input id="area" type="text" inputmode="decimal" placeholder="Ex.: 5,5"></label>
@@ -56,7 +57,8 @@ export async function renderTanques(ctx, el) {
       <p id="erro" class="erro" hidden></p>
       <button class="btn primario" type="submit">Cadastrar tanque</button>
     </form>
-    <details class="form-dobra" id="d-planilha">
+    </details>
+    <details class="card form-dobra" id="d-planilha">
       <summary>Cadastrar vários tanques de uma vez (colar planilha)</summary>
       <div class="form">
         <p class="mudo" style="margin-top:0">Copie as linhas do Excel (ou escreva uma por linha) nesta ordem: <b>Tanque · Área (ha) · Fase · Peixes · Peso médio · Início do ciclo</b>. Pode separar por tabulação ou ponto e vírgula. Peso em kg ou com "g" (ex.: 500 g). Tanque sem peixes entra só como tanque.</p>
@@ -175,21 +177,22 @@ export async function renderTanque(ctx, el, id, params = {}) {
     <h2>Lotes</h2>
     <div class="card">
       ${todos.length ? `<ul class="lista">${todos.map((l) => `
-        <li>
-          <div class="esq"><b>${esc(ROTULO_TIPO[l.tipo] || l.tipo)} · ${esc(l.especie)}</b>
-            <small>desde ${fmtData(l.data_entrada)} · ${fmtInt(l.quantidade_inicial)} peixes · ${pmTxt(Number(l.peso_inicial_kg) / Math.max(1, Number(l.quantidade_inicial)))} cada na entrada (${fmtNum(l.peso_inicial_kg, 0)} kg)</small></div>
-          <div class="acoes" style="margin:0">
-            <span class="tag ${l.ativo ? 'ok' : ''}">${l.ativo ? 'Ativo' : 'Encerrado'}</span>
+        <li class="item-dobra"><details class="lote-dobra" data-lote="${esc(l.id)}">
+          <summary><span class="esq"><b>${esc(ROTULO_TIPO[l.tipo] || l.tipo)} · ${esc(l.especie)}</b>
+            <small>desde ${fmtData(l.data_entrada)} · ${fmtInt(l.quantidade_inicial)} peixes · ${pmTxt(Number(l.peso_inicial_kg) / Math.max(1, Number(l.quantidade_inicial)))} cada na entrada (${fmtNum(l.peso_inicial_kg, 0)} kg)</small></span>
+            <span class="tag ${l.ativo ? 'ok' : ''}">${l.ativo ? 'Ativo' : 'Encerrado'}</span></summary>
+          <div class="acoes">
             <a class="btn mini" href="#/relatorio/${esc(l.id)}">Relatório</a>
             <button class="btn mini" data-editar-lote="${esc(l.id)}" type="button">Editar</button>
             ${l.ativo ? `<button class="btn mini perigo" data-encerrar="${esc(l.id)}" type="button">Encerrar</button>` : `<button class="btn mini" data-reabrir="${esc(l.id)}" type="button">Reabrir</button>`}
           </div>
-        </li>`).join('')}</ul>` : '<p class="mudo" style="margin:0">Nenhum lote neste tanque ainda.</p>'}
+        </details></li>`).join('')}</ul>` : '<p class="mudo" style="margin:0">Nenhum lote neste tanque ainda.</p>'}
     </div>
 
     </div><div>
-    <form id="f-lote" class="card form" novalidate>
-      <h3>Novo lote de peixes</h3>
+    <details class="card form-dobra" id="d-lote"${doInicio || !todos.length ? ' open' : ''}>
+      <summary>${doInicio ? `Povoar com ${esc(ROTULO_TIPO[faseIni])}` : 'Novo lote de peixes'}</summary>
+    <form id="f-lote" class="form" novalidate>
       <div class="duas">
         <label>Fase
           <select id="tipo">${FASES.map(([v, r]) => `<option value="${v}"${v === faseIni ? ' selected' : ''}>${r}</option>`).join('')}</select></label>
@@ -213,9 +216,11 @@ export async function renderTanque(ctx, el, id, params = {}) {
       <p id="erro" class="erro" hidden></p>
       <button class="btn primario" type="submit">Cadastrar lote</button>
     </form>
+    </details>
 
-    <h2>Nome${temArea ? ' e área' : ''} do tanque</h2>
-    <form id="f-nome" class="card form" novalidate>
+    <details class="card form-dobra" id="d-nome">
+      <summary>Nome${temArea ? ' e área' : ''} do tanque</summary>
+    <form id="f-nome" class="form" novalidate>
       <div class="duas">
         <label>Nome <input id="nome" maxlength="60" value="${esc(tanque.nome)}"></label>
         ${temArea ? `<label>Área (hectares) <input id="area" type="text" inputmode="decimal" value="${tanque.area_ha != null ? esc(String(tanque.area_ha).replace('.', ',')) : ''}" placeholder="Ex.: 5,5"></label>` : ''}
@@ -223,6 +228,7 @@ export async function renderTanque(ctx, el, id, params = {}) {
       <p id="erro-nome" class="erro" hidden></p>
       <button class="btn" type="submit">Salvar</button>
     </form>
+    </details>
     </div></div>
     ${dono ? `<details class="avancado">
       <summary>Opções avançadas</summary>
@@ -239,8 +245,7 @@ export async function renderTanque(ctx, el, id, params = {}) {
   // peso médio por peixe → peso total do lote (o banco guarda o total)
   const f = el.querySelector('#f-lote');
   if (doInicio) {
-    f.querySelector('h3').textContent = `Povoar com ${ROTULO_TIPO[faseIni]}`;
-    requestAnimationFrame(() => f.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+    requestAnimationFrame(() => el.querySelector('#d-lote').scrollIntoView({ block: 'start', behavior: 'smooth' }));
   }
   const pmKg = (inp, un) => { const v = num(f.querySelector(inp).value); return v > 0 ? (f.querySelector(un).value === 'g' ? v / 1000 : v) : null; };
   const atualizaPm = () => {

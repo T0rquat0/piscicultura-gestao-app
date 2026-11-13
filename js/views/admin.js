@@ -9,7 +9,9 @@ const ESTADO = {
   teste: ['Em teste', 'ok'], teste_acabou: ['Teste acabou', 'erro'], ativo: ['Pagante', 'ok'],
   carencia: ['Em carência', 'alerta'], vencido: ['Vencido', 'erro'], livre: ['Sem limite', ''],
 };
-const FILTROS = [['todas', 'Todas'], ['teste', 'Em teste'], ['ativo', 'Pagantes'], ['atencao', 'Vencidas'], ['livre', 'Sem limite'], ['bloqueada', 'Bloqueadas']];
+const FILTROS = [['todas', 'Todas'], ['teste', 'Em teste'], ['ativo', 'Pagantes'], ['atencao', 'Vencidas'], ['livre', 'Sem limite'], ['bloqueada', 'Bloqueadas'], ['semdoc', 'Sem CPF/CNPJ']];
+const diasAte = (iso) => Math.round((Date.parse(String(iso).slice(0, 10)) - Date.parse(hojeISO())) / 864e5);
+const desde = (iso) => { if (!iso) return 'nunca lançou ração'; const d = -diasAte(iso); return d <= 0 ? 'lançou ração hoje' : d === 1 ? 'lançou ração ontem' : `lançou ração há ${d} dias`; };
 const TIPO_LANC = { receita: 'Receita', despesa: 'Despesa', retirada: 'Retirada' };
 const CATEGORIAS_SISTEMA = [['', 'Sem categoria'], ['servidor', 'Servidor / banco de dados'], ['dominio', 'Domínio / site'], ['impostos', 'Impostos'], ['marketing', 'Divulgação'], ['implantacao', 'Implantação / treinamento'], ['outros', 'Outros']];
 const ROT_CAT = Object.fromEntries(CATEGORIAS_SISTEMA);
@@ -36,41 +38,88 @@ export async function renderAdmin(ctx, el, aba = 'fazendas', estado = { filtro: 
   const conta = (g) => fazendas.filter((f) => situacao(f).grupo === g).length;
   const recarregar = (novaAba = aba) => renderAdmin(ctx, el, novaAba, estado);
 
-  const abaFazendas = () => `
+  const validade = (f) => { const p = f.plano || {}; return f.bloqueada ? '' : p.valido_ate ? ` até ${fmtData(p.valido_ate)}` : ''; };
+  const parada = (f) => !f.bloqueada && (f.ultimo_lancamento ? -diasAte(f.ultimo_lancamento) >= 7 : -diasAte(f.criado_em) >= 7);
+  const atencao = () => {
+    const a = [];
+    const item = (classe, titulo, texto, botao) => `<div class="adm-alerta ${classe}"><div><b>${titulo}</b><small>${texto}</small></div>${botao}</div>`;
+    const abrir = (f, t = 'Abrir') => `<button class="btn mini" type="button" data-abrir="${esc(f.id)}">${t}</button>`;
+    if (config.modo_piloto) a.push(item('alerta', 'Modo piloto ligado', 'Quem contrata um pacote usa 12 meses de graça. Desligue antes do primeiro cliente pagante.', '<button class="btn mini" type="button" data-ir-aba="pacotes">Ver</button>'));
+    if (pendentes.length) a.push(item('alerta', `${plural(pendentes.length, 'cobrança esperando', 'cobranças esperando')} confirmação`, pendentes.map((c) => `${esc(c.fazenda)}: ${fmtBRL(c.valor)}`).join(' · ') + '. Confira se o dinheiro entrou.', '<button class="btn mini" type="button" data-ir-aba="cobrancas">Ver</button>'));
+    for (const f of fazendas) {
+      const p = f.plano || {};
+      if (f.bloqueada) continue;
+      if (['vencido', 'carencia', 'teste_acabou'].includes(p.estado)) a.push(item('erro', `${esc(f.nome)}: ${p.estado === 'teste_acabou' ? 'teste acabou' : 'mensalidade vencida'}`, `${p.valido_ate ? `Desde ${fmtData(p.valido_ate)}. ` : ''}Cobre ou bloqueie.`, abrir(f)));
+      else if (p.estado === 'teste' && p.valido_ate && diasAte(p.valido_ate) >= 0 && diasAte(p.valido_ate) <= 3) a.push(item('alerta', `${esc(f.nome)}: teste acaba em ${plural(diasAte(p.valido_ate), 'dia', 'dias')}`, 'Bom momento para ligar e oferecer o plano.', abrir(f)));
+      if (parada(f) && f.tanques) a.push(item('alerta', `${esc(f.nome)}: parada`, `${desde(f.ultimo_lancamento)[0].toUpperCase()}${desde(f.ultimo_lancamento).slice(1)}. Ligue para saber se precisa de ajuda.`, abrir(f)));
+    }
+    const semdoc = fazendas.filter((f) => !f.documento).length;
+    if (semdoc) a.push(item('alerta', `${plural(semdoc, 'fazenda', 'fazendas')} sem CPF/CNPJ`, 'Sem o documento, a mesma pessoa pode fazer outro teste grátis.', '<button class="btn mini" type="button" data-filtro="semdoc">Ver</button>'));
+    return a;
+  };
+  const abaFazendas = () => {
+    const f = estado.aberta && fazendas.find((x) => x.id === estado.aberta);
+    if (f) return fichaFazenda(f);
+    const at = atencao();
+    return `
       <div class="kpis adm-kpis">
         <div class="kpi"><span>Fazendas</span><b>${fazendas.length}</b></div>
         <div class="kpi"><span>Em teste</span><b>${conta('teste')}</b></div>
         <div class="kpi"><span>Pagantes</span><b>${conta('ativo')}</b></div>
         <div class="kpi"><span>Vencidas / bloqueadas</span><b>${conta('atencao') + conta('bloqueada')}</b></div>
       </div>
+      <h2>Precisa de atenção <span class="contagem">${at.length}</span></h2>
+      ${at.length ? `<div class="adm-alertas">${at.join('')}</div>` : '<p class="mudo nota">Tudo certo por aqui.</p>'}
+      <h2>Clientes</h2>
       <label class="adm-busca">Procurar <input id="adm-busca" type="search" placeholder="Fazenda, dono, e-mail ou CPF/CNPJ" value="${esc(estado.busca)}"></label>
       <div class="adm-filtros">${FILTROS.map(([k, r]) => `<button type="button" class="chip${estado.filtro === k ? ' on' : ''}" data-filtro="${k}">${r}</button>`).join('')}</div>
       <div id="adm-lista">${listaFazendas()}</div>`;
+  };
   const listaFazendas = () => {
     const termo = estado.busca.trim().toLowerCase();
-    const lista = fazendas.filter((f) => (estado.filtro === 'todas' || situacao(f).grupo === estado.filtro)
+    const lista = fazendas.filter((f) => (estado.filtro === 'todas' || (estado.filtro === 'semdoc' ? !f.documento : situacao(f).grupo === estado.filtro))
       && (!termo || [f.nome, f.dono_nome, f.dono_email].some((x) => String(x || '').toLowerCase().includes(termo))
         || (termo.replace(/\D/g, '').length >= 3 && String(f.documento || '').includes(termo.replace(/\D/g, '')))));
-    return `${lista.length ? lista.map((f) => {
+    return lista.length ? `<div class="card adm-lista">${lista.map((f) => {
         const s = situacao(f), p = f.plano || {};
-        const validade = f.bloqueada ? '' : p.valido_ate ? ` até ${fmtData(p.valido_ate)}` : '';
-        return `<article class="card adm-faz" data-faz="${esc(f.id)}">
-          <header><b>${esc(f.nome)}</b><span class="tag ${s.classe}">${esc(s.rotulo)}${esc(validade)}</span></header>
-          <small>${esc(f.dono_nome || 'sem dono')}${f.dono_email ? ` · ${esc(f.dono_email)}` : ''}</small>
-          <small>CPF/CNPJ: ${f.documento ? esc(fmtDocumento(f.documento)) : '<b>não informado</b>'}</small>
-          <small>Entrou em ${fmtData(f.criado_em)} · ${plural(f.pessoas, 'pessoa', 'pessoas')} · ${plural(f.tanques, 'tanque', 'tanques')}, ${fmtInt(p.em_uso || 0)} em uso${p.limite ? ` de ${p.limite}` : ''}</small>
-          <small>Último lançamento de ração: ${f.ultimo_lancamento ? fmtData(f.ultimo_lancamento) : 'nenhum'}</small>
-          <div class="acoes">
-            <button class="btn mini" data-estender="${esc(f.id)}" type="button">${p.estado === 'livre' ? 'Dar prazo de teste' : 'Estender teste'}</button>
-            <button class="btn mini" data-documento="${esc(f.id)}" type="button">${f.documento ? 'Corrigir CPF/CNPJ' : 'Informar CPF/CNPJ'}</button>
-            ${f.bloqueada ? `<button class="btn mini" data-liberar="${esc(f.id)}" type="button">Liberar</button>`
-              : `<button class="btn mini perigo" data-bloquear="${esc(f.id)}" type="button">Bloquear</button>`}
-            <button class="btn mini" data-desconectar-dono="${esc(f.id)}" type="button">Desconectar celular do dono</button>
-            <button class="btn mini primario" data-suporte="${esc(f.id)}" type="button">Entrar como suporte</button>
-            <button class="btn mini" data-acessos="${esc(f.id)}" type="button">Acessos do suporte</button>
-          </div>
-        </article>`;
-      }).join('') : '<div class="card vazio">Nenhuma fazenda neste filtro.</div>'}`;
+        return `<button type="button" class="adm-faz adm-linha" data-abrir="${esc(f.id)}">
+          <span class="esq"><b>${esc(f.nome)}</b>
+            <small>${esc(f.dono_nome || 'sem dono')}${f.dono_email ? ` · ${esc(f.dono_email)}` : ''}</small>
+            <small>${plural(f.tanques, 'tanque', 'tanques')}, ${fmtInt(p.em_uso || 0)} em uso${p.limite ? ` de ${p.limite}` : ''} · ${desde(f.ultimo_lancamento)}</small>
+            <small>CPF/CNPJ: ${f.documento ? esc(fmtDocumento(f.documento)) : '<b class="adm-semdoc">não informado</b>'}</small></span>
+          <span class="tag ${s.classe}">${esc(s.rotulo)}${esc(validade(f))}</span><span class="seta">${icone('direita', 20)}</span>
+        </button>`;
+      }).join('')}</div>` : '<div class="card vazio">Nenhuma fazenda neste filtro.</div>';
+  };
+  const fichaFazenda = (f) => {
+    const s = situacao(f), p = f.plano || {}, cob = pendentes.find((c) => c.fazenda_id === f.id);
+    const acaoLi = (attr, titulo, sub, extra = '') => `<li><button type="button" class="adm-acao${extra}" ${attr}><span class="esq"><b>${titulo}</b><small>${sub}</small></span><span class="seta">${icone('direita', 20)}</span></button></li>`;
+    return `
+      <button type="button" class="link adm-voltar" data-fechar-ficha>‹ Todas as fazendas</button>
+      <div class="card adm-ficha">
+        <header><h2>${esc(f.nome)}</h2><span class="tag ${s.classe}">${esc(s.rotulo)}${esc(validade(f))}</span></header>
+        <dl class="adm-dados">
+          <div><dt>Dono</dt><dd>${esc(f.dono_nome || '—')}</dd></div>
+          <div><dt>E-mail</dt><dd>${esc(f.dono_email || '—')}</dd></div>
+          <div><dt>CPF/CNPJ</dt><dd>${f.documento ? esc(fmtDocumento(f.documento)) : '<b class="adm-semdoc">não informado</b>'}</dd></div>
+          <div><dt>Entrou em</dt><dd>${fmtData(f.criado_em)}</dd></div>
+          <div><dt>Pessoas</dt><dd>${fmtInt(f.pessoas)}</dd></div>
+          <div><dt>Tanques</dt><dd>${fmtInt(f.tanques)}, ${fmtInt(p.em_uso || 0)} em uso${p.limite ? ` de ${p.limite}` : ' (sem limite)'}</dd></div>
+          <div><dt>Último lançamento de ração</dt><dd>${f.ultimo_lancamento ? fmtData(f.ultimo_lancamento) : 'nenhum'}</dd></div>
+        </dl>
+      </div>
+      ${cob ? `<div class="adm-alerta alerta"><div><b>Cobrança esperando: ${fmtBRL(cob.valor)}</b><small>Pacote de ${fmtInt(cob.tanques_max)} tanques, pedido em ${fmtData(cob.criada_em)}.</small></div><button class="btn mini" type="button" data-ir-aba="cobrancas">Ver</button></div>` : ''}
+      <h2>Ações</h2>
+      <div class="card"><ul class="lista adm-acoes">
+        ${acaoLi(`data-suporte="${esc(f.id)}"`, 'Entrar como suporte', 'Ver e alterar tudo como o dono, por 2 horas. Fica no histórico da fazenda', ' adm-principal')}
+        ${acaoLi(`data-estender="${esc(f.id)}"`, p.estado === 'livre' ? 'Dar prazo de teste' : 'Estender teste', 'Mais dias de uso grátis')}
+        ${acaoLi(`data-documento="${esc(f.id)}"`, f.documento ? 'Corrigir CPF/CNPJ' : 'Informar CPF/CNPJ', 'Um teste grátis por documento')}
+        ${acaoLi(`data-desconectar-dono="${esc(f.id)}"`, 'Desconectar celular do dono', 'Perdeu o celular? Sai da conta em todos os aparelhos')}
+        ${f.bloqueada ? acaoLi(`data-liberar="${esc(f.id)}"`, 'Liberar a fazenda', 'Volta a funcionar como antes')
+          : acaoLi(`data-bloquear="${esc(f.id)}"`, 'Bloquear a fazenda', 'Ninguém vê nem lança até liberar. Os dados ficam guardados', ' perigo')}
+      </ul></div>
+      <h2>Acessos do suporte</h2>
+      <div class="card" id="adm-acessos"><p class="mudo" style="margin:0">Carregando…</p></div>`;
   };
 
   const abaCobrancas = () => `
@@ -170,10 +219,17 @@ export async function renderAdmin(ctx, el, aba = 'fazendas', estado = { filtro: 
   if (busca) busca.addEventListener('input', () => { estado.busca = busca.value; redesenharLista(); });
   el.querySelectorAll('[data-filtro]').forEach((b) => b.addEventListener('click', () => {
     estado.filtro = b.dataset.filtro;
-    el.querySelectorAll('[data-filtro]').forEach((x) => x.classList.toggle('on', x === b));
+    el.querySelectorAll('.adm-filtros [data-filtro]').forEach((x) => x.classList.toggle('on', x.dataset.filtro === estado.filtro));
     redesenharLista();
   }));
   function ligarFazendas() {
+    el.querySelectorAll('[data-abrir]').forEach((b) => b.addEventListener('click', () => { estado.aberta = b.dataset.abrir; recarregar('fazendas'); window.scrollTo(0, 0); }));
+    el.querySelectorAll('[data-fechar-ficha]').forEach((b) => b.addEventListener('click', () => { estado.aberta = null; recarregar('fazendas'); }));
+    el.querySelectorAll('[data-ir-aba]').forEach((b) => b.addEventListener('click', () => { estado.aberta = null; recarregar(b.dataset.irAba); }));
+    const caixaAcessos = el.querySelector('#adm-acessos');
+    if (caixaAcessos && estado.aberta) ctx.api.acessosSuporte(estado.aberta).then((l) => {
+      caixaAcessos.innerHTML = l.length ? `<ul class="lista registros">${l.map((a) => `<li><div class="esq"><b>${esc(a.quem)}</b><small>${fmtData(a.inicio)} ${horaDe(a.inicio)}–${horaDe(a.fim)}${a.motivo ? ` · ${esc(a.motivo)}` : ''}</small></div></li>`).join('')}</ul>` : '<p class="mudo" style="margin:0">Ninguém do suporte entrou nesta fazenda.</p>';
+    }).catch(() => { caixaAcessos.innerHTML = '<p class="mudo" style="margin:0">Não deu para carregar os acessos agora.</p>'; });
     el.querySelectorAll('[data-estender]').forEach((b) => b.addEventListener('click', async () => {
       const f = fazPor(b.dataset.estender);
       const v = await formulario({

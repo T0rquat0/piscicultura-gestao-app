@@ -623,7 +623,21 @@ async function iniciar() {
 olhoNasSenhas(document.body); // olho para mostrar/esconder a senha em todos os campos de senha
 ligarMascaraMoeda(document.body); // campos de R$: números entram pela direita, como no caixa eletrônico
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  // Versão nova publicada com o app aberto: a cópia nova assume e o app avisa ("Atualizar"), sem recarregar
+  // sozinho no meio de um lançamento. Ao voltar para o app, confere se saiu versão nova.
+  const jaTinha = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (jaTinha) avisarVersaoNova(); });
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').then((reg) => {
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && navigator.onLine) reg.update().catch(() => {}); });
+  }).catch(() => {}));
+}
+function avisarVersaoNova() {
+  if (document.getElementById('versao-nova')) return;
+  const d = document.createElement('div');
+  d.id = 'versao-nova'; d.className = 'versao-nova'; d.setAttribute('role', 'status');
+  d.innerHTML = '<span>Versão nova do app</span><button type="button" class="btn mini">Atualizar</button>';
+  d.querySelector('button').addEventListener('click', () => location.reload());
+  document.body.appendChild(d);
 }
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 

@@ -405,3 +405,14 @@ export function sugestaoRacao(lotes, resumo, tabela) {
   if (!(kg > 0)) return null;
   return { kg, biomassaKg: bio, pct: taxas.size === 1 ? [...taxas][0] : (kg / bio) * 100, provisoria };
 }
+
+// Ração de cada lote: alevinagem usa ração de alevino; as outras fases, a de engorda (igual ao sql/17).
+export const tipoRacaoDoLote = (tipoLote) => (tipoLote === 'alevinagem' ? 'alevino' : 'engorda');
+
+// Quanto falta no estoque registrado para cobrir um lançamento de ração (kg). O saldo do servidor ainda não conta o que
+// está na fila do celular sem enviar, por isso desconta os pendentes. 0 = o estoque cobre; null = saldo desconhecido.
+export function faltaNoEstoque(saldoKg, pendentesKg, lancarKg) {
+  if (saldoKg == null || saldoKg === '' || !Number.isFinite(Number(saldoKg))) return null;
+  const resta = Number(saldoKg) - (Number(pendentesKg) || 0) - (Number(lancarKg) || 0);
+  return resta < 0 ? Math.round(-resta * 100) / 100 : 0;
+}

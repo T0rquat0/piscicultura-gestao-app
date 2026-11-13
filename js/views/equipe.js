@@ -12,6 +12,7 @@ export async function renderEquipe(ctx, el) {
 
   el.innerHTML = `
     <h1>Equipe</h1>
+    <div class="pc-duas"><div>
     ${!navigator.onLine ? '<p class="aviso">Sem internet: a equipe só pode ser alterada com conexão.</p>' : ''}
     ${usuarios.map((u) => {
       const meus = new Set(vinculos.filter((v) => v.usuario_id === u.id).map((v) => v.tanque_id));
@@ -40,9 +41,11 @@ export async function renderEquipe(ctx, el) {
       </details>`;
     }).join('')}
 
+    </div><div>
     <h2>Adicionar pessoa</h2>
-    ${convites ? `<div class="card form" id="convite">
-      <b>Convidar por link</b>
+    ${convites ? `<details class="card form-dobra" id="d-convite"${usuarios.length <= 1 ? ' open' : ''}>
+      <summary>Convidar pessoa por link</summary>
+      <div class="form" id="convite">
       <p class="mudo" style="margin:0">Gere um link e mande pelo WhatsApp. A pessoa cria a conta (ou entra com a que já tem) e fica ligada a esta fazenda. Cada link serve para uma pessoa e vale 7 dias.</p>
       <label>Papel <select id="conv-papel"><option value="funcionario">Funcionário</option><option value="gerente">Gerente</option></select></label>
       <button class="btn primario" id="b-convite" type="button">Gerar link de convite</button>
@@ -54,7 +57,9 @@ export async function renderEquipe(ctx, el) {
       ${convites.length ? `<div><b>Convites em aberto</b><ul class="lista">${convites.map((c) => `<li><div class="esq"><b>${esc(ROTULO_PAPEL[c.papel] || c.papel)}</b><small>gerado em ${fmtData(c.criado_em)} · vale até ${fmtData(c.expira_em)}</small></div>
         <span class="acoes-reg"><button class="btn mini" data-copiar="${esc(c.token)}" type="button">Copiar</button><button class="btn mini perigo" data-cancelar-conv="${esc(c.token)}" type="button">Cancelar</button></span></li>`).join('')}</ul></div>` : ''}
       <p class="mudo" style="margin:0">Depois que a pessoa entrar, ela aparece na lista acima: libere os tanques dela.</p>
-    </div>` : '<div class="card vazio">O convite por link ainda não foi ativado neste sistema (falta rodar o sql/10 no Supabase).</div>'}`;
+    </div>
+    </details>` : '<div class="card vazio">O convite por link ainda não foi ativado neste sistema (falta rodar o sql/10 no Supabase).</div>'}
+    </div></div>`;
   // (o antigo "Vincular pelo e-mail" saiu em 11/11/2026: só o convite por link, que é mais simples e mais seguro)
 
   el.querySelectorAll('[data-todos]').forEach((b) => b.addEventListener('click', () => {

@@ -74,6 +74,9 @@ sessao = {'access_token': 'x', 'refresh_token': 'y', 'token_type': 'bearer', 'ex
           'expires_at': int(time.time()) + 3600 * 24 * 30, 'user': {'id': U, 'email': 't@t.com', 'aud': 'authenticated', 'role': 'authenticated'}}
 
 ok = True
+def abrir_dobra(pg, sel):  # toca na linha que abre o formulário (só se estiver fechada), como a pessoa faz
+    d = pg.locator(sel).first; d.wait_for(state='attached', timeout=20000)
+    if d.get_attribute('open') is None: d.locator('summary').first.click(); pg.wait_for_timeout(200)
 def checa(cond, msg):
     global ok
     print(('OK   ' if cond else 'FALHA ') + msg); ok = ok and cond
@@ -127,14 +130,14 @@ with sync_playwright() as pw:
     checa(('racao_estoque', 'c1', {'data_compra': '2026-10-01', 'quantidade_kg': 750, 'custo_total': None, 'fornecedor': 'Agro Y'}) in patches, 'compra: 30 sacos de 25 kg gravam 750 kg, sem valor, fornecedor sem espaços')
 
     # 3) Tanque: editar lote e reabrir encerrado
-    pg.goto(BASE + f'#/tanque/{T}'); pg.wait_for_selector(f'[data-editar-lote="{L1}"]', timeout=15000)
+    pg.goto(BASE + f'#/tanque/{T}'); abrir_dobra(pg, f'details[data-lote="{L1}"]'); pg.wait_for_selector(f'[data-editar-lote="{L1}"]', timeout=15000)
     pg.screenshot(path='tanque.png', full_page=True)
-    checa(pg.is_visible(f'[data-reabrir="{L2}"]') and not pg.is_visible(f'[data-reabrir="{L1}"]'), 'Reabrir aparece só no lote encerrado')
+    checa(pg.locator(f'[data-reabrir="{L2}"]').count() == 1 and pg.locator(f'[data-reabrir="{L1}"]').count() == 0, 'Reabrir aparece só no lote encerrado')
     pg.click(f'[data-editar-lote="{L1}"]'); pg.wait_for_selector('.dialogo form')
     pg.fill('.dialogo [name=especie]', 'Tambacu'); pg.fill('.dialogo [name=qtd]', '1200'); pg.fill('.dialogo [name=pm]', '0,05')
     pg.click('.dialogo button[type=submit]'); pg.wait_for_timeout(800)
     checa(('lotes', L1, {'tipo': 'engorda', 'especie': 'Tambacu', 'data_entrada': '2026-09-01', 'quantidade_inicial': 1200, 'peso_inicial_kg': 60}) in patches, 'lote: grava espécie, quantidade e peso (1.200 × 0,05 kg = 60 kg)')
-    pg.wait_for_selector(f'[data-reabrir="{L2}"]')
+    abrir_dobra(pg, f'details[data-lote="{L2}"]'); pg.wait_for_selector(f'[data-reabrir="{L2}"]')
     pg.click(f'[data-reabrir="{L2}"]'); pg.wait_for_selector('.dialogo [data-ok]')
     checa('já tem um lote ativo' in pg.inner_text('.dialogo'), 'reabrir: avisa que já há lote ativo')
     pg.click('.dialogo [data-ok]'); pg.wait_for_timeout(800)

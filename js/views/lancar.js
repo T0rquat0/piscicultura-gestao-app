@@ -7,7 +7,7 @@ import * as rascunho from '../rascunho.js';
 import { confirmar } from '../dialogo.js';
 import { ordemNatural } from './home.js';
 import { AGUA_LIMITES, PESO_SACO_PADRAO_KG, CAUSAS_MORTE, TAXA_RACAO } from '../config.js';
-import { sugestaoRacao, vivosDoLote, indicadoresDespesca, avisoPesoMedio, avaliarAgua, ehTambaqui } from '../calc.js';
+import { sugestaoRacao, vivosDoLote, indicadoresDespesca, avisoPesoMedio, avaliarAgua, ehTambaqui, tipoRacaoDoLote, faltaNoEstoque } from '../calc.js';
 
 const TIPOS = {
   racao: { rotulo: 'Ração', tabela: 'racao_consumo' },
@@ -55,7 +55,7 @@ function camposDoTipo(tipo, kgSaco, verDinheiro = false) {
       <label><span id="rot-peso">Peso total dos peixes (kg)</span>
         <input id="peso" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 2,4" required></label>
       <label>Quantos peixes foram pesados?
-        <input id="amostra" type="number" inputmode="numeric" step="1" min="1" placeholder="Ex.: 10" required></label>
+        <input id="amostra" type="text" inputmode="numeric" autocomplete="off" placeholder="Ex.: 10" required></label>
       <div class="calc resultado" id="pm">Peso médio: —</div>
       <p id="aviso-amostra" class="aviso" hidden>Poucos peixes pesados: com menos de 30 o peso médio fica pouco confiável.</p>`;
   }
@@ -95,7 +95,7 @@ function camposDoTipo(tipo, kgSaco, verDinheiro = false) {
       </div>
       <p class="calc" id="desp-dica"></p>
       <label>Quantos peixes saíram?
-        <input id="desp-qtd" class="grande" type="number" inputmode="numeric" step="1" min="1" placeholder="0" required></label>
+        <input id="desp-qtd" class="grande" type="text" inputmode="numeric" autocomplete="off" placeholder="0" required></label>
       <label>Peso total bruto (kg)
         <input id="desp-bruto" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 9547" required></label>
       <label>Peso total líquido (kg) <small class="mudo">(opcional)</small>
@@ -109,7 +109,7 @@ function camposDoTipo(tipo, kgSaco, verDinheiro = false) {
       <div class="calc resultado" id="desp-calc" hidden></div>`;
   }
   return `<label>Quantos peixes morreram?
-    <input id="qtd" class="grande" type="number" inputmode="numeric" step="1" min="1" placeholder="0" required></label>
+    <input id="qtd" class="grande" type="text" inputmode="numeric" autocomplete="off" placeholder="0" required></label>
     <details class="como-det"><summary>Como lançar</summary>
     <ol class="como">
       <li>Conte os peixes mortos encontrados hoje neste tanque.</li>
@@ -548,6 +548,30 @@ export async function renderLancar(ctx, el, params = {}) {
     return !texto || confirmar({ titulo: 'Confira o peso', texto, ok: 'Está certo', cancelar: 'Corrigir' });
   }
 
+  // Estoque registrado não cobre este lançamento de ração: avisa e pede a compra, mas deixa lançar (o peixe
+  // já comeu; travar o funcionário no tanque só faria o lançamento ficar sem registro). Sem saldo conhecido, não pergunta.
+  async function estoqueConferido(lote, kg) {
+    try {
+      const tipoR = tipoRacaoDoLote(lote && lote.tipo);
+      if (navigator.onLine) ctx.api.saldosRacao().catch(() => null); // atualiza a cópia para a próxima vez
+      const s = await db.kvGet('saldosRacao');
+      if (!s || !Array.isArray(s.linhas) || !s.linhas.length) return true;
+      const linha = s.porTipo ? s.linhas.find((x) => x.tipo_racao === tipoR) : s.linhas[0];
+      const pend = (await db.filaList()).filter((i) => i.tabela === 'racao_consumo'
+        && (!s.porTipo || tipoRacaoDoLote((lotes.find((l) => l.id === i.payload.lote_id) || {}).tipo) === tipoR))
+        .reduce((t, i) => t + Number(i.payload.quantidade_kg || 0), 0);
+      const falta = faltaNoEstoque(linha ? linha.saldo_kg : 0, pend, kg);
+      if (!falta) return true;
+      const kgSaco = state.ref.kgSaco || PESO_SACO_PADRAO_KG, nome = s.porTipo ? `ração de ${tipoR}` : 'ração';
+      const sacosTxt = `${fmtNum(Math.ceil((falta / kgSaco) * 10) / 10, 1).replace(/,0$/, '')} ${falta / kgSaco <= 1 ? 'saco' : 'sacos'}`;
+      return confirmar({
+        titulo: `Falta ${nome} no estoque`,
+        texto: `Pelo estoque registrado, faltam ${sacosTxt} (${fmtNum(falta, 0)} kg) de ${nome} para este lançamento. Pode lançar, mas ${ctx.podeGerir() ? 'registre a compra que faltou em Estoque de ração (ou conte o galpão)' : 'avise o dono para registrar a compra que faltou'}, para o estoque não ficar errado.`,
+        ok: 'Lançar mesmo assim', cancelar: 'Voltar',
+      });
+    } catch { return true; }
+  }
+
   const aoSalvar = async () => {
     erro.hidden = true;
     const lote_id = selLote.value;
@@ -568,11 +592,15 @@ export async function renderLancar(ctx, el, params = {}) {
       if (!(q > 0)) return mostrarErro('Informe quantos kg de ração foram dados (pode ter vírgula: 37,5).');
       if (q > 5000) return mostrarErro('Quantidade muito alta para um tanque num dia. Confira os kg.');
       payload = { ...base, tanque_id: selTanque.value, quantidade_kg: Math.round(q * 100) / 100 };
+      if (!(await estoqueConferido(loteSel, payload.quantidade_kg))) return;
     } else if (tipo === 'biometria') {
       const pesoTxt = f.querySelector('#peso').value, p = pesoAmostraKg(), q = num(f.querySelector('#amostra').value);
       if (pesoTxt.includes('.') && pesoTxt.includes(',')) return mostrarErro('Digite o peso sem ponto de milhar. Ex.: 1250,5');
       if (!(p > 0)) return mostrarErro(`Informe o peso total da amostra em ${pesoEmGramas() ? 'gramas' : 'kg'}.`);
       if (!(q >= 1) || !Number.isInteger(q)) return mostrarErro('Informe quantos peixes foram pesados (número inteiro).');
+      const loteB = lotes.find((l) => l.id === lote_id), dadosB = await dadosRapidos();
+      const vivosB = loteB ? (dadosB && dadosB.res[loteB.id] ? vivosDoLote(loteB, dadosB.res[loteB.id]) : Number(loteB.quantidade_inicial) || null) : null;
+      if (vivosB != null && vivosB > 0 && q > vivosB) return mostrarErro(`O tanque tem cerca de ${plural(vivosB, 'peixe', 'peixes')}: não dá para ter pesado ${fmtInt(q)}. Confira a quantidade (um zero a mais?).`);
       if (p / q > 100) return mostrarErro(`Deu ${fmtNum(p / q, 0)} kg por peixe, o que não existe em viveiro. Confira se o peso não foi digitado em gramas (${pesoEmGramas() ? 'o campo está em gramas' : 'o campo está em kg: 2.400 g = 2,4 kg'}).`);
       payload = { ...base, peso_amostra_kg: p, quantidade_amostrada: q };
       if (!(await pesoConferido(lote_id, q, p, data, await dadosRapidos()))) return;

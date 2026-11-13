@@ -11,7 +11,7 @@ import { ESTOQUE_ATENCAO_DIAS, ESTOQUE_CRITICO_DIAS, ESTOQUE_COBERTURA_DIAS, CON
 const MENSAGEM = {
   critico: 'Estoque acabando. Compre já e conte o que sobrou.',
   atencao: 'Planeje a próxima compra. Com pouco estoque, contar é rápido: aproveite para contar.',
-  negativo: 'O consumo lançado passou do que foi comprado. Confira as compras e faça uma contagem.',
+  negativo: 'Foi lançada mais ração do que a registrada no estoque. Registre a compra que faltou (abaixo) ou faça uma contagem.',
   'sem-dado': 'Ainda sem ração lançada para estimar quanto dura.',
   ok: 'Estoque tranquilo.',
 };
@@ -62,12 +62,12 @@ export async function renderEstoque(ctx, el) {
 
   el.innerHTML = `
     <h1>Estoque de ração</h1>
-    ${porTipo ? `<div class="seg" style="--n:2" role="tablist">${Object.entries(NOME_RACAO).map(([k]) => `<button type="button" data-tipo-racao="${k}" class="${k === tipoAtual ? 'on' : ''}">${k === 'engorda' ? 'Engorda' : 'Alevino'} <small>${((v) => `${v < 0 ? '−' : ''}${sc(Math.abs(v), 0)} ${Math.abs(v / kgS) === 1 ? 'saco' : 'sacos'}`)(Number((saldos.linhas.find((x) => x.tipo_racao === k) || {}).saldo_kg || 0))}</small></button>`).join('')}</div>` : ''}
+    ${porTipo ? `<div class="seg" style="--n:2" role="tablist">${Object.entries(NOME_RACAO).map(([k]) => `<button type="button" data-tipo-racao="${k}" class="${k === tipoAtual ? 'on' : ''}">${k === 'engorda' ? 'Engorda' : 'Alevino'} <small>${((v) => `${sc(Math.max(0, v), 0)} ${Math.max(0, v / kgS) === 1 ? 'saco' : 'sacos'}`)(Number((saldos.linhas.find((x) => x.tipo_racao === k) || {}).saldo_kg || 0))}</small></button>`).join('')}</div>` : ''}
     <div class="pc-duas"><div>
     <div class="estoque-hero n-${sit.nivel}">
       <span>${porTipo ? `Ração de ${tipoAtual} em estoque` : 'Em estoque agora'}</span>
-      <b>${kg < 0 ? '−' : ''}${sc(Math.abs(kg), 0)}<em>${sc(Math.abs(kg), 0) === '1' ? 'saco' : 'sacos'}</em></b>
-      <small>${fmtNum(kg, 0)} kg${sit.dias != null ? ` · dura cerca de <strong>${fmtInt(Math.floor(sit.dias))} dias</strong>` : ''}</small>
+      <b>${sc(Math.max(0, kg), 0)}<em>${sc(Math.max(0, kg), 0) === '1' ? 'saco' : 'sacos'}</em></b>
+      <small>${kg < 0 ? `faltou registrar a compra de ${sc(Math.abs(kg), 0)} ${sc(Math.abs(kg), 0) === '1' ? 'saco' : 'sacos'} (${fmtNum(Math.abs(kg), 0)} kg)` : `${fmtNum(kg, 0)} kg`}${sit.dias != null ? ` · dura cerca de <strong>${fmtInt(Math.floor(sit.dias))} dias</strong>` : ''}</small>
       ${sit.porDia > 0 ? `<small>Gasta ~${sc(sit.porDia)} ${sc(sit.porDia) === '1' ? 'saco' : 'sacos'} por dia (${peloDeHoje ? 'pelo que foi dado hoje' : 'média dos últimos 7 dias'})</small>` : ''}
       ${sit.dias != null || sit.nivel === 'negativo' ? `<div class="hero-prog">${progresso(((sit.dias || 0) / ESTOQUE_COBERTURA_DIAS) * 100, { tom: { atencao: 'alerta', critico: 'erro', negativo: 'erro' }[sit.nivel] || '', rotulo: `Ração para ${fmtInt(Math.floor(sit.dias || 0))} de ${ESTOQUE_COBERTURA_DIAS} dias` })}<p class="h-trilho-leg"><span>${fmtInt(Math.floor(sit.dias || 0))} de ${ESTOQUE_COBERTURA_DIAS} dias de ração${peloDeHoje ? ' (no ritmo de hoje)' : ''}</span><span>meta: ${ESTOQUE_COBERTURA_DIAS} dias</span></p></div>` : ''}
       ${sit.nivel === 'ok' ? '' : `<p>${MENSAGEM[sit.nivel]}</p>`}
@@ -140,15 +140,12 @@ export async function renderEstoque(ctx, el) {
     </div>
 
     ${gerir ? `<h2>Entradas registradas</h2>
-    <div class="card rolagem">
-      ${compras.length ? `<table>
-        <thead><tr><th>Data</th><th class="n">Sacos</th>${din ? '<th class="n">Valor</th>' : ''}<th>Fornecedor</th><th></th></tr></thead>
-        <tbody>${compras.map((c) => `<tr>
-          <td>${fmtData(c.data_compra)}</td><td class="n">${sc(c.quantidade_kg)}${c.sacos_nota != null && Number(c.sacos_recebidos) < Number(c.sacos_nota) ? `<small class="falta-nota">faltaram ${fmtNum(Number(c.sacos_nota) - Number(c.sacos_recebidos), 0)} da nota</small>` : ''}</td>
-          ${din ? `<td class="n">${c.custo_total != null ? fmtBRL(c.custo_total) : '—'}</td>` : ''}
-          <td>${esc(c.fornecedor || '—')}</td>
-          <td><span class="acoes-reg"><button class="btn mini" data-edit="${esc(c.id)}" type="button">Editar</button><button class="btn mini perigo" data-del="${esc(c.id)}" type="button">Excluir</button></span></td>
-        </tr>`).join('')}</tbody></table>` : '<p class="mudo" style="margin:0">Nenhuma entrada registrada.</p>'}
+    <div class="card">
+      ${compras.length ? `<ul class="lista compras">${compras.map((c) => `<li>
+          <div class="esq"><b>${fmtData(c.data_compra)} · ${sc(c.quantidade_kg)} ${sc(c.quantidade_kg) === '1' ? 'saco' : 'sacos'}</b>
+            <small>${esc(c.fornecedor || 'sem fornecedor')}${din ? ` · ${c.custo_total != null ? fmtBRL(c.custo_total) : 'sem valor'}` : ''}${c.sacos_nota != null && Number(c.sacos_recebidos) < Number(c.sacos_nota) ? ` · <b class="falta-nota">faltaram ${fmtNum(Number(c.sacos_nota) - Number(c.sacos_recebidos), 0)} da nota</b>` : ''}</small></div>
+          <span class="acoes-reg"><button class="btn mini" data-edit="${esc(c.id)}" type="button">Editar</button><button class="btn mini perigo" data-del="${esc(c.id)}" type="button">Excluir</button></span>
+        </li>`).join('')}</ul>` : '<p class="mudo" style="margin:0">Nenhuma entrada registrada.</p>'}
     </div>` : ''}
     </div><div>
     <h2>Movimento dos últimos 30 dias</h2>

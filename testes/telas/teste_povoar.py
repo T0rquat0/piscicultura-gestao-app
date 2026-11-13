@@ -60,6 +60,9 @@ def rota(route, req):
 sessao = {'access_token': 'x', 'refresh_token': 'y', 'token_type': 'bearer', 'expires_in': 3600 * 24 * 30,
           'expires_at': int(time.time()) + 3600 * 24 * 30, 'user': {'id': U, 'email': 't@t.com', 'aud': 'authenticated', 'role': 'authenticated'}}
 ok = True
+def abrir_dobra(pg, sel):  # toca na linha que abre o formulário (só se estiver fechada), como a pessoa faz
+    d = pg.locator(sel).first; d.wait_for(state='attached', timeout=20000)
+    if d.get_attribute('open') is None: d.locator('summary').first.click(); pg.wait_for_timeout(200)
 def checa(cond, msg):
     global ok
     print(('OK   ' if cond else 'FALHA ') + msg); ok = ok and cond
@@ -85,7 +88,7 @@ with sync_playwright() as pw:
     checa([f.strip() for f in fases] == ['Berçário', 'Alevinagem', 'Recria', 'Engorda'], f'tanque vazio mostra as 4 fases ({fases})')
     pg.click('.povoar-fase:has-text("Alevinagem")'); pg.wait_for_selector('#f-lote', timeout=15000)
     checa(pg.input_value('#f-lote #tipo') == 'alevinagem', 'formulário abre com Alevinagem marcada')
-    checa('Povoar com Alevinagem' in pg.inner_text('#f-lote h3'), 'título do formulário diz a fase')
+    checa('Povoar com Alevinagem' in pg.inner_text('#d-lote > summary') and pg.get_attribute('#d-lote', 'open') is not None, 'formulário já aberto, e o título diz a fase')
     pg.wait_for_timeout(600); pg.screenshot(path='povoar_form.png')
     pg.fill('#qtd', '50000'); pg.fill('#pm-in', '2'); pg.select_option('#pm-un', 'g')
     pg.click('#f-lote button[type=submit]'); pg.wait_for_timeout(1500)
@@ -95,8 +98,8 @@ with sync_playwright() as pw:
 
     # caminho antigo (Mais > Tanques) continua com Engorda e sem voltar sozinho
     pg = abrir('dono')
-    pg.goto(BASE + f'#/tanque/{T2}'); pg.wait_for_selector('#f-lote', timeout=15000)
-    checa(pg.input_value('#f-lote #tipo') == 'engorda' and pg.inner_text('#f-lote h3') == 'Novo lote de peixes', 'cadastro pelo Mais segue igual (Engorda, "Novo lote de peixes")')
+    pg.goto(BASE + f'#/tanque/{T2}'); abrir_dobra(pg, '#d-lote'); pg.wait_for_selector('#f-lote', timeout=15000)
+    checa(pg.input_value('#f-lote #tipo') == 'engorda' and pg.inner_text('#d-lote > summary') == 'Novo lote de peixes', 'cadastro pelo Mais segue igual (Engorda, "Novo lote de peixes")')
     pg.close()
 
     pg = abrir('funcionario')

@@ -60,6 +60,9 @@ def rota(route, req):
 sessao = {'access_token': 'x', 'refresh_token': 'y', 'token_type': 'bearer', 'expires_in': 3600 * 24 * 30,
           'expires_at': int(time.time()) + 3600 * 24 * 30, 'user': {'id': U, 'email': 't@t.com', 'aud': 'authenticated', 'role': 'authenticated'}}
 ok = True
+def abrir_dobra(pg, sel):  # toca na linha que abre o formulário (só se estiver fechada), como a pessoa faz
+    d = pg.locator(sel).first; d.wait_for(state='attached', timeout=20000)
+    if d.get_attribute('open') is None: d.locator('summary').first.click(); pg.wait_for_timeout(200)
 def checa(cond, msg):
     global ok
     print(('OK   ' if cond else 'FALHA ') + msg); ok = ok and cond
@@ -95,7 +98,7 @@ with sync_playwright() as pw:
     pg.goto(BASE + '#/'); pg.wait_for_selector('#view', timeout=20000)
 
     # 1) Novo tanque com área
-    pg.goto(BASE + '#/tanques'); pg.wait_for_selector('#f-novo', timeout=15000)
+    pg.goto(BASE + '#/tanques'); abrir_dobra(pg, '#d-novo-tanque'); pg.wait_for_selector('#f-novo', timeout=15000)
     checa('2 ha' in pg.inner_text('.lista'), 'lista de tanques mostra a área (2 ha)')
     pg.fill('#f-novo #nome', 'Tanque 03'); pg.fill('#f-novo #area', '5,5'); pg.click('#f-novo button[type=submit]'); pg.wait_for_timeout(800)
     checa(achou('tanques', nome='Tanque 03', area_ha=5.5), 'novo tanque grava área 5,5 ha')
@@ -120,7 +123,7 @@ with sync_playwright() as pw:
     res = pg.inner_text('.tq-resumo')
     checa('5.000 peixes/ha' in res and '4,0 t/ha' in res, 'densidade: 10.000 peixes em 2 ha = 5.000/ha e 8 t / 2 ha = 4,0 t/ha')
     checa('Recria' in pg.inner_text('.lista'), 'lote aparece com a fase Recria')
-    pg.goto(BASE + f'#/tanque/{T2}'); pg.wait_for_selector('#f-lote', timeout=15000)
+    pg.goto(BASE + f'#/tanque/{T2}'); abrir_dobra(pg, '#d-lote'); pg.wait_for_selector('#f-lote', timeout=15000)
     opcoes = pg.eval_on_selector_all('#tipo option', 'os => os.map(o => o.textContent)')
     checa(opcoes == ['Berçário', 'Alevinagem', 'Recria', 'Engorda'], 'fases no cadastro: Berçário, Alevinagem, Recria, Engorda')
     pg.select_option('#tipo', 'recria'); pg.check('#andamento')
@@ -130,7 +133,7 @@ with sync_playwright() as pw:
     pg.click('#f-lote button[type=submit]'); pg.wait_for_timeout(1000)
     checa(achou('lotes', tipo='recria', quantidade_inicial=98000, peso_inicial_kg=49000, data_entrada='2026-08-15'), 'lote em andamento: grava início do ciclo e peso total de entrada')
     checa(achou('biometrias', peso_amostra_kg=1.2, quantidade_amostrada=1), 'lote em andamento: grava a pesagem de hoje (1,2 kg)')
-    pg.goto(BASE + f'#/tanque/{T2}'); pg.wait_for_selector('#f-lote')
+    pg.goto(BASE + f'#/tanque/{T2}'); abrir_dobra(pg, '#d-lote'); pg.wait_for_selector('#f-lote')
     pg.fill('#qtd', '1000'); pg.fill('#pm-in', '2300'); pg.click('#f-lote button[type=submit]'); pg.wait_for_timeout(400)
     checa('30 kg' in pg.inner_text('#f-lote #erro'), 'barra peso médio de 2.300 kg por peixe (o erro do peso total)')
 

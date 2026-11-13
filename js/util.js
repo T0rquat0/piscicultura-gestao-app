@@ -104,9 +104,11 @@ export function numDecimal(v) {
 export const pesoMedioTxt = (kg) => { if (kg >= 1) return `${fmtNum(kg, 2)} kg`; const g = kg * 1000; return `${fmtNum(g, g < 10 && Math.abs(g - Math.round(g)) >= 0.05 ? 1 : 0)} g`; }; // 2,5 g · 8 g · 150 g · 1,54 kg
 
 export function num(v) {
-  if (typeof v === 'number') return v;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : NaN;
   const s = String(v ?? '').trim().replace(',', '.');
   if (s === '') return NaN; // campo vazio não vale como zero
+  // só algarismos com no máximo uma vírgula/ponto (e sinal de menos): "0x10", "1e9", "Infinity", "12,5,3" e "5..5" não são números aqui
+  if (!/^-?(\d+(\.\d*)?|\.\d+)$/.test(s)) return NaN;
   const n = Number(s);
   return Number.isFinite(n) ? n : NaN;
 }

@@ -2,7 +2,7 @@
 // EstratÃ©gia: rede primeiro (sempre pega a versÃ£o nova quando hÃ¡ sinal), com limite de 2,5 s;
 // se a rede falhar ou demorar, usa a cÃ³pia guardada. RequisiÃ§Ãµes ao Supabase (outro domÃ­nio)
 // NÃƒO passam por aqui: os dados offline ficam no IndexedDB (js/db.js), nÃ£o neste cache.
-const CACHE = 'piscicultura-shell-v115';
+const CACHE = 'piscicultura-shell-v116';
 const SHELL = [
   './',
   'index.html',
@@ -49,7 +49,7 @@ async function redePrimeiro(req) {
   if (copia && (!navigator.onLine || Date.now() < semRedeAte)) return copia;
   try {
     const resp = await Promise.race([
-      fetch(req),
+      fetch(req, { cache: 'no-cache' }), // sempre pergunta ao servidor se mudou (o cache do navegador podia entregar o .js velho)
       new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), copia ? 2500 : 20000)),
     ]);
     if (resp && resp.ok) cache.put(req, resp.clone());
