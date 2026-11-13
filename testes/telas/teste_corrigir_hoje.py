@@ -75,9 +75,9 @@ def rodar(papel):
         atalho = pg.locator('.td-corrigir')
         res = {'atalho': atalho.count() > 0}
         if papel == 'funcionario':
-            atalho.first.click()
-        else:
-            pg.goto(BASE + f'#/relatorio/{L1}?aba=registros')
+            res['atalho_meus'] = atalho.first.get_attribute('href') == '#/meus'
+            atalho.first.click(); pg.wait_for_selector('text=Meus lançamentos', timeout=15000)
+        pg.goto(BASE + f'#/relatorio/{L1}?aba=registros')
         pg.wait_for_selector('.seg button[data-aba=registros].on', timeout=15000); pg.wait_for_timeout(600)
         res['texto'] = pg.inner_text('#view')
         res['edit'] = sorted(pg.eval_on_selector_all('[data-edit]', 'els => els.map(e => e.dataset.edit)'))
@@ -94,6 +94,7 @@ def rodar(papel):
 
 f = rodar('funcionario')
 checa(f['atalho'], 'tela do tanque: funcionário vê "Lançou errado?"')
+checa(f.get('atalho_meus'), '"Lançou errado?" leva a Meus lançamentos (desfazer ou corrigir)')
 checa('Você pode corrigir ou apagar' in f['texto'], 'aba de lançamentos explica a regra (só o que você lançou hoje)')
 checa(f['edit'] == ['mortalidade:m1', 'racao_consumo:r1'], f'funcionário: Editar só no que ele lançou hoje ({f["edit"]})')
 checa(f['del'] == ['mortalidade:m1', 'racao_consumo:r1'], f'funcionário: Excluir só no que ele lançou hoje ({f["del"]})')

@@ -62,8 +62,11 @@ def rodar(papel):
             pg.goto(BASE + '#/mais'); pg.wait_for_timeout(200)
             pg.goto(BASE + f'#/lancar?tipo=racao&tanque={tq}'); pg.wait_for_selector('#racao-kg', timeout=10000); pg.wait_for_timeout(400)
             pg.fill('#racao-kg', str(kg)); pg.locator('#f button[type=submit]').click(); pg.wait_for_timeout(700)
-            dlg = pg.inner_text('.dialogo') if pg.locator('.dialogo').count() else ''
-            if dlg and resposta: pg.click('.dialogo [data-ok]' if resposta == 'ok' else '.dialogo [data-cancelar]'); pg.wait_for_timeout(700)
+            def conferencia():  # funcionário: "Confira antes de salvar" (vem depois do aviso de estoque): confirma
+                if pg.locator('.dialogo:not(.sai) .dialogo-resumo').count(): pg.click('.dialogo:not(.sai) [data-ok]'); pg.wait_for_timeout(700)
+            conferencia()
+            dlg = pg.inner_text('.dialogo:not(.sai)') if pg.locator('.dialogo:not(.sai)').count() else ''
+            if dlg and resposta: pg.click('.dialogo [data-ok]' if resposta == 'ok' else '.dialogo [data-cancelar]'); pg.wait_for_timeout(700); conferencia()
             if resposta == 'ok':  # outras perguntas de conferência do app que venham depois (ex.: ração acima da média): confirma
                 for _ in range(3):
                     if not pg.locator('.dialogo [data-ok]').count(): break

@@ -71,7 +71,9 @@ def rodar(papel):
             if kg: pg.goto(BASE + f'#/lancar?tipo=racao&tanque={T}'); pg.wait_for_selector('#racao-kg', timeout=10000); pg.fill('#racao-kg', str(kg))
             else: pg.goto(BASE + f'#/lancar?tipo=mortalidade&tanque={T}'); pg.wait_for_selector('#qtd', timeout=10000); pg.fill('#qtd', '1')
             pg.locator('#f button[type=submit]').click(); pg.wait_for_timeout(500)
-            if pg.locator('.dialogo [data-ok]').count(): pg.click('.dialogo [data-ok]'); pg.wait_for_timeout(300)
+            for _ in range(3):  # conferência do funcionário e/ou "Isso já foi lançado?"
+                if not pg.locator('.dialogo:not(.sai) [data-ok]').count(): break
+                pg.click('.dialogo:not(.sai) [data-ok]'); pg.wait_for_timeout(400)
         n = pendentes(); checa(n == 20 and not chegadas, f'{papel}: 20 lançamentos guardados no celular, nada saiu ({n})')
         # 2) recarrega sem internet 2 vezes
         for _ in range(2): pg.reload(); pg.wait_for_selector('nav.abas', timeout=20000); pg.wait_for_timeout(600)
