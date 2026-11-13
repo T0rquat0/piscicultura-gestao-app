@@ -81,14 +81,15 @@ async function atualizarPendentes() {
 // ---------- dados de referência (tanques e lotes ativos) guardados para uso offline ----------
 async function carregarRefLocal() {
   const ref = await db.kvGet('ref');
-  state.ref = ref && state.perfil && ref.userId === state.perfil.id ? ref : { tanques: [], lotes: [] };
+  // a cópia guardada é da pessoa E da fazenda (o administrador em suporte troca de fazenda com o mesmo usuário)
+  state.ref = ref && state.perfil && ref.userId === state.perfil.id && (!ref.fazendaId || ref.fazendaId === state.perfil.fazenda_id) ? ref : { tanques: [], lotes: [] };
 }
 
 async function atualizarRef() {
   if (!navigator.onLine || !state.user || !api) return false;
   try {
     const [tanques, lotes, kgSaco, logo, precoKg] = await Promise.all([api.tanques(), api.lotes({ apenasAtivos: true }), api.kgSaco().catch(() => null), api.logo().catch(() => undefined), api.precoKg().catch(() => null)]);
-    state.ref = { tanques, lotes, kgSaco: kgSaco || (state.ref && state.ref.kgSaco) || null, logo: logo === undefined ? (state.ref && state.ref.logo) || null : logo, precoKg, userId: state.perfil.id, atualizado_em: new Date().toISOString() };
+    state.ref = { tanques, lotes, kgSaco: kgSaco || (state.ref && state.ref.kgSaco) || null, logo: logo === undefined ? (state.ref && state.ref.logo) || null : logo, precoKg, userId: state.perfil.id, fazendaId: state.perfil.fazenda_id, atualizado_em: new Date().toISOString() };
     await db.kvSet('ref', state.ref);
     atualizarMarca();
     state.semRede = false;
@@ -133,6 +134,9 @@ const ctx = {
   podeGerir: () => !!state.perfil && (state.perfil.papel === 'dono' || state.perfil.papel === 'gerente'),
   // valores em R$ (preço da ração, custo, preço do peixe): só o dono (decisão de 10/11/2026)
   verDinheiro: () => !!state.perfil && state.perfil.papel === 'dono',
+  emSuporte: () => !!(state.perfil && state.perfil.suporte),
+  entrarSuporte,
+  sairSuporte,
   toast,
   atualizarRef,
   recarregarTopo: atualizarMarca,
@@ -308,6 +312,15 @@ async function abrirApp(user) {
     setTimeout(() => toast('Convite não usado: esta conta já faz parte de uma fazenda.', 'erro'), 600);
   }
   if (perfil.ativo === false) { if (daRede) await apagarCopias(); mostrarMensagem('Acesso desativado', 'Seu acesso a esta fazenda foi desativado. Fale com o dono.'); return; }
+  // suporte do administrador (sql/34): em suporte o banco mostra a fazenda do cliente, e a própria some (fica parecendo
+  // "bloqueada"). Antes dessa conferência, pergunta se há suporte aberto e abre a fazenda do cliente como dono.
+  if (daRede && perfil.fazenda_id && !perfil.fazendas) {
+    const sup = await api.meuSuporte().catch(() => null);
+    if (sup && sup.fazenda_id) {
+      perfil = { ...perfil, fazenda_id: sup.fazenda_id, papel: 'dono', fazendas: { nome: sup.nome }, suporte: { nome: sup.nome, expira: sup.expira } };
+      await db.kvSet('perfil', perfil);
+    }
+  }
   // fazenda bloqueada pelo administrador (sql/15): o perfil vem, mas a fazenda não aparece
   if (daRede && perfil.fazenda_id && !perfil.fazendas) {
     // ou este aparelho foi desconectado (celular perdido, sql/24): o banco já não reconhece a sessão
@@ -403,6 +416,33 @@ async function sair(forcar = false) {
   mostrarLogin();
 }
 
+// ---------- suporte do administrador (sql/34) ----------
+// Trocar de fazenda: apaga as cópias da fazenda anterior e abre o app de novo (perfil, tanques e números da outra).
+async function trocarDeFazenda() {
+  for (const k of ['perfil', 'ref', 'resumo', 'racao14']) { try { await db.kvDel(k); } catch { /* ignora */ } }
+  location.hash = '#/';
+  location.reload();
+}
+async function semPendentesParaTrocar() {
+  await atualizarPendentes();
+  if (!state.pendentes) return true;
+  toast('Há lançamentos sem enviar neste aparelho. Envie (ou descarte em Pendentes) antes de trocar de fazenda.', 'erro');
+  return false;
+}
+async function entrarSuporte(fazendaId, motivo) {
+  if (!(await semPendentesParaTrocar())) return false;
+  await api.adminEntrarSuporte(fazendaId, motivo);
+  await trocarDeFazenda();
+  return true;
+}
+async function sairSuporte(venceu = false) {
+  if (!venceu && !(await semPendentesParaTrocar())) return;
+  try { await api.adminSairSuporte(); } catch (e) { if (!venceu) { toast(e.message, 'erro'); return; } }
+  await trocarDeFazenda();
+}
+const suporteVenceu = () => { const s = state.perfil && state.perfil.suporte; return !!(s && s.expira && Date.now() > Date.parse(s.expira)); };
+const horaCurta = (iso) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+
 // ---------- estrutura e rotas ----------
 // No celular: barra de cima + abas embaixo. No computador: a mesma navegação numa lateral (o CSS troca uma pela outra).
 function montarShell() {
@@ -410,15 +450,19 @@ function montarShell() {
   const fazenda = esc((p.fazendas && p.fazendas.nome) || 'Piscicultura');
   const papel = esc(ROTULO_PAPEL[p.papel] || p.papel);
   const links = [['', '#/', 'inicio', 'Início'], ['lancar', '#/lancar', 'lancar', 'Lançar'], ['relatorio', '#/relatorio', 'relatorio', 'Relatórios'], ['mais', '#/mais', 'mais', 'Mais']];
+  const sup = p.suporte;
+  const faixa = sup ? `<div class="faixa-suporte" role="status"><span><b>Suporte</b> · ${esc(p.nome)} (administrador) · até ${horaCurta(sup.expira)}</span><button class="btn mini" type="button" data-sair-suporte>Sair do suporte</button></div>` : '';
   root.innerHTML = `
-  <div class="app">
+  <div class="app${sup ? ' em-suporte' : ''}">
     <header class="topo">
       <div class="marca"><span class="logo-sm"></span>
-        <div><strong>${fazenda}</strong><small>${esc(p.nome)} · ${papel}</small></div></div>
+        <div><strong>${fazenda}</strong><small>${sup ? `Suporte · ${esc(p.nome)}` : `${esc(p.nome)} · ${papel}`}</small></div></div>
       <a id="pill" class="pill" href="#/pendencias"></a>
     </header>
+    ${faixa ? `<div class="faixa-cel">${faixa}</div>` : ''}
     <aside class="lateral" aria-label="Navegação">
       <div class="marca"><span class="logo-sm"></span><div><strong>${fazenda}</strong><small>Piscicultura</small></div></div>
+      ${faixa}
       <nav>${links.filter(([aba]) => aba !== 'mais').map(([aba, href, ic, txt]) => `<a data-aba="${aba}" href="${href}">${icone(ic, 19)}<span>${txt}</span></a>`).join('')}</nav>
       ${htmlAtalhos()}
       <div class="lateral-pe">
@@ -435,6 +479,9 @@ function montarShell() {
   atualizarPill();
   atualizarMarca();
   pintarAtalhos(ctx, parseHash(location.hash).rota);
+  root.querySelectorAll('[data-sair-suporte]').forEach((b) => b.addEventListener('click', async () => {
+    if (await confirmar({ titulo: 'Sair do suporte?', texto: `Você volta para a sua fazenda. O que fez na ${(p.fazendas && p.fazendas.nome) || 'fazenda do cliente'} fica no histórico dela.`, ok: 'Sair do suporte' })) sairSuporte();
+  }));
 }
 
 function renderErro(el, e) {
@@ -447,6 +494,8 @@ function renderErro(el, e) {
 async function rotear() {
   const view = document.getElementById('view');
   if (!view || !state.perfil) return;
+  // suporte venceu (2 horas): o banco já devolveu o administrador para a fazenda dele; o app acompanha
+  if (suporteVenceu() && navigator.onLine) { toast('O tempo do suporte acabou (2 horas). Voltando para a sua fazenda.', 'erro'); sairSuporte(true); return; }
   const { rota, partes, params } = parseHash(location.hash);
   rotaAtual = rota;
   const aba = rota === 't' ? '' : ['', 'lancar', 'relatorio'].includes(rota) ? rota : 'mais'; // tela do tanque é aberta pelo Início
@@ -507,7 +556,7 @@ function apiSemSessao() {
   return new Proxy(api, { get: (t, k) => (k === 'resumoGuardado' ? t[k] : k === 'resumoLotes' ? t.resumoGuardado : typeof t[k] === 'function' ? falha : t[k]) });
 }
 function criarCliente() {
-  const LEITURA = /\/rest\/v1\/rpc\/(resumo_lotes|saldo_racao|consumo_diario|plano_atual|eh_admin|nomes_equipe)|grant_type=refresh_token/;
+  const LEITURA = /\/rest\/v1\/rpc\/(resumo_lotes|saldo_racao|consumo_diario|plano_atual|eh_admin|nomes_equipe|meu_suporte|acessos_suporte)|grant_type=refresh_token/;
   const fetchComTimeout = (url, opts = {}) => {
     if (Date.now() < redeMortaAte) return Promise.reject(semRedeErro());
     const ctrl = new AbortController();
