@@ -61,6 +61,9 @@ def rota(route, req):
 sessao = {'access_token': 'x', 'refresh_token': 'y', 'token_type': 'bearer', 'expires_in': 3600 * 24 * 30,
           'expires_at': int(time.time()) + 3600 * 24 * 30, 'user': {'id': U, 'email': 't@t.com', 'aud': 'authenticated', 'role': 'authenticated'}}
 ok = True
+def abrir_dobra(pg, sel):  # toca na linha que abre o formulário (só se estiver fechada), como a pessoa faz
+    d = pg.locator(sel).first; d.wait_for(state='attached', timeout=20000)
+    if d.get_attribute('open') is None: d.locator('summary').first.click(); pg.wait_for_timeout(200)
 def checa(cond, msg):
     global ok
     print(('OK   ' if cond else 'FALHA ') + msg); ok = ok and cond
@@ -86,7 +89,7 @@ with sync_playwright() as pw:
     b = pw.chromium.launch(**LANCAR)
     ctx, pg = abrir(b)
     # [2] lote novo: alevinagem abre em gramas, engorda em kg
-    pg.goto(BASE + f'#/tanque/{T2}'); pg.wait_for_selector('#f-lote', timeout=15000)
+    pg.goto(BASE + f'#/tanque/{T2}'); abrir_dobra(pg, '#d-lote'); pg.wait_for_selector('#f-lote', timeout=15000)
     checa(pg.input_value('#pm-un') == 'kg', '[2] lote novo de engorda abre em kg')
     pg.select_option('#tipo', 'alevinagem')
     checa(pg.input_value('#pm-un') == 'g' and pg.input_value('#pmh-un') == 'g', '[2] ao escolher Alevinagem, o peso passa para gramas')
@@ -135,7 +138,7 @@ with sync_playwright() as pw:
     dados['usuarios'][0]['papel'] = 'dono'; dados['tanques'] = TQ
     pg.on('pageerror', lambda e: erros_js.append(str(e))); pg.route('**/*', rota)
     pg.add_init_script(f"localStorage.setItem('sb-ppvliseblxpsepmeknnl-auth-token', {json.dumps(json.dumps(sessao))});")
-    pg.goto(BASE + f'#/tanque/{T}'); pg.wait_for_selector('[data-editar-lote]', timeout=20000); pg.locator('[data-editar-lote]').first.click(); pg.wait_for_timeout(700)
+    pg.goto(BASE + f'#/tanque/{T}'); abrir_dobra(pg, 'details.lote-dobra'); pg.wait_for_selector('[data-editar-lote]', timeout=20000); pg.locator('[data-editar-lote]').first.click(); pg.wait_for_timeout(700)
     caixa = pg.evaluate("(() => { const c = document.querySelector('.dialogo-caixa'); const r = c.getBoundingClientRect(); return { cabe: r.bottom <= innerHeight + 1, rola: getComputedStyle(c).overflowY } })()")
     checa(caixa['cabe'] and caixa['rola'] == 'auto', f'[g2] formulário "corrigir lote" cabe numa tela de 600 px e rola ({caixa})')
     pg.get_by_role('button', name='Voltar').click(); pg.wait_for_timeout(300)

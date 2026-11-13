@@ -5,6 +5,9 @@ _PRE = open(os.path.join(os.path.dirname(_ARQ), 'teste_despesca.py'), encoding='
 exec(_PRE)
 SEM = {'sim': False}
 _rota = rota
+def abrir_dobra(pg, sel):  # toca na linha que abre o formulário (só se estiver fechada), como a pessoa faz
+    d = pg.locator(sel).first; d.wait_for(state='attached', timeout=20000)
+    if d.get_attribute('open') is None: d.locator('summary').first.click(); pg.wait_for_timeout(200)
 def rota(route, req):
     if SEM['sim'] and ('/rest/v1/despesas_gerais' in req.url or '/rest/v1/custos_lote' in req.url):
         return route.fulfill(status=404, content_type='application/json', body=json.dumps({'code': '42P01', 'message': 'does not exist'}))
@@ -59,7 +62,7 @@ with sync_playwright() as pw:
     t = pg.inner_text('#view'); checa('Em andamento' in t and 'de margem' not in t and 'Ainda não há ciclo' in t, 'lote ativo: sem lucro final'); pg.close()
 
     # despesas gerais: validações, gravação, exclusão, e toque duplo
-    preparar('dono'); pg = abrir(b); vai(pg, '#/despesas', '#f-desp')
+    preparar('dono'); pg = abrir(b); vai(pg, '#/despesas', '#d-desp'); abrir_dobra(pg, '#d-desp')
     for v, m in [('abc', 'letras'), ('0', 'zero'), ('99999999999', 'acima do limite'), ('', 'vazio')]:
         pg.fill('#d-valor', v); pg.click('#f-desp button[type=submit]'); pg.wait_for_timeout(200); checa('Confira o valor' in pg.inner_text('#d-erro'), f'despesa {m}: recusa')
     pg.fill('#d-data', '2030-01-01'); pg.fill('#d-valor', '10'); pg.click('#f-desp button[type=submit]'); pg.wait_for_timeout(200); checa('futuro' in pg.inner_text('#d-erro'), 'data futura: recusa')
@@ -78,7 +81,7 @@ with sync_playwright() as pw:
     preparar('gerente'); pg = abrir(b); vai(pg, '#/lucro', '.card.vazio'); checa('só para o dono' in pg.inner_text('#view'), 'gerente: Lucro bloqueado')
     vai(pg, '#/despesas', '.card.vazio'); checa('só para o dono' in pg.inner_text('#view'), 'gerente: Despesas bloqueado')
     vai(pg, '#/relatorio', '.hub'); checa(pg.locator('a[href="#/lucro"]').count() == 0, 'gerente: sem o atalho'); pg.close()
-    preparar('dono'); est['despesas_gerais'][0]['descricao'] = X; pg = abrir(b); vai(pg, '#/despesas', '#f-desp'); checa(X in pg.inner_text('#view') and pg.evaluate('!window.__xss'), 'texto malicioso aparece como texto'); pg.close(); b.close()
+    preparar('dono'); est['despesas_gerais'][0]['descricao'] = X; pg = abrir(b); vai(pg, '#/despesas', '#d-desp'); abrir_dobra(pg, '#d-desp'); checa(X in pg.inner_text('#view') and pg.evaluate('!window.__xss'), 'texto malicioso aparece como texto'); pg.close(); b.close()
 checa(not erros_js, f'sem erro de JavaScript: {erros_js[:3]}')
 print('RESULTADO: TUDO OK' if ok else 'RESULTADO: FALHOU')
 sys.exit(0 if ok else 1)

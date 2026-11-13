@@ -38,42 +38,49 @@ export function renderMais(ctx, el) {
 
     <div id="teste"></div>
     </div><div>
-    <section class="card lat-cfg" id="cfg-atalhos" aria-labelledby="t-atalhos">
-      <b id="t-atalhos">Atalhos da barra lateral</b>
+    <h2 class="mais-t">Ajustes</h2>
+    <details class="card form-dobra lat-cfg" id="cfg-atalhos">
+      <summary><span><b id="t-atalhos">Atalhos da barra lateral</b><small>O que aparece no menu do lado e em que ordem</small></span></summary>
+      <div class="form">
       <small style="display:block">Escolha o que aparece no menu do lado esquerdo e em que ordem. Vale para este computador.</small>
       <ul class="atalhos-cfg" id="lista-atalhos"></ul>
-    </section>
+      </div>
+    </details>
 
-    ${p.papel === 'dono' ? `<div class="card">
-      <b>Peso do saco de ração</b>
+    ${p.papel === 'dono' ? `<details class="card form-dobra">
+      <summary><span><b>Peso do saco de ração</b><small>${fmtNum(state.ref.kgSaco || PESO_SACO_PADRAO_KG, 0)} kg por saco</small></span></summary>
+      <div class="form">
       <small style="display:block">Usado para converter sacos em kg ao lançar a ração.</small>
       <form id="f-saco" class="saco-linha"><label class="saco-campo"><span>Quilos por saco</span>
         <span class="com-sufixo"><input id="kgsaco" type="number" inputmode="decimal" step="0.1" min="1" value="${state.ref.kgSaco || PESO_SACO_PADRAO_KG}" required><em>kg</em></span></label>
-      <button class="btn primario" type="submit">Salvar</button></form></div>` : ''}
+      <button class="btn primario" type="submit">Salvar</button></form></div></details>` : ''}
 
-    ${p.papel === 'dono' ? `<div class="card">
-      <b>Preço do peixe</b>
+    ${p.papel === 'dono' ? `<details class="card form-dobra">
+      <summary><span><b>Preço do peixe</b><small>${state.ref.precoKg ? `R$ ${fmtNum(state.ref.precoKg, 2)} por kg` : 'não informado'}</small></span></summary>
+      <div class="form">
       <small style="display:block">Usado só para estimar, na tela Início, quanto vale o peixe que está na água.</small>
       <form id="f-preco" class="saco-linha"><label class="saco-campo"><span>Reais por quilo</span>
         <span class="com-sufixo"><input id="precokg" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Ex.: 9,50" value="${state.ref.precoKg || ''}" required><em>R$/kg</em></span></label>
-      <button class="btn primario" type="submit">Salvar</button></form></div>` : ''}
+      <button class="btn primario" type="submit">Salvar</button></form></div></details>` : ''}
 
-    ${p.papel === 'dono' ? `<div class="card">
-      <b>Logo da fazenda</b>
+    ${p.papel === 'dono' ? `<details class="card form-dobra">
+      <summary><span><b>Logo da fazenda</b><small>${state.ref.logo ? 'logo enviado' : 'sem logo: usa a marca do sistema'}</small></span></summary>
+      <div class="form">
       <small style="display:block">Aparece no cabeçalho dos relatórios em PDF. Sem logo, usamos a marca do sistema.</small>
       <div class="logo-linha"><span class="caixa">${state.ref.logo ? `<img src="${esc(state.ref.logo)}" alt="">` : icone('peixe', 44)}</span>
         <div class="cfg-btns"><button class="btn" id="b-logo" type="button">${state.ref.logo ? 'Trocar logo' : 'Enviar logo'}</button>
         ${state.ref.logo ? '<button class="btn perigo" id="b-logo-x" type="button">Remover</button>' : '<small class="mudo">PNG ou JPG. Fundo transparente fica melhor.</small>'}</div></div>
-      <input id="in-logo" type="file" accept="image/*" hidden></div>` : ''}
+      <input id="in-logo" type="file" accept="image/*" hidden></div></details>` : ''}
 
-    ${p.papel === 'dono' ? `<div class="card">
-      <b>Cópia de segurança dos dados</b>
+    ${p.papel === 'dono' ? `<details class="card form-dobra">
+      <summary><span><b>Cópia de segurança dos dados</b><small>Baixar ou importar</small></span></summary>
+      <div class="form">
       <small style="display:block">Um arquivo com tudo da fazenda: tanques, lotes, lançamentos, compras, contagens e equipe. Inclui os valores pagos e o preço do peixe: guarde só com você e não mande para a equipe.</small>
       <div class="cfg-lista">
         <button class="hub-card" id="b-copia" type="button"><span class="item-ic">${icone('baixar')}</span><span class="esq"><b>Baixar cópia</b><small>Salva um arquivo para guardar no Drive ou mandar por e-mail</small></span><span class="seta">${icone('direita', 20)}</span></button>
         <button class="hub-card" id="b-importar" type="button"><span class="item-ic">${icone('subir')}</span><span class="esq"><b>Importar cópia</b><small>Devolve o que faltar, sem alterar o que existe</small></span><span class="seta">${icone('direita', 20)}</span></button>
       </div>
-      <input id="in-copia" type="file" accept=".json,application/json" hidden></div>` : ''}
+      <input id="in-copia" type="file" accept=".json,application/json" hidden></div></details>` : ''}
     </div></div>
 
     ${TERMOS_VERSAO ? '<p class="mudo nota" style="text-align:center"><a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> · <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>' : ''}

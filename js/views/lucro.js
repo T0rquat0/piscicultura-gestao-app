@@ -108,7 +108,9 @@ export async function renderDespesas(ctx, el) {
   const totalMes = lista.filter((d) => d.data.slice(0, 7) === mes).reduce((s, d) => s + Number(d.valor), 0);
   el.innerHTML = `<h1>${T}</h1>
     <p class="mudo" style="margin-top:-.4rem">Custos da fazenda que não são de um lote só. Entram no lucro divididos por peso produzido.</p>
-    <form class="form card" id="f-desp" novalidate>
+    <details class="card form-dobra" id="d-desp"${lista.length ? '' : ' open'}>
+      <summary>Nova despesa</summary>
+    <form class="form" id="f-desp" novalidate>
       <label>Data <input id="d-data" type="date" value="${hoje}" max="${hoje}" required></label>
       <label>Tipo <select id="d-cat">${CATEGORIAS_DESPESA.map(([v, r]) => `<option value="${v}">${esc(r)}</option>`).join('')}</select></label>
       <label>Valor <span class="com-prefixo"><em>R$</em><input id="d-valor" type="text" inputmode="numeric" autocomplete="off" maxlength="16" placeholder="0,00" required></span></label>
@@ -116,6 +118,7 @@ export async function renderDespesas(ctx, el) {
       <p id="d-erro" class="erro" hidden></p>
       <button class="btn primario" type="submit">Salvar despesa</button>
     </form>
+    </details>
     <h2>Lançadas</h2>
     <p class="mudo">Neste mês: <b>${fmtBRL(totalMes)}</b></p>
     <div class="card">${lista.length ? `<ul class="lista">${lista.map((d) => `<li><div class="esq"><b>${esc(rotuloCat(d.categoria))} · ${fmtBRL(d.valor)}</b><small>${fmtData(d.data)}${d.descricao ? ` · ${esc(d.descricao)}` : ''}</small></div><button class="btn mini perigo" type="button" data-del="${esc(d.id)}">Excluir</button></li>`).join('')}</ul>` : '<p class="mudo" style="margin:0">Nenhuma despesa lançada.</p>'}</div>`;

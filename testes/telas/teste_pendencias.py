@@ -17,6 +17,9 @@ D = '11111111-1111-4111-8111-111111111111'; F = '22222222-2222-4222-8222-2222222
 hoje = datetime.date.today()
 dia = lambda n: (hoje + datetime.timedelta(days=n)).isoformat()
 ok = True
+def abrir_dobra(pg, sel):  # toca na linha que abre o formulário (só se estiver fechada), como a pessoa faz
+    d = pg.locator(sel).first; d.wait_for(state='attached', timeout=20000)
+    if d.get_attribute('open') is None: d.locator('summary').first.click(); pg.wait_for_timeout(200)
 def checa(c, m):
     global ok
     print(('OK   ' if c else 'FALHA ') + m); ok = ok and c
@@ -65,7 +68,7 @@ with sync_playwright() as pw:
     # consumo 350 kg/7 dias = 50 kg/dia; 30 dias = 1500 kg; tem 350 -> faltam 1150 kg = 46 sacos de 25 kg
     checa('~46 sacos' in pg.inner_text('#sugestao-compra'), 'estoque: sugere comprar ~46 sacos (1.150 kg para durar 30 dias)')
     checa('há 10 dias' in pg.inner_text('#lembrete-contagem'), 'estoque: lembra que a última contagem foi há 10 dias')
-    pg.goto(BASE + '#/mais'); pg.wait_for_selector('#b-copia', timeout=15000)
+    pg.goto(BASE + '#/mais'); abrir_dobra(pg, 'details:has(#b-copia)'); pg.wait_for_selector('#b-copia', timeout=15000)
     with pg.expect_download() as dl: pg.click('#b-copia')
     arq = dl.value; caminho = arq.path(); dados = json.load(open(caminho, encoding='utf-8'))
     checa(arq.suggested_filename == f'Cópia dos dados - Fazenda São João - {hoje:%d-%m-%Y}.json', f'cópia: nome do arquivo legível, com acento ({arq.suggested_filename})')

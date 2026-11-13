@@ -15,6 +15,9 @@ SB = 'https://ppvliseblxpsepmeknnl.supabase.co'
 D = '11111111-1111-4111-8111-111111111111'; F = '22222222-2222-4222-8222-222222222222'
 AQUI = os.getcwd()
 ok = True
+def abrir_dobra(pg, sel):  # toca na linha que abre o formulário (só se estiver fechada), como a pessoa faz
+    d = pg.locator(sel).first; d.wait_for(state='attached', timeout=20000)
+    if d.get_attribute('open') is None: d.locator('summary').first.click(); pg.wait_for_timeout(200)
 def checa(c, m):
     global ok
     print(('OK   ' if c else 'FALHA ') + m); ok = ok and c
@@ -82,7 +85,7 @@ with sync_playwright() as pw:
     ins = [x for tb, x in est['insert'] if tb == 'racao_estoque']
     checa(ins[-1]['quantidade_kg'] == 250 and ins[-1]['sacos_nota'] == 10 and ins[-1]['sacos_recebidos'] == 10, 'sem marcar a conferência: chegou tudo (10 de 10, 250 kg)')
     # importar
-    pg.goto(BASE + '#/mais'); pg.wait_for_selector('#b-importar', timeout=15000)
+    pg.goto(BASE + '#/mais'); abrir_dobra(pg, 'details:has(#b-importar)'); pg.wait_for_selector('#b-importar', timeout=15000)
     pg.set_input_files('#in-copia', arq_ruim); pg.wait_for_timeout(500)
     checa('não é uma cópia do app' in pg.inner_text('#toast') and not any(r[0] == 'importar_copia' for r in est['rpc']), 'importar: arquivo qualquer é recusado sem chamar o banco')
     pg.set_input_files('#in-copia', arq_ok); pg.wait_for_selector('.dialogo [data-ok]')
@@ -99,7 +102,7 @@ with sync_playwright() as pw:
     pg.click('#d-compra summary'); pg.fill('#sacos', '40'); pg.check('#conferir'); pg.fill('#recebidos', '38'); pg.click('#f-compra button[type=submit]'); pg.wait_for_timeout(1500)
     ins = [x for tb, x in est['insert'] if tb == 'racao_estoque']
     checa(len(ins) == 2 and ins[-1]['quantidade_kg'] == 950 and 'sacos_nota' not in ins[-1], 'sem o sql/14: grava a compra sem a conferência, com o kg que chegou (950)')
-    pg.goto(BASE + '#/mais'); pg.wait_for_selector('#b-importar', timeout=15000)
+    pg.goto(BASE + '#/mais'); abrir_dobra(pg, 'details:has(#b-importar)'); pg.wait_for_selector('#b-importar', timeout=15000)
     pg.set_input_files('#in-copia', arq_ok); pg.click('.dialogo [data-ok]'); pg.wait_for_timeout(1200)
     checa('falta rodar o sql/14' in pg.inner_text('#toast'), 'sem o sql/14: importar explica o que falta')
     errs += est['erros'] + est['fora']; b.close()

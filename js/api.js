@@ -226,9 +226,11 @@ export function criarApi(client) {
     // saldo de cada ração (engorda e alevino, sql/17). Sem o sql/17: uma linha só, o total, contada como engorda.
     async saldosRacao() {
       const { data, error } = await client.rpc('saldo_racao_por_tipo');
-      if (!error && Array.isArray(data) && data.length) return { porTipo: true, linhas: data };
-      const s = await this.saldoRacao();
-      return { porTipo: false, linhas: s ? [{ ...s, tipo_racao: 'engorda' }] : [] };
+      let r;
+      if (!error && Array.isArray(data) && data.length) r = { porTipo: true, linhas: data };
+      else { const s = await this.saldoRacao(); r = { porTipo: false, linhas: s ? [{ ...s, tipo_racao: 'engorda' }] : [] }; }
+      db.kvSet('saldosRacao', { ...r, em: Date.now() }).catch(() => {});
+      return r;
     },
     async consumoDiario(dias = 30, tipo = null) {
       if (tipo) {

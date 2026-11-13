@@ -4,6 +4,9 @@ _ARQ = os.path.abspath(__file__)
 _PRE = open(os.path.join(os.path.dirname(_ARQ), 'teste_lucro.py'), encoding='utf-8').read().split('\nwith sync_playwright() as pw:')[0]
 exec(_PRE)
 
+def abrir_dobra(pg, sel):  # toca na linha que abre o formulário (só se estiver fechada), como a pessoa faz
+    d = pg.locator(sel).first; d.wait_for(state='attached', timeout=20000)
+    if d.get_attribute('open') is None: d.locator('summary').first.click(); pg.wait_for_timeout(200)
 def digita(pg, sel, teclas):
     vistos = []
     pg.click(sel)
@@ -30,7 +33,7 @@ with sync_playwright() as pw:
     pg.fill('#custo', 'R$ 3.200,00'); checa(pg.input_value('#custo') == '3.200,00', 'colar "R$ 3.200,00" fica 3.200,00')
     checa(pg.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'), '360 px: sem transbordar')
     # despesas gerais
-    vai(pg, '#/despesas', '#f-desp')
+    vai(pg, '#/despesas', '#d-desp'); abrir_dobra(pg, '#d-desp')
     checa(digita(pg, '#d-valor', list('2500'))[-1] == '25,00', 'despesa: 2500 vira 25,00')
     # custo do alevino (janela)
     vai(pg, '#/lucro', '.lucro-ciclo'); pg.click('[data-alevino]'); pg.wait_for_selector('.dialogo form')
