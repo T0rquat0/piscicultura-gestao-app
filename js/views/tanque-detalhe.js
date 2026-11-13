@@ -5,8 +5,10 @@ import { previsaoDespesca, vivosDoLote } from '../calc.js';
 import { icone } from '../icons.js';
 import { pedirTexto } from '../dialogo.js';
 import { metaDe, htmlPrevisao, PROXIMA_FASE } from './despesca.js';
+import { dadosDoDia, formatosSaco } from './dia.js';
+import { acoesDoTanque } from './ronda.js';
 
-export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje, metas = {}, podeGerir = false) {
+export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje, metas = {}, podeGerir = false, acoesHtml = '') {
   const nomeLote = (l) => `${ROTULO_TIPO[l.tipo] || l.tipo} · ${l.especie}`;
   const blocos = lotes.length
     ? lotes.map((l) => {
@@ -49,40 +51,57 @@ export function htmlCardTanque(tanque, lotes, resumo, racaoHojeLocal, hoje, meta
   return `
   <section class="tanque-card tdet ${!comLote ? 'sem-lote' : lancouHoje ? 'ok' : 'falta'}">
     <header class="td-topo"><div><h1 class="td-nome">${esc(tanque.nome)}</h1><p class="td-sub">${esc(sub)}</p></div>${selo}</header>
+    ${comLote ? acoesHtml : ''}
     ${blocos}
-    ${comLote ? `<div class="td-acoes">
-      <a class="btn primario grande" href="#/lancar?tipo=racao&tanque=${esc(tanque.id)}">Lançar ração</a>
-      <div class="td-duo">
-        <a class="btn" href="#/lancar?tipo=biometria&tanque=${esc(tanque.id)}">Biometria</a>
-        <a class="btn" href="#/lancar?tipo=mortalidade&tanque=${esc(tanque.id)}">Mortalidade</a>
-        <a class="btn" href="#/lancar?tipo=manejo&tanque=${esc(tanque.id)}">Manejo</a>
-        <a class="btn" href="#/lancar?tipo=agua&tanque=${esc(tanque.id)}">Água</a>
-        ${podeGerir ? `<a class="btn" href="#/lancar?tipo=despesca&tanque=${esc(tanque.id)}">Despesca</a>` : ''}
-      </div>
-    </div>` : ''}
   </section>`;
 }
 
-// Tela de um tanque (todos os papéis): números do lote e atalhos para lançar
+// Tela de um tanque (todos os papéis): o que dar hoje, os botões grandes de lançar e os números do lote
 export async function renderTanqueDetalhe(ctx, el, id) {
   const { state } = ctx;
   const tanque = state.ref.tanques.find((t) => t.id === id);
   if (!tanque) { el.innerHTML = '<div class="card vazio">Tanque não encontrado.</div>'; return; }
   el.innerHTML = '<p class="carregando">Carregando…</p>';
-  const resumo = {};
-  const linhasResumo = await (navigator.onLine ? ctx.api.resumoLotes() : ctx.api.resumoGuardado()).catch(() => null);
-  if (linhasResumo) for (const r of linhasResumo) resumo[r.lote_id] = r;
-  const semDetalhe = !linhasResumo;
-  const numerosGuardados = !semDetalhe && (!navigator.onLine || !!ctx.state.semRede);
-  const hoje = hojeISO();
-  const fila = await db.filaList();
-  const racaoHojeLocal = new Set(fila.filter((i) => i.tabela === 'racao_consumo' && i.payload.data === hoje).map((i) => i.payload.tanque_id));
+  const D = await dadosDoDia(ctx, { mortes: true, saldos: false });
+  if (!el.isConnected) return;
+  const { resumo, semDetalhe, numerosGuardados, hoje } = D;
+  const F = formatosSaco(state.ref.kgSaco);
   const meus = state.ref.lotes.filter((l) => l.tanque_id === id);
   const metas = (await db.kvGet('metasDespesca')) || {};
+  const gerir = ctx.podeGerir();
+
+  // ração de hoje: já dada, ou quanto dar (média da semana; sem média, a sugestão pelo peso dos peixes)
+  let plano = '';
+  if (meus.length) {
+    const kgHoje = D.hojeKg(id);
+    if (D.status[id] === 'ok') plano = `<div class="plano-hoje ok"><span>Ração de hoje</span><b>✓ ${kgHoje ? `${esc(F.nSacos(F.sacos(kgHoje)))} dados (${fmtNum(kgHoje, 0)} kg)` : 'já lançada'}</b></div>`;
+    else {
+      const m = D.mediaKg(id), sg = m ? null : D.sugestao(id);
+      if (m) plano = `<div class="plano-hoje"><span>Ração de hoje</span><b>Dar ${fmtNum(m, 0)} kg (${esc(F.nSacos(F.sacos(m)))})</b>
+        <details><summary>Por que essa quantidade?</summary><p>É a média dos dias com ração neste tanque na última semana. Se o peixe comer menos ou sobrar ração, ajuste.</p></details></div>`;
+      else if (sg && sg.kg > 0) plano = `<div class="plano-hoje"><span>Ração de hoje</span><b>Dar ~${fmtNum(sg.kg, 0)} kg (${esc(F.nSug(sg.kg))})</b>
+        <details><summary>Por que essa quantidade?</summary><p>${fmtNum(sg.pct, 1)}% do peso dos peixes no tanque${gerir ? ` (${fmtNum(sg.biomassaKg || 0, 0)} kg)` : ''}, pela fase em que estão${sg.provisoria ? '. Taxa provisória' : ''}. Confirme a taxa com o técnico.</p></details></div>`;
+    }
+  }
+  // mortes da semana deste tanque
+  const ids = new Set(meus.map((l) => l.id));
+  const mortes7 = D.mortes ? D.mortes.filter((x) => ids.has(x.lote_id)).reduce((a, x) => a + (Number(x.quantidade) || 0), 0) : null;
+  const acoes = acoesDoTanque(ctx, D, tanque, F, 't');
+  const grandes = acoes.filter((a) => ['racao', 'mortalidade', 'agua', 'biometria'].includes(a.tipo))
+    .map((a) => (a.tipo === 'mortalidade' && mortes7 != null ? { ...a, sub: `${fmtInt(mortes7)} ${mortes7 === 1 ? 'peixe' : 'peixes'} em 7 dias` } : a));
+  const outras = acoes.filter((a) => !grandes.some((g) => g.tipo === a.tipo));
+  const acoesHtml = `${plano}
+    <div class="acoes4">${grandes.map((a) => `<a class="acao${a.feita ? ' feita' : ''}${a.ruim ? ' ruim' : ''}${a.alerta ? ' alerta' : ''}" href="${a.href}" data-acao="${a.tipo}">${icone(a.ic, 28)}<span>${esc(a.rot)}</span><small>${esc(a.sub)}</small></a>`).join('')}</div>`;
+
   el.innerHTML = `${semDetalhe ? '<p class="aviso">Sem conexão: os totais aparecem quando houver internet.</p>' : numerosGuardados ? '<p class="aviso">Sem conexão: números da última atualização.</p>' : ''}
-    ${htmlCardTanque(tanque, meus, resumo, racaoHojeLocal, hoje, metas, ctx.podeGerir())}
-    ${meus.length ? `<a class="hub-card td-rel" href="#/relatorio/${esc(meus[0].id)}"><span class="item-ic">${icone('relatorio')}</span><span class="esq"><b>Relatório do lote</b><small>Peso, ração e mortalidade do início até hoje</small></span><span class="seta">${icone('direita', 20)}</span></a>
-    ${!ctx.podeGerir() ? `<a class="hub-card td-corrigir" href="#/relatorio/${esc(meus[0].id)}?aba=registros"><span class="item-ic">${icone('historico')}</span><span class="esq"><b>Lançou errado?</b><small>Corrija ou apague o que você lançou hoje. Depois de hoje, só o dono ou o gerente.</small></span><span class="seta">${icone('direita', 20)}</span></a>` : ''}` : ''}`;
+    ${htmlCardTanque(tanque, meus, resumo, D.racaoHojeLocal, hoje, metas, gerir, acoesHtml)}
+    <ul class="lista td-lista card">
+      ${meus.length ? outras.map((a) => `<li><a class="item" href="${a.href}" data-acao="${a.tipo}"><span class="item-ic">${icone(a.ic)}</span><span class="esq"><b>${esc(a.rot)}</b><small>${esc(a.sub)}</small></span><span class="seta">${icone('direita', 20)}</span></a></li>`).join('') : ''}
+      ${meus.length ? `<li><a class="item td-rel" href="#/relatorio/${esc(meus[0].id)}"><span class="item-ic">${icone('relatorio')}</span><span class="esq"><b>Relatório do lote</b><small>Peso, ração, mortes, água, lançamentos e PDF</small></span><span class="seta">${icone('direita', 20)}</span></a></li>` : ''}
+      ${meus.length && !gerir ? `<li><a class="item td-corrigir" href="#/relatorio/${esc(meus[0].id)}?aba=registros"><span class="item-ic">${icone('historico')}</span><span class="esq"><b>Lançou errado?</b><small>Corrija ou apague o que você lançou hoje. Depois de hoje, só o dono ou o gerente.</small></span><span class="seta">${icone('direita', 20)}</span></a></li>` : ''}
+      ${gerir ? `<li><a class="item td-cadastro" href="#/tanque/${esc(tanque.id)}"><span class="item-ic">${icone('ajuste')}</span><span class="esq"><b>Cadastro do tanque e lotes</b><small>Nome, área, povoar, editar, encerrar ou reabrir lote</small></span><span class="seta">${icone('direita', 20)}</span></a></li>` : ''}
+    </ul>`;
+  if (!el.querySelector('.td-lista li')) el.querySelector('.td-lista').remove();
   el.querySelectorAll('[data-meta]').forEach((b) => b.addEventListener('click', async () => {
     const l = meus.find((x) => x.id === b.dataset.meta); if (!l) return;
     const v = await pedirTexto({ titulo: 'Meta de despesca', rotulo: 'Peso médio de cada peixe na despesca (kg)', texto: String(metaDe(l, metas)).replace('.', ','), placeholder: 'Ex.: 2,5', maxlength: 8,

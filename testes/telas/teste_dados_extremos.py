@@ -105,7 +105,7 @@ def rotas(d):
             '#/relatorio/' + enc, '#/relatorio/racao', '#/tanques', '#/tanque/' + t, '#/estoque', '#/equipe', '#/plano', '#/historico', '#/pendencias', '#/mais', '#/admin']
 
 
-ABAS = lambda r: r in ('#/', '#/lancar', '#/relatorio', '#/mais') or r.startswith('#/lancar?')
+ABAS = lambda r: r in ('#/', '#/tanques', '#/relatorio', '#/mais')  # menu desde 13/11/2026: Hoje, Tanques, Relatórios, Fazenda
 RUINS_ARQ = ['undefined', 'NaN', 'Infinity', 'Invalid Date', '[object']
 
 
@@ -195,7 +195,7 @@ with sync_playwright() as pw:
                 for r in rotas(d):
                     atual['r'] = r; telas += 1
                     # chega pela aba Mais (ou Início para a tela do tanque) para testar o voltar até a origem
-                    origem = '#/' if r.startswith('#/t/') else '#/relatorio' if r.startswith('#/relatorio/') else '#/mais'
+                    origem = '#/tanques' if r.startswith('#/t/') else '#/' if r.startswith('#/lancar') else '#/relatorio' if r.startswith('#/relatorio/') else '#/mais'
                     if not ABAS(r): pg.goto(BASE + origem); pg.wait_for_timeout(500)
                     pg.goto(BASE + r); pg.wait_for_timeout(1300)
                     txt = pg.inner_text('#view') if pg.locator('#view').count() else ''

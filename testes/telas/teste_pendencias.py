@@ -94,7 +94,8 @@ with sync_playwright() as pw:
 
     # 4) funcionário: nada de plano, sugestão, lembrete nem cópia
     b, pg, est = abrir(pw, 'funcionario', {'estado': 'teste', 'valido_ate': dia(2)}, saldo_base, [])
-    pg.goto(BASE + '#/'); pg.wait_for_selector('#avisos', state='attached', timeout=20000); pg.wait_for_timeout(1500)
+    # a Hoje do funcionário é a ronda (desde 13/11/2026)
+    pg.goto(BASE + '#/'); pg.wait_for_selector('#view .h-titulo', timeout=20000); pg.wait_for_timeout(1500)
     checa(pg.locator('#aviso-plano').count() == 0 and pg.locator('#aviso-contagem').count() == 0, 'funcionário: não vê aviso de plano nem de contagem')
     pg.goto(BASE + '#/estoque'); pg.wait_for_selector('.estoque-hero', timeout=15000)
     checa(pg.locator('#sugestao-compra').count() == 0, 'funcionário: não vê sugestão de compra')

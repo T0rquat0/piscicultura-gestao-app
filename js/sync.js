@@ -12,6 +12,11 @@ import { filaList, filaPut, filaRemove, kvGet, kvSet } from './db.js';
 // é trocada pelos números do banco, então uma diferença aqui dura pouco.
 export async function anotarNoResumo(tabela, p) {
   try {
+    if (tabela === 'qualidade_agua') { // a água medida vai para a lista dos últimos dias (a Ronda mostra "✓ água" sem sinal)
+      const ag = await kvGet('agua14');
+      if (Array.isArray(ag)) { ag.push({ data: p.data, hora: p.hora, tanque_id: p.tanque_id, oxigenio_mgl: p.oxigenio_mgl, temperatura_c: p.temperatura_c, ph: p.ph, amonia_mgl: p.amonia_mgl }); await kvSet('agua14', ag); }
+      return;
+    }
     const linhas = await kvGet('resumo');
     const r = Array.isArray(linhas) ? linhas.find((x) => x.lote_id === p.lote_id) : null;
     if (!r) return;

@@ -41,7 +41,7 @@ function camposDoTipo(tipo, kgSaco, verDinheiro = false) {
       <ol class="como">
         <li>Digite o total de kg de ração dado hoje neste tanque (o número que o equipamento mostra).</li>
         <li>Pode ter vírgula: 37,5.</li>
-        <li>O app mostra quantos sacos isso dá. Cada saco vale ${fmtNum(kgSaco, 0)} kg (muda em Mais &gt; Peso do saco).</li>
+        <li>O app mostra quantos sacos isso dá. Cada saco vale ${fmtNum(kgSaco, 0)} kg (muda em Fazenda &gt; Peso do saco).</li>
       </ol></details>`;
   }
   if (tipo === 'biometria') {
@@ -121,6 +121,8 @@ export async function renderLancar(ctx, el, params = {}) {
   const { state } = ctx;
   const tiposVisiveis = Object.entries(TIPOS).filter(([, v]) => !v.gerir || ctx.podeGerir());
   const tipo = tiposVisiveis.some(([k]) => k === params.tipo) ? params.tipo : 'racao';
+  // de onde veio (ronda ou tela do tanque): depois de salvar, o "voltar" leva para lá
+  const volta = params.volta === 'ronda' || params.volta === 't' ? params.volta : '';
   const { tanques, lotes } = state.ref;
   const kgSaco = state.ref.kgSaco || PESO_SACO_PADRAO_KG;
 
@@ -179,7 +181,7 @@ export async function renderLancar(ctx, el, params = {}) {
   { const sg = el.querySelector('.seg'), on = sg && sg.querySelector('button.on'); if (on && sg.scrollWidth > sg.clientWidth) sg.scrollLeft = on.offsetLeft - (sg.clientWidth - on.offsetWidth) / 2; }
   if (params.de !== undefined) { const sg = el.querySelector('.seg'); if (sg) sg.dataset.de = params.de; }
   el.querySelectorAll('.seg button').forEach((b) =>
-    b.addEventListener('click', () => renderLancar(ctx, el, { tipo: b.dataset.tipo, tanque: el.querySelector('#tanque').value, de: tiposVisiveis.findIndex(([k]) => k === tipo) })));
+    b.addEventListener('click', () => renderLancar(ctx, el, { tipo: b.dataset.tipo, tanque: el.querySelector('#tanque').value, de: tiposVisiveis.findIndex(([k]) => k === tipo), volta })));
 
   const f = el.querySelector('#f');
   let rascunhoSalvo = false, timerRascunho = null;
@@ -731,12 +733,12 @@ export async function renderLancar(ctx, el, params = {}) {
         ${navigator.onLine ? '' : '<p class="mudo nota">Sem internet: guardado no celular. Será enviado sozinho quando a internet voltar.</p>'}
         <div class="sucesso-acoes">
           ${proximo ? `<button type="button" class="btn primario grande" id="b-proximo">Próximo: ${esc(proximo.nome)}</button>` : `<button type="button" class="btn primario grande" id="b-outro">Lançar em outro tanque</button>`}
-          <div class="sucesso-links">${proximo ? '<button type="button" class="link" id="b-outro">Outro tanque</button><span aria-hidden="true">·</span>' : ''}<a class="link" href="#/">Voltar ao início</a></div>
+          <div class="sucesso-links">${proximo ? '<button type="button" class="link" id="b-outro">Outro tanque</button><span aria-hidden="true">·</span>' : ''}${volta === 'ronda' ? `<a class="link" href="${ctx.podeGerir() ? '#/ronda' : '#/'}" id="b-volta">Voltar à ronda</a>` : volta === 't' ? `<a class="link" href="#/t/${esc(selTanque.value)}" id="b-volta">Voltar ao ${esc(nomeTanque)}</a>` : '<a class="link" href="#/">Voltar ao início</a>'}</div>
         </div>
       </div>`;
-    el.querySelector('#b-outro').addEventListener('click', () => renderLancar(ctx, el, { tipo, escolher: '1' }));
+    el.querySelector('#b-outro').addEventListener('click', () => renderLancar(ctx, el, { tipo, escolher: '1', volta }));
     const bp = el.querySelector('#b-proximo');
-    if (bp) bp.addEventListener('click', () => renderLancar(ctx, el, { tipo, tanque: proximo.id }));
+    if (bp) bp.addEventListener('click', () => renderLancar(ctx, el, { tipo, tanque: proximo.id, volta }));
   };
   // ---- rascunho: o que foi digitado fica no aparelho até salvar (sair da tela não perde) ----
   const guardarRascunho = () => { if (!rascunhoSalvo && f.isConnected) rascunho.guardar(state.perfil.id, tipo, rascunho.capturar(f)); };
@@ -759,7 +761,7 @@ export async function renderLancar(ctx, el, params = {}) {
     f.querySelector('#b-limpar-rascunho').addEventListener('click', async () => {
       rascunhoSalvo = true; clearTimeout(timerRascunho);
       await rascunho.apagar(state.perfil.id, tipo);
-      renderLancar(ctx, el, { tipo, tanque: selTanque.value });
+      renderLancar(ctx, el, { tipo, tanque: selTanque.value, volta });
     });
   }
 

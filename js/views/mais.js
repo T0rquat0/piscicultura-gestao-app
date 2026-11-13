@@ -10,22 +10,27 @@ export function renderMais(ctx, el) {
   const { state } = ctx;
   const p = state.perfil;
   const gerir = ctx.podeGerir();
-  const itens = [
-    gerir && ['#/tanques', 'tanque', 'Tanques e lotes', 'Cadastrar tanques e lotes de peixes'],
-    p.papel === 'dono' && ['#/plano', 'check', 'Meu plano', 'Pacote de tanques e prazo'],
-    gerir && ['#/despesas', 'estoque', 'Despesas gerais', 'Energia, mão de obra e outros custos'],
-    ['#/estoque', 'estoque', 'Estoque de ração', gerir ? 'Saldo, compras e custos' : 'Saldo de ração'],
-    p.papel === 'dono' && ['#/equipe', 'equipe', 'Equipe', 'Pessoas, papéis e tanques liberados'],
-    p.papel === 'dono' && ['#/historico', 'historico', 'Histórico e lixeira', 'Quem alterou ou excluiu, e restaurar'],
-    state.admin && ['#/admin', 'admin', 'Administração do sistema', 'Todas as fazendas, cobranças e pacotes'],
-    ['#/pendencias', 'pendentes', 'Pendentes de envio', state.pendentes ? `${state.pendentes} aguardando envio` : 'Nada pendente'],
-  ].filter(Boolean);
+  const dono = p.papel === 'dono';
+  // grupos da tela Fazenda (o que antes ficava solto no "Mais")
+  const grupos = [
+    ['No dia a dia', [
+      ['#/estoque', 'estoque', 'Estoque de ração', gerir ? 'Saldo, compras e contagem' : 'Saldo de ração'],
+      gerir && ['#/despesas', 'estoque', 'Despesas gerais', 'Energia, mão de obra e outros custos'],
+      ['#/pendencias', 'pendentes', 'Pendentes de envio', state.pendentes ? `${state.pendentes} aguardando envio` : 'Nada pendente'],
+    ]],
+    ['Pessoas', [dono && ['#/equipe', 'equipe', 'Equipe', 'Pessoas, papéis e tanques liberados']]],
+    ['Plano', [dono && ['#/plano', 'check', 'Meu plano', 'Pacote de tanques e prazo']]],
+    ['Segurança', [dono && ['#/historico', 'historico', 'Histórico e lixeira', 'Quem alterou ou excluiu, e restaurar']]],
+    ['Sistema', [state.admin && ['#/admin', 'admin', 'Administração do sistema', 'Todas as fazendas, cobranças e pacotes']]],
+  ].map(([t, its]) => [t, its.filter(Boolean)]).filter(([, its]) => its.length);
+  const htmlGrupo = ([titulo, its]) => `<h2 class="mais-t">${esc(titulo)}</h2><div class="card"><ul class="lista">${its.map(([href, ic, t, s]) => `
+      <li><a class="item" href="${href}"><span class="item-ic">${icone(ic)}</span><span class="esq"><b>${esc(t)}</b><small>${esc(s)}</small></span><span class="seta">${icone('direita', 20)}</span></a></li>`).join('')}</ul></div>`;
 
   el.innerHTML = `
-    <h1>Mais</h1>
+    <h1>Fazenda</h1>
+    <p class="sub-titulo">${esc((p.fazendas && p.fazendas.nome) || '')}${p.suporte ? ' · suporte do administrador' : ` · você é ${p.papel === 'funcionario' ? 'funcionário' : `o ${esc(ROTULO_PAPEL[p.papel] || p.papel).toLowerCase()}`}`}</p>
     <div class="pc-duas"><div>
-    <div class="card"><ul class="lista">${itens.map(([href, ic, t, s]) => `
-      <li><a class="item" href="${href}"><span class="item-ic">${icone(ic)}</span><span class="esq"><b>${esc(t)}</b><small>${esc(s)}</small></span><span class="seta">${icone('direita', 20)}</span></a></li>`).join('')}</ul></div>
+    ${grupos.map(htmlGrupo).join('')}
 
     <div class="card">
       <div class="perfil-linha"><span class="avatar">${esc((p.nome || '?').trim().charAt(0).toUpperCase())}</span>

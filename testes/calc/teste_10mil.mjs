@@ -114,8 +114,9 @@ for (let i = 0; i < N; i++) {
 }
 
 // ---------- 4) botão de voltar: 10 mil caminhos de navegação ----------
-const SUBS = ['#/estoque', '#/tanques', '#/tanque/A', '#/tanque/B', '#/t/A', '#/t/B', '#/equipe', '#/plano', '#/historico', '#/pendencias', '#/admin', '#/relatorio/racao', '#/relatorio/L1', '#/relatorio/L2'];
-const ABAS = ['#/', '#/lancar', '#/relatorio', '#/mais'];
+// menu desde 13/11/2026: Hoje, Tanques, Relatórios e Fazenda; Lançar e Ronda viraram telas de dentro
+const SUBS = ['#/estoque', '#/lancar', '#/ronda', '#/tanque/A', '#/tanque/B', '#/t/A', '#/t/B', '#/equipe', '#/plano', '#/historico', '#/pendencias', '#/admin', '#/relatorio/racao', '#/relatorio/L1', '#/relatorio/L2'];
+const ABAS = ['#/', '#/tanques', '#/relatorio', '#/mais'];
 const partes = (h) => h.replace(/^#\/?/, '').split('?')[0].split('/');
 const ir = (h) => { const [rota, ...p] = partes(h); registrarRota(h, rota, p); return rota; };
 for (let i = 0; i < N; i++) {
