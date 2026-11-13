@@ -58,7 +58,9 @@ with sync_playwright() as pw:
     digita('7000'); salvar(); checa('muito alta' in erro() and not posts, '7.000 kg num tanque é barrado')
     digita('1.250,5'); salvar(); checa('ponto de milhar' in erro() and not posts, '"1.250,5" pede para digitar sem ponto de milhar')
     digita(''); salvar(); checa('kg de ração' in erro() and not posts, 'campo vazio é barrado')
-    digita('600'); salvar(); pg.wait_for_timeout(1500)
+    digita('600'); pg.get_by_text('Salvar ração').click(); pg.wait_for_selector('.dialogo-resumo', timeout=10000)
+    checa('600 kg de ração (24 sacos)' in pg.inner_text('.dialogo-resumo'), 'conferência mostra 600 kg (24 sacos) antes de salvar')
+    pg.click('.dialogo [data-ok]'); pg.wait_for_timeout(3000)
     r = [c for tb, c in posts if tb == 'racao_consumo']
     checa(len(r) == 1 and float(r[0]['quantidade_kg']) == 600, f'600 kg digitados vão 600 kg para o banco ({[c.get("quantidade_kg") for c in r]})')
     corpo = pg.inner_text('body')

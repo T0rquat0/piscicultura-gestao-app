@@ -5,6 +5,8 @@ import { esc, hojeISO, fmtData, fmtNum, fmtInt, num, uuid, ROTULO_TIPO, progress
 import * as db from '../db.js';
 import * as rascunho from '../rascunho.js';
 import { confirmar } from '../dialogo.js';
+import { ligarTeclado } from '../teclado.js';
+import { desfazerLancamento, minutosParaDesfazer } from '../desfazer.js';
 import { ordemNatural } from './home.js';
 import { AGUA_LIMITES, PESO_SACO_PADRAO_KG, CAUSAS_MORTE, TAXA_RACAO } from '../config.js';
 import { sugestaoRacao, vivosDoLote, indicadoresDespesca, avisoPesoMedio, avaliarAgua, ehTambaqui, tipoRacaoDoLote, faltaNoEstoque } from '../calc.js';
@@ -27,6 +29,9 @@ const sacosDeKg = (kg, kgSaco) => Math.round((kg / kgSaco) * 10) / 10;
 // "1.250" (ponto de milhar, como o equipamento às vezes mostra) = 1250 kg, não 1,25 kg
 const kgDigitado = (v) => { const t = String(v ?? '').trim(); return /^\d{1,3}(\.\d{3})+$/.test(t) ? Number(t.replace(/\./g, '')) : numDecimal(t); };
 const kgEmSacosTxt = (kg, kgSaco) => `${fmtNum(kg, casas(kg))} kg = ${sacosTxt(sacosDeKg(kg, kgSaco))} de ${fmtNum(kgSaco, 0)} kg`;
+
+// nome do lançamento para a pessoa ("Manejo" é o probiótico)
+const ROTULO_LANC = { racao: 'Ração', biometria: 'Pesagem', mortalidade: 'Mortes', despesca: 'Despesca', manejo: 'Probiótico', agua: 'Água' };
 
 const TITULO2 = { racao: 'Quantidade de ração', biometria: 'Pesagem dos peixes', mortalidade: 'Peixes mortos', despesca: 'Dados da despesca', manejo: 'Aplicação de probiótico', agua: 'Medição da água' };
 
@@ -480,6 +485,14 @@ export async function renderLancar(ctx, el, params = {}) {
     const q = f.querySelector('#racao-kg'), conv = f.querySelector('#conv');
     q.addEventListener('input', () => { const n = kgDigitado(q.value); conv.textContent = n > 0 ? kgEmSacosTxt(n, kgSaco) : `Digite o total em kg. Ex.: 600 kg = ${sacosTxt(sacosDeKg(600, kgSaco))}`; });
   }
+  // funcionário: teclado grande na tela para os números da ronda (ração, mortes e pesagem)
+  if (!ctx.podeGerir()) {
+    const c = (sel) => f.querySelector(sel);
+    if (tipo === 'racao') ligarTeclado([{ el: c('#racao-kg'), decimal: true }], c('#sug-racao'));
+    else if (tipo === 'mortalidade') ligarTeclado([{ el: c('#qtd'), decimal: false }], c('#qtd').closest('label'));
+    else if (tipo === 'biometria') ligarTeclado([{ el: c('#peso'), decimal: true }, { el: c('#amostra'), decimal: false }], c('#pm'));
+    if (['racao', 'mortalidade', 'biometria'].includes(tipo)) f.classList.add('com-teclado');
+  }
 
   // marca os tanques que já receberam ração hoje (fila local + servidor, quando houver internet)
   async function marcarAlimentados() {
@@ -573,6 +586,14 @@ export async function renderLancar(ctx, el, params = {}) {
       });
     } catch { return true; }
   }
+
+  // o lançamento em palavras: "600 kg de ração (24 sacos)", "12 peixes mortos"...
+  const resumoDe = (payload) => (tipo === 'racao' ? `${kgTxt(payload.quantidade_kg)} kg de ração (${sacosTxt(sacosDeKg(payload.quantidade_kg, kgSaco))})`
+    : tipo === 'biometria' ? `${pesoMedioTxt(payload.peso_amostra_kg / payload.quantidade_amostrada)} de peso médio (${fmtInt(payload.quantidade_amostrada)} peixes pesados)`
+    : tipo === 'agua' ? [payload.oxigenio_mgl != null && `O₂ ${fmtNum(payload.oxigenio_mgl, 1)} mg/L`, payload.temperatura_c != null && `${fmtNum(payload.temperatura_c, 1)} °C`, payload.ph != null && `pH ${fmtNum(payload.ph, 1)}`, payload.amonia_mgl != null && `amônia ${fmtNum(payload.amonia_mgl, 2)} mg/L`].filter(Boolean).join(' · ')
+    : tipo === 'manejo' ? `${payload.produto}: ${String(payload.dose).replace('.', ',')} ${payload.unidade} ${payload.via === 'agua' ? 'na água' : 'na ração'}`
+    : tipo === 'despesca' ? `despesca ${payload.tipo}: ${plural(payload.quantidade, 'peixe', 'peixes')}, ${fmtNum(payload.peso_bruto_kg, 0)} kg bruto`
+    : `${plural(payload.quantidade, 'peixe morto', 'peixes mortos')}`);
 
   const aoSalvar = async () => {
     erro.hidden = true;
@@ -676,6 +697,17 @@ export async function renderLancar(ctx, el, params = {}) {
       if (causa) payload.causa = causa;
     }
 
+    // funcionário: confere o resumo antes de gravar (o número errado é pego aqui, não depois)
+    if (!ctx.podeGerir()) {
+      const agora = new Date();
+      const certo = await confirmar({
+        titulo: 'Confira antes de salvar',
+        linhas: [['Tanque', (tanques.find((t) => t.id === selTanque.value) || {}).nome || ''], ['O quê', ROTULO_LANC[tipo]], ['Quanto', resumoDe(payload)],
+          ['Quando', data === hoje ? `Hoje, ${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}` : fmtData(data)]],
+        ok: 'Está certo, salvar', cancelar: 'Voltar e mudar',
+      });
+      if (!certo) return;
+    }
     // possível lançamento duplicado (dois toques, ou duas pessoas lançando o mesmo)
     const btn = f.querySelector('button[type=submit]');
     btn.disabled = true;
@@ -684,10 +716,11 @@ export async function renderLancar(ctx, el, params = {}) {
       const ok = await confirmar({ titulo: 'Isso já foi lançado?', texto: `${parecido} Lançar de novo mesmo assim?`, ok: 'Lançar mesmo assim', cancelar: 'Não lançar' });
       if (!ok) { btn.disabled = false; return; }
     }
+    const criadoEm = new Date().toISOString();
     try {
       await db.filaAdd({
         uuid_local: id, tabela: TIPOS[tipo].tabela, payload,
-        registrado_por: state.perfil.id, criado_em: new Date().toISOString(), status: 'pendente', erro: null, tentativas: 0,
+        registrado_por: state.perfil.id, criado_em: criadoEm, status: 'pendente', erro: null, tentativas: 0,
       });
       await db.kvSet('ultimoTanque', selTanque.value);
     } catch (e) {
@@ -701,19 +734,15 @@ export async function renderLancar(ctx, el, params = {}) {
       state.ref.lotes = state.ref.lotes.filter((l) => l.id !== lote_id);
       try { await db.kvSet('ref', state.ref); } catch { /* opcional */ }
     }
+    let ultimaAntes; // para o "Desfazer" devolver o "Repetir" de antes (senão ele sugeriria o número errado)
     if (tipo === 'racao') {
-      try { const m = (await db.kvGet('ultimaRacao')) || {}; m[selTanque.value] = payload.quantidade_kg; await db.kvSet('ultimaRacao', m); } catch { /* opcional */ }
+      try { const m = (await db.kvGet('ultimaRacao')) || {}; ultimaAntes = m[selTanque.value]; m[selTanque.value] = payload.quantidade_kg; await db.kvSet('ultimaRacao', m); } catch { /* opcional */ }
     }
     rascunhoSalvo = true; clearTimeout(timerRascunho); await rascunho.apagar(state.perfil.id, tipo);
     await ctx.atualizarPendentes();
     ctx.sincronizarAgora(); // em segundo plano; não trava a tela
     const nomeTanque = (tanques.find((t) => t.id === selTanque.value) || {}).nome || '';
-    const resumo = tipo === 'racao' ? `${kgTxt(payload.quantidade_kg)} kg de ração (${sacosTxt(sacosDeKg(payload.quantidade_kg, kgSaco))})`
-      : tipo === 'biometria' ? `${pesoMedioTxt(payload.peso_amostra_kg / payload.quantidade_amostrada)} de peso médio (${fmtInt(payload.quantidade_amostrada)} peixes pesados)`
-      : tipo === 'agua' ? [payload.oxigenio_mgl != null && `O₂ ${fmtNum(payload.oxigenio_mgl, 1)} mg/L`, payload.temperatura_c != null && `${fmtNum(payload.temperatura_c, 1)} °C`, payload.ph != null && `pH ${fmtNum(payload.ph, 1)}`, payload.amonia_mgl != null && `amônia ${fmtNum(payload.amonia_mgl, 2)} mg/L`].filter(Boolean).join(' · ')
-      : tipo === 'manejo' ? `${payload.produto}: ${String(payload.dose).replace('.', ',')} ${payload.unidade} ${payload.via === 'agua' ? 'na água' : 'na ração'}`
-      : tipo === 'despesca' ? `despesca ${payload.tipo}: ${plural(payload.quantidade, 'peixe', 'peixes')}, ${fmtNum(payload.peso_bruto_kg, 0)} kg bruto`
-      : `${plural(payload.quantidade, 'peixe morto', 'peixes mortos')}`;
+    const resumo = resumoDe(payload);
     ctx.toast(navigator.onLine ? 'Salvo. Enviando…' : 'Salvo no celular. Será enviado quando houver internet.', 'ok');
     // sugestão de ronda: o próximo tanque (em ordem) que ainda não recebeu ração hoje
     let proximo = null;
@@ -733,10 +762,37 @@ export async function renderLancar(ctx, el, params = {}) {
         ${navigator.onLine ? '' : '<p class="mudo nota">Sem internet: guardado no celular. Será enviado sozinho quando a internet voltar.</p>'}
         <div class="sucesso-acoes">
           ${proximo ? `<button type="button" class="btn primario grande" id="b-proximo">Próximo: ${esc(proximo.nome)}</button>` : `<button type="button" class="btn primario grande" id="b-outro">Lançar em outro tanque</button>`}
-          <div class="sucesso-links">${proximo ? '<button type="button" class="link" id="b-outro">Outro tanque</button><span aria-hidden="true">·</span>' : ''}${volta === 'ronda' ? `<a class="link" href="${ctx.podeGerir() ? '#/ronda' : '#/'}" id="b-volta">Voltar à ronda</a>` : volta === 't' ? `<a class="link" href="#/t/${esc(selTanque.value)}" id="b-volta">Voltar ao ${esc(nomeTanque)}</a>` : '<a class="link" href="#/">Voltar ao início</a>'}</div>
+          ${minutosParaDesfazer(TIPOS[tipo].tabela, criadoEm) ? `<button type="button" class="btn desfazer" id="b-desfazer">${icone('desfazer', 20)} <span>Desfazer (${minutosParaDesfazer(TIPOS[tipo].tabela, criadoEm)} min)</span></button>` : ''}
+          <div class="sucesso-links">${proximo ? '<button type="button" class="link" id="b-outro">Outro tanque</button><span aria-hidden="true">·</span>' : ''}${volta === 'ronda' ? `<a class="link" href="${ctx.podeGerir() ? '#/ronda' : '#/'}" id="b-volta">Voltar à ronda</a>` : volta === 't' ? `<a class="link" href="#/t/${esc(selTanque.value)}" id="b-volta">Voltar ao ${esc(nomeTanque)}</a>` : '<a class="link" href="#/">Voltar ao início</a>'}<span aria-hidden="true">·</span><a class="link" href="#/meus" id="b-meus">Meus lançamentos</a></div>
         </div>
       </div>`;
     el.querySelector('#b-outro').addEventListener('click', () => renderLancar(ctx, el, { tipo, escolher: '1', volta }));
+    // Desfazer: vale por 5 minutos; o botão conta os minutos e some quando acaba
+    const bd = el.querySelector('#b-desfazer');
+    if (bd) {
+      const tabela = TIPOS[tipo].tabela, tanqueSalvo = selTanque.value;
+      let relogio = null;
+      const conta = () => {
+        const m = bd.isConnected ? minutosParaDesfazer(tabela, criadoEm) : 0;
+        if (!m) { clearInterval(relogio); bd.remove(); return; }
+        bd.querySelector('span').textContent = `Desfazer (${m} min)`;
+      };
+      relogio = setInterval(conta, 15000);
+      bd.addEventListener('click', async () => {
+        if (bd.disabled) return;
+        bd.disabled = true;
+        try {
+          await desfazerLancamento(ctx, { uuidLocal: id, tabela, payload, criadoEm });
+          clearInterval(relogio);
+          if (tipo === 'racao') { try { const m = (await db.kvGet('ultimaRacao')) || {}; if (ultimaAntes > 0) m[tanqueSalvo] = ultimaAntes; else delete m[tanqueSalvo]; await db.kvSet('ultimaRacao', m); } catch { /* opcional */ } }
+          ctx.toast('Desfeito. Pode lançar de novo.', 'ok');
+          renderLancar(ctx, el, { tipo, tanque: tanqueSalvo, volta });
+        } catch (e) {
+          bd.disabled = false;
+          ctx.toast((e && e.message) || 'Não foi possível desfazer.', 'erro');
+        }
+      });
+    }
     const bp = el.querySelector('#b-proximo');
     if (bp) bp.addEventListener('click', () => renderLancar(ctx, el, { tipo, tanque: proximo.id, volta }));
   };

@@ -23,6 +23,7 @@ import { renderAdmin } from './views/admin.js';
 import { renderPendencias } from './views/pendencias.js';
 import { renderMais } from './views/mais.js';
 import { renderRonda } from './views/ronda.js';
+import { renderMeus } from './views/meus.js';
 import { renderLucro, renderDespesas } from './views/lucro.js';
 import { htmlAtalhos, atualizarLateral, marcarAtalho, pintarAtalhos } from './lateral.js';
 import { registrarRota, linhaVoltar, ehAbaPrincipal } from './voltar.js';
@@ -500,8 +501,8 @@ async function rotear() {
   if (suporteVenceu() && navigator.onLine) { toast('O tempo do suporte acabou (2 horas). Voltando para a sua fazenda.', 'erro'); sairSuporte(true); return; }
   const { rota, partes, params } = parseHash(location.hash);
   rotaAtual = rota;
-  // aba acesa: o tanque e o cadastro ficam em Tanques; ronda e lançar, em Hoje; o resto, em Fazenda
-  const aba = ['t', 'tanque', 'tanques'].includes(rota) ? 'tanques' : ['', 'ronda', 'lancar'].includes(rota) ? '' : rota === 'relatorio' || rota === 'lucro' || rota === 'despesas' ? 'relatorio' : 'mais';
+  // aba acesa: o tanque e o cadastro ficam em Tanques; ronda, lançar e meus lançamentos, em Hoje; o resto, em Fazenda
+  const aba = ['t', 'tanque', 'tanques'].includes(rota) ? 'tanques' : ['', 'ronda', 'lancar', 'meus'].includes(rota) ? '' : rota === 'relatorio' || rota === 'lucro' || rota === 'despesas' ? 'relatorio' : 'mais';
   document.querySelectorAll('.abas a, .lateral a[data-aba]').forEach((a) => {
     const on = a.dataset.aba === aba;
     a.classList.toggle('on', on);
@@ -530,6 +531,7 @@ async function rotear() {
       case 'admin': await renderAdmin(ctx, el); break;
       case 'pendencias': await renderPendencias(ctx, el); break;
       case 'ronda': await renderRonda(ctx, el); break;
+      case 'meus': await renderMeus(ctx, el); break;
       case 'mais': case 'fazenda': renderMais(ctx, el); break;
       default: await renderHome(ctx, el);
     }

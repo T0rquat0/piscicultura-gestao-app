@@ -1320,3 +1320,29 @@ a.acao:active, .rl-tq:active { transform: scale(.98); }
   a.acao:hover, .numeros a.num:hover { border-color: var(--controle); }
 }
 @media (prefers-reduced-motion: reduce) { a.acao:active, .rl-tq:active { transform: none; } }
+
+/* ---------- layout novo, etapa 2 (13/11/2026): teclado grande, confirmação, desfazer, meus lançamentos ---------- */
+.teclado { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; margin: .2rem 0 .3rem; }
+.teclado button { min-height: 58px; border: 1px solid var(--controle); background: var(--campo-bg); color: var(--tinta); border-radius: var(--r-campo); font-size: 1.55rem; font-weight: 700; font-variant-numeric: tabular-nums; display: flex; align-items: center; justify-content: center; cursor: pointer; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+.teclado button:active { background: var(--rio-claro); }
+.teclado button:focus-visible { outline: 3px solid var(--rio); outline-offset: 2px; }
+.teclado .tec-limpa { font-size: 1rem; font-weight: 600; }
+.com-teclado input.tec-alvo { border-color: var(--rio); box-shadow: 0 0 0 3px var(--rio-claro); }
+@media (min-width: 900px) { .teclado { max-width: 420px; } .teclado button { min-height: 52px; } }
+
+.dialogo-resumo { margin: .2rem 0 .9rem; border: 1.5px solid var(--rio); border-radius: var(--r-card); padding: .55rem .9rem; display: grid; gap: .1rem; }
+.dialogo-resumo div { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding: .3rem 0; }
+.dialogo-resumo div + div { border-top: 1px solid var(--linha); }
+.dialogo-resumo dt { color: var(--tinta-2); flex: none; }
+.dialogo-resumo dd { margin: 0; font-weight: 700; text-align: right; overflow-wrap: anywhere; }
+
+.btn.desfazer { width: 100%; min-height: 48px; gap: .45rem; }
+
+.meus-lista .meu { display: block; }
+.meu-cab { display: flex; align-items: flex-start; gap: .6rem; }
+.meu-cab .esq { flex: 1; min-width: 0; }
+.meu-cab .sit { flex: none; margin-top: .1rem; }
+.meu-acoes { margin-top: .45rem; display: flex; gap: .5rem; }
+.meu-acoes .btn { gap: .35rem; }
+.ronda-protocolo ol { margin: .35rem 0 0; padding-left: 1.2rem; color: var(--tinta-2); font-size: .92rem; display: grid; gap: .25rem; }
+.ronda-meus { margin-top: .6rem; }

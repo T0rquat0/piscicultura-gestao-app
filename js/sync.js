@@ -39,14 +39,49 @@ export async function anotarNoResumo(tabela, p) {
     }
   } catch { /* sem armazenamento: só deixa de atualizar a cópia */ }
 }
+// O contrário de anotarNoResumo: um lançamento desfeito sai da cópia guardada no aparelho.
+// A última pesagem não volta para a anterior (não está guardada): a cópia se renova na próxima abertura com sinal.
+export async function desanotarNoResumo(tabela, p) {
+  try {
+    const tira = async (chave, igual) => {
+      const l = await kvGet(chave);
+      if (!Array.isArray(l)) return;
+      const i = l.findIndex(igual);
+      if (i >= 0) { l.splice(i, 1); await kvSet(chave, l); }
+    };
+    if (tabela === 'qualidade_agua') {
+      await tira('agua14', (x) => x.tanque_id === p.tanque_id && x.data === p.data && (x.hora || null) === (p.hora || null) && Number(x.oxigenio_mgl) === Number(p.oxigenio_mgl));
+      return;
+    }
+    if (tabela === 'racao_consumo') await tira('racao14', (x) => x.tanque_id === p.tanque_id && x.data === p.data && Math.abs(Number(x.quantidade_kg) - Number(p.quantidade_kg)) < 0.001);
+    const linhas = await kvGet('resumo');
+    const r = Array.isArray(linhas) ? linhas.find((x) => x.lote_id === p.lote_id) : null;
+    if (!r) return;
+    const n = (v) => Number(v) || 0;
+    if (tabela === 'racao_consumo') r.racao_kg = Math.max(0, n(r.racao_kg) - n(p.quantidade_kg));
+    else if (tabela === 'mortalidade') r.mortos = Math.max(0, n(r.mortos) - n(p.quantidade));
+    else if (tabela === 'despescas') r.despescados = Math.max(0, n(r.despescados) - n(p.quantidade));
+    else return;
+    await kvSet('resumo', linhas);
+  } catch { /* sem armazenamento: só deixa de atualizar a cópia */ }
+}
 import { ehErroDeRede, ehErroDeSessao, traduzErro } from './util.js';
 
 const TABELAS = new Set(['biometrias', 'mortalidade', 'racao_consumo', 'despescas', 'manejos', 'qualidade_agua']);
 let rodando = false;
+let envioAtual = null;
 
-export async function sincronizar(client, userId) {
-  if (rodando) return { ocupado: true, enviados: 0, falhas: 0, semRede: false, sessaoExpirada: false };
+// espera o envio em andamento terminar (o "Desfazer" precisa saber se o item ainda está na fila ou já foi para o banco)
+export const esperarEnvio = () => envioAtual || Promise.resolve();
+
+export function sincronizar(client, userId) {
+  if (rodando) return Promise.resolve({ ocupado: true, enviados: 0, falhas: 0, semRede: false, sessaoExpirada: false });
   rodando = true;
+  envioAtual = enviar(client, userId).finally(() => { rodando = false; envioAtual = null; });
+  return envioAtual;
+}
+
+async function enviar(client, userId) {
   const r = { ocupado: false, enviados: 0, falhas: 0, semRede: false, sessaoExpirada: false };
   const tentados = new Set();
   try {
@@ -109,8 +144,6 @@ export async function sincronizar(client, userId) {
         r.falhas++;
       }
     }
-  } finally {
-    rodando = false;
-  }
+  } finally { /* rodando volta a false em sincronizar() */ }
   return r;
 }

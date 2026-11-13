@@ -337,6 +337,23 @@ export function criarApi(client) {
       const lista = r.error ? ok(await client.from('usuarios').select('id,nome')) : r.data || [];
       return Object.fromEntries(lista.map((u) => [u.id, u.nome]));
     },
+    // "Desfazer" logo depois de lançar: apaga pelo código do aparelho (uuid_local), porque o id do banco o aparelho não sabe.
+    // O funcionário só apaga o que ele mesmo lançou hoje (sql/33); devolve quantas linhas saíram (0 = nada a apagar ou sem permissão).
+    async apagarPorUuid(tabela, uuidLocal) {
+      if (!TABELAS_EXCLUIVEIS.has(tabela)) throw new Error('Tabela não permitida');
+      const d = ok(await client.from(tabela).delete().eq('uuid_local', uuidLocal).select('id'));
+      return (d || []).length;
+    },
+    // o que a pessoa lançou hoje (desde a meia-noite), em todas as tabelas de lançamento; tabela que não existe (sql não rodado) vem vazia
+    async meusLancamentosHoje(userId, desdeISO) {
+      const tabs = ['racao_consumo', 'mortalidade', 'biometrias', 'qualidade_agua', 'manejos', 'despescas'];
+      const listas = await Promise.all(tabs.map(async (t) => {
+        const { data, error } = await client.from(t).select('*').eq('registrado_por', userId).gte('criado_em', desdeISO).order('criado_em', { ascending: false }).limit(300);
+        if (error) { if (ehErroDeRede(error)) throw new ErroApi(error); return []; }
+        return (data || []).map((r) => ({ tabela: t, payload: r }));
+      }));
+      return listas.flat();
+    },
     async excluir(tabela, id) {
       if (!TABELAS_EXCLUIVEIS.has(tabela)) throw new Error('Tabela não permitida');
       ok(await client.from(tabela).delete().eq('id', id));

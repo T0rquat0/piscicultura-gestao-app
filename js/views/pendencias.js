@@ -2,22 +2,26 @@
 import { esc, fmtData, fmtNum, plural, pesoMedioTxt } from '../util.js';
 import { confirmar } from '../dialogo.js';
 import * as db from '../db.js';
+import { PESO_SACO_PADRAO_KG } from '../config.js';
 
-const ROTULO = { racao_consumo: 'Ração', biometrias: 'Biometria', mortalidade: 'Mortalidade', despescas: 'Despesca', manejos: 'Probiótico', qualidade_agua: 'Água' };
+export const ROTULO = { racao_consumo: 'Ração', biometrias: 'Biometria', mortalidade: 'Mortalidade', despescas: 'Despesca', manejos: 'Probiótico', qualidade_agua: 'Água' };
 
-function descricao(it, ref) {
+export function descricao(it, ref) {
   const p = it.payload;
   const lote = ref.lotes.find((l) => l.id === p.lote_id);
   const tanqueId = p.tanque_id || (lote && lote.tanque_id);
   const tanque = ref.tanques.find((t) => t.id === tanqueId);
   let valor = '';
-  if (it.tabela === 'racao_consumo') valor = `${fmtNum(p.quantidade_kg, 2)} kg`;
+  if (it.tabela === 'racao_consumo') { // 600 kg (24 sacos), 37,5 kg (1,5 saco): o mesmo jeito da tela de lançar
+    const kg = Number(p.quantidade_kg) || 0, sc = Math.round((kg / (ref.kgSaco || PESO_SACO_PADRAO_KG)) * 10) / 10;
+    valor = `${fmtNum(kg, Number.isInteger(kg) ? 0 : 2)} kg (${fmtNum(sc, Number.isInteger(sc) ? 0 : 1)} ${sc > 0 && sc <= 1 ? 'saco' : 'sacos'})`;
+  }
   else if (it.tabela === 'biometrias') valor = `${fmtNum(p.peso_amostra_kg, Number.isInteger(Number(p.peso_amostra_kg)) ? 0 : 3)} kg em ${plural(p.quantidade_amostrada, 'peixe', 'peixes')} (médio ${pesoMedioTxt(p.peso_amostra_kg / p.quantidade_amostrada)})`;
   else if (it.tabela === 'qualidade_agua') valor = [p.oxigenio_mgl != null && `O₂ ${fmtNum(p.oxigenio_mgl, 1)}`, p.temperatura_c != null && `${fmtNum(p.temperatura_c, 1)} °C`, p.ph != null && `pH ${fmtNum(p.ph, 1)}`, p.amonia_mgl != null && `NH₃ ${fmtNum(p.amonia_mgl, 2)}`].filter(Boolean).join(', ');
   else if (it.tabela === 'manejos') valor = `${p.produto}, ${fmtNum(p.dose, Number.isInteger(p.dose) ? 0 : 2)} ${p.unidade}, ${p.via === 'agua' ? 'na água' : 'na ração'}`;
   else if (it.tabela === 'despescas') valor = `${p.tipo === 'total' ? 'total' : 'parcial'}, ${plural(p.quantidade, 'peixe', 'peixes')}, ${fmtNum(p.peso_bruto_kg, 0)} kg bruto`;
   else valor = `${plural(p.quantidade, 'peixe', 'peixes')}`;
-  return { titulo: `${ROTULO[it.tabela] || it.tabela} · ${tanque ? tanque.nome : 'tanque'}`, sub: `${fmtData(p.data)} · ${valor}` };
+  return { titulo: `${ROTULO[it.tabela] || it.tabela} · ${tanque ? tanque.nome : 'tanque'}`, sub: `${fmtData(p.data)} · ${valor}`, valor };
 }
 
 export async function renderPendencias(ctx, el) {

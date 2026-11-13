@@ -87,6 +87,10 @@ def rodar(papel):
         abrir('mortalidade', '#qtd')
         pg.fill('#qtd', '3'); n0 = len(posts)
         pg.evaluate("() => { const b = document.querySelector('#f button[type=submit]'); for (let i = 0; i < 5; i++) b.click(); }")
+        pg.wait_for_timeout(700)
+        if papel == 'funcionario':
+            checa(pg.locator('.dialogo').count() == 1, f'{papel}: 5 toques abrem uma conferência só ({pg.locator(".dialogo").count()})')
+            pg.click('.dialogo [data-ok]')
         pg.wait_for_timeout(2500)
         mort = [p for p in posts[n0:] if p[0] == 'mortalidade']
         checa(len(mort) == 1, f'{papel}: 5 toques seguidos em Salvar gravam 1 vez só ({len(mort)} gravações)')
@@ -94,7 +98,9 @@ def rodar(papel):
         # 3) sem sinal: salva na fila, volta o sinal, envia uma vez só
         abrir('racao', '#racao-kg')
         ctx.set_offline(True); pg.wait_for_timeout(300)
-        pg.fill('#racao-kg', '42'); n0 = len(posts); salvar(); pg.wait_for_timeout(500)
+        pg.fill('#racao-kg', '42'); n0 = len(posts); pg.locator('#f button[type=submit]').click(); pg.wait_for_timeout(700)
+        if papel == 'funcionario': pg.click('.dialogo [data-ok]')  # "Confira antes de salvar": está certo
+        pg.wait_for_timeout(500)
         offline_ok = len([p for p in posts[n0:] if p[0] == 'racao_consumo']) == 0 and tela_ok()
         ctx.set_offline(False); pg.evaluate("window.dispatchEvent(new Event('online'))"); pg.wait_for_timeout(5000)
         envios = [p for p in posts[n0:] if p[0] == 'racao_consumo' and float(p[1].get('quantidade_kg', 0)) == 42]

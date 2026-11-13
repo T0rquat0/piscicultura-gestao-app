@@ -58,7 +58,7 @@ with sync_playwright() as pw:
     pg.reload(); pg.wait_for_selector('nav.abas', timeout=20000)
     checa('Sem internet' in pg.inner_text('#pill'), 'sem internet: o app abre e mostra "Sem internet"')
     pg.goto(BASE + '#/lancar'); pg.wait_for_selector('#f #racao-kg', timeout=15000)
-    pg.fill('#racao-kg', '50'); pg.click('#f button[type=submit]'); pg.wait_for_timeout(1500)
+    pg.fill('#racao-kg', '50'); pg.click('#f button[type=submit]'); pg.wait_for_selector('.dialogo-resumo', timeout=10000); pg.click('.dialogo [data-ok]'); pg.wait_for_timeout(1500)
     pend = pg.evaluate("new Promise(r => { const q = indexedDB.open('piscicultura'); q.onsuccess = () => { const t = q.result.transaction('fila').objectStore('fila').getAll(); t.onsuccess = () => r(t.result.length); }; })")
     checa(pend == 1, 'sem internet: lançar ração guarda no celular para enviar depois (1 pendente)')
     pg.screenshot(path='offline.png')

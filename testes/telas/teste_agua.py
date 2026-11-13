@@ -31,7 +31,9 @@ with sync_playwright() as pw:
     pg.fill('#ag-od', '3,5'); pg.fill('#ag-temp', '29'); pg.wait_for_timeout(150)
     checa('Oxigênio baixo' in pg.inner_text('#ag-res'), f'mostra na hora: {pg.inner_text("#ag-res")!r}')
     pg.fill('#ag-od', '5,2'); pg.wait_for_timeout(150); checa('Dentro da faixa' in pg.inner_text('#ag-res'), 'dentro da faixa')
-    pg.fill('#ag-od', '3,5'); pg.fill('#ag-obs', 'cedo'); pg.click('#f button[type=submit]'); pg.wait_for_selector('.sucesso', timeout=10000); pg.wait_for_timeout(1200)
+    pg.fill('#ag-od', '3,5'); pg.fill('#ag-obs', 'cedo'); pg.click('#f button[type=submit]'); pg.wait_for_selector('.dialogo-resumo', timeout=10000)
+    cf = pg.inner_text('.dialogo-resumo'); checa('Água' in cf and 'O₂ 3,5' in cf, f'funcionário confere antes de salvar: {cf!r}'); pg.click('.dialogo [data-ok]')
+    pg.wait_for_selector('.sucesso', timeout=10000); pg.wait_for_timeout(1200)
     x = env(); checa(len(x) == 1 and x[0]['oxigenio_mgl'] == 3.5 and x[0]['temperatura_c'] == 29 and x[0]['ph'] is None and x[0]['tanque_id'] == T and 'lote_id' not in x[0] and x[0]['hora'] and x[0]['obs'] == 'cedo', f'enviado: {x}')
     t = pg.inner_text('.sucesso'); checa('Medição salva' in t and 'Oxigênio baixo' in t, f'sucesso avisa: {t[:90]!r}'); pg.close()
 

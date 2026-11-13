@@ -2,7 +2,8 @@
 // Uso: if (!(await confirmar({ titulo, texto, ok, cancelar, perigo }))) return;
 import { esc } from './util.js';
 
-export function confirmar({ titulo, texto = '', ok = 'Confirmar', cancelar = 'Voltar', perigo = false, digitar = '' }) {
+// linhas: [[rótulo, valor]] mostradas como um resumo ("Confira antes de salvar")
+export function confirmar({ titulo, texto = '', ok = 'Confirmar', cancelar = 'Voltar', perigo = false, digitar = '', linhas = null }) {
   return new Promise((resolve) => {
     const fundo = document.createElement('div');
     fundo.className = 'dialogo';
@@ -12,6 +13,7 @@ export function confirmar({ titulo, texto = '', ok = 'Confirmar', cancelar = 'Vo
       <div class="dialogo-caixa">
         <h3>${esc(titulo)}</h3>
         ${texto ? `<p>${esc(texto)}</p>` : ''}
+        ${linhas && linhas.length ? `<dl class="dialogo-resumo">${linhas.map(([r, v]) => `<div><dt>${esc(r)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
         ${digitar ? `<label class="dialogo-campo">Para confirmar, digite: <b>${esc(digitar)}</b>
           <input type="text" data-digitar autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></label>` : ''}
         <div class="dialogo-acoes">
